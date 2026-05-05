@@ -36,7 +36,7 @@ async function getFeedback(transcription, sentence, tip) {
       messages: [
         {
           role: "system",
-          content: "You are Teacher Toms, a warm and encouraging English speaking coach for Korean learners. You ONLY write in Korean and English. No Chinese, Japanese, Russian or any other script."
+          content: "You are Tom, a warm and encouraging English speaking coach for Korean learners. You ONLY write in Korean and English. No Chinese, Japanese, Russian or any other script."
         },
         {
           role: "user",
@@ -61,7 +61,7 @@ Format exactly like this:
 💡 더 자연스러운 표현
 → [More natural native English version]
 
-💪 [One short motivating Korean sentence — pure Korean hangul only]
+💪 [One short motivating Korean sentence — pure Korean hangul only — examples: 잘하고 있어요! 화이팅! 계속 연습해요! 더 노력해봐요! — NO Japanese, NO Chinese]
 
 Scoring: 10=perfect, 8-9=minor issues, 6-7=some mistakes, 4-5=several issues, 1-3=major issues
 Under 150 words. Korean and English ONLY.`
@@ -342,7 +342,7 @@ function StudentScreen({ user, homework, updateStudent, setScreen }) {
                       </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                      <div style={{ fontSize: "16px", color: "#2a2218" }}>Teacher Toms의 피드백</div>
+                      <div style={{ fontSize: "16px", color: "#2a2218" }}>Tom의 피드백</div>
                       <button onClick={speakFeedback} style={{ background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.1)", color: isSpeaking ? "#4a90d9" : "#8a7e72", padding: "6px 14px", borderRadius: "16px", cursor: "pointer", fontSize: "13px", fontFamily: "Georgia, serif" }}>{isSpeaking ? "🔊 듣는 중…" : "🔊 듣기"}</button>
                     </div>
                     <div style={{ fontSize: "14px", color: "#4a4238", lineHeight: 1.8, whiteSpace: "pre-line" }}>{feedback.text}</div>
