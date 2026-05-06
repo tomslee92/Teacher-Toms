@@ -62,7 +62,45 @@ const cleanText = t => {
   }).join("");
 };
 
-function highlightMissed(target, spoken) {
+// ── Feedback Display — rich formatted output ──────────────────────────────────
+function FeedbackDisplay({ text }) {
+  if (!text) return null;
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+
+  const sectionIcon = l =>
+    l.startsWith("🎯") || l.startsWith("✅") || l.startsWith("📝") ||
+    l.startsWith("💡") || l.startsWith("💪") || l.startsWith("📌");
+
+  const isScore = l => l.startsWith("🎯");
+  const isGood = l => l.startsWith("✅");
+  const isGrammar = l => l.startsWith("📝");
+  const isTip = l => l.startsWith("💡");
+  const isMotivation = l => l.startsWith("💪");
+  const isWrong = l => l.startsWith("❌");
+  const isCorrect = l => l.startsWith("✅") && !sectionIcon(l);
+  const isExplain = l => l.startsWith("📌");
+  const isAlt = l => l.startsWith("→");
+
+  return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+    lines.map((line, i) => {
+      if (isScore(line)) return React.createElement("div", { key: i, style: { background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "8px" } },
+        React.createElement("span", { style: { fontSize: "18px" } }, "🎯"),
+        React.createElement("span", { style: { fontSize: "15px", fontWeight: "700", color: C.text } }, line.replace("🎯", "").trim())
+      );
+      if (line === "✅ 잘한 점" || line === "✅ 잘한점") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.success, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "✅ 잘한 점");
+      if (line === "📝 문법 피드백" || line === "📝 문법피드백") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.error, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "📝 문법 피드백");
+      if (line === "💡 이렇게도 말할 수 있어요") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.gold, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "💡 이렇게도 말할 수 있어요");
+      if (line === "완벽해요!" || line === "완벽해요") return React.createElement("div", { key: i, style: { background: C.successBg, border: `1px solid #A8D5B5`, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.success, fontWeight: "600" } }, "✨ 완벽해요!");
+      if (isWrong(line)) return React.createElement("div", { key: i, style: { background: C.errorBg, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.error, fontFamily: "monospace" } }, line);
+      if (line.startsWith("✅") && i > 0 && (lines[i-1].startsWith("❌") || lines[i-2]?.startsWith("❌"))) return React.createElement("div", { key: i, style: { background: C.successBg, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.success, fontFamily: "monospace" } }, line);
+      if (isExplain(line)) return React.createElement("div", { key: i, style: { background: C.goldBg, borderLeft: `3px solid ${C.gold}`, borderRadius: "0 6px 6px 0", padding: "8px 12px", fontSize: "13px", color: C.textMid } }, line.replace("📌", "").trim());
+      if (isAlt(line)) return React.createElement("div", { key: i, style: { background: C.bgSoft, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.text, fontStyle: "italic" } }, line);
+      if (isMotivation(line)) return React.createElement("div", { key: i, style: { marginTop: "4px", fontSize: "14px", color: C.textMid, fontWeight: "500", textAlign: "center" } }, line.replace("💪", "").trim() + " 💪");
+      // Regular text line
+      return React.createElement("div", { key: i, style: { fontSize: "14px", color: C.text, lineHeight: 1.7 } }, line);
+    })
+  );
+}
   if (!target || !spoken) return React.createElement("span", null, target);
   const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
   const spokenNorm = norm(spoken);
@@ -409,7 +447,7 @@ function MiniPractice({ phrase, user, isPreview, showListen = true }) {
       {feedback && (
         <div className="fade-in">
           {transcription && <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "10px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>🎙 {highlightMissed(phrase.english, transcription)}</div>}
-          <div style={{ fontSize: "13px", color: C.text, lineHeight: 1.85, whiteSpace: "pre-line" }}>{feedback.text}</div>
+          <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8
             ? <div style={{ marginTop: "8px", padding: "8px 10px", background: C.successBg, borderRadius: "6px", fontSize: "12px", color: C.success, fontWeight: "500" }}>🎉 Great job!</div>
             : <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
@@ -738,7 +776,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
       {feedback && (
         <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: `1px solid ${C.border}` }} className="fade-in">
           {transcription && <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>🎙 {highlightMissed(phrase.english, transcription)}</div>}
-          <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.9, whiteSpace: "pre-line" }}>{feedback.text}</div>
+          <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8 ? (
             <div style={{ marginTop: "12px" }}>
               <Msg text="🎉 잘했어요! 8점 이상 달성!" type="success" />
@@ -767,7 +805,8 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   const [translation, setTranslation] = useState(null);
   const [translating, setTranslating] = useState(false);
   const [englishPhrase, setEnglishPhrase] = useState("");
-  const [showPractice, setShowPractice] = useState(false);
+  const [correctedEnglish, setCorrectedEnglish] = useState("");
+  const [showCorrectPractice, setShowCorrectPractice] = useState(false);
   const [situation, setSituation] = useState("");
   const [situationPhrases, setSituationPhrases] = useState([]);
   const [generatingSituation, setGeneratingSituation] = useState(false);
@@ -787,12 +826,18 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
 
   const handleSpeakStop = async (blob) => {
     if (isPreview) return;
-    setLoading(true); setFeedback(null); setTranscription(null); setErrMsg("");
+    setLoading(true); setFeedback(null); setTranscription(null); setErrMsg(""); setCorrectedEnglish(""); setShowCorrectPractice(false);
     try {
       const said = await transcribe(blob);
       setTranscription(said);
       const { text, score } = await getFreeTalkFeedback(said);
       setFeedback({ text, score });
+      // Extract the ✅ corrected English line for practice
+      const correctedLine = text.split("\n").find(l => l.trim().startsWith("✅") && /[a-zA-Z]/.test(l) && !l.includes("잘한"));
+      if (correctedLine) {
+        const extracted = correctedLine.replace(/^✅\s*/, "").trim();
+        if (extracted && /[a-zA-Z]/.test(extracted)) setCorrectedEnglish(extracted);
+      }
       if (score >= 8) await onPracticed();
     } catch(e) { setErrMsg("Feedback error: " + e.message); }
     setLoading(false);
@@ -873,7 +918,7 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
     <div>
       <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "20px", overflowX: "auto" }}>
         {tabs.map(([m, label]) =>
-          React.createElement("button", { key: m, onClick: () => { setMode(m); setFeedback(null); setTranslation(null); speakRec.reset(); askRec.reset(); setErrMsg(""); setShowPractice(false); }, style: { padding: "11px 14px", background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.text}` : "2px solid transparent", color: mode === m ? C.text : C.textLight, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap" } }, label)
+          React.createElement("button", { key: m, onClick: () => { setMode(m); setFeedback(null); setTranslation(null); speakRec.reset(); askRec.reset(); setErrMsg(""); setShowPractice(false); setCorrectedEnglish(""); setShowCorrectPractice(false); }, style: { padding: "11px 14px", background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.text}` : "2px solid transparent", color: mode === m ? C.text : C.textLight, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap" } }, label)
         )}
       </div>
 
@@ -901,10 +946,24 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
           {feedback && (
             <Card style={{ marginTop: "16px" }} className="fade-in">
               {transcription && <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, fontStyle: "italic", borderLeft: `3px solid ${C.text}` }}>🎙 "{transcription}"</div>}
-              <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.9, whiteSpace: "pre-line" }}>{feedback.text}</div>
+              <FeedbackDisplay text={feedback.text} />
               <div style={{ marginTop: "10px", padding: "10px 12px", background: feedback.score >= 8 ? C.successBg : C.retryBg, borderRadius: "6px", fontSize: "13px", color: feedback.score >= 8 ? C.success : C.retry, fontWeight: "500" }}>
                 {feedback.score >= 8 ? "🎉 잘했어요!" : "계속 연습하면 더 잘 할 수 있어요! 💪"}
               </div>
+              {correctedEnglish && (
+                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: "12px", color: C.textLight, marginBottom: "8px", letterSpacing: "0.5px" }}>교정된 표현으로 연습해 보세요:</div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
+                    <Btn onClick={() => speak(correctedEnglish)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 듣기</Btn>
+                    <Btn onClick={() => setShowCorrectPractice(p => !p)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🎙 {showCorrectPractice ? "닫기" : "연습하기"}</Btn>
+                    <Btn onClick={() => saveToMyPhrases({ english: correctedEnglish, korean: "", context: "Free Talk 연습 중 교정된 표현" })} variant={myPhrases.includes(correctedEnglish.toLowerCase()) ? "success" : "ghost"} style={{ fontSize: "12px", padding: "6px 12px" }}>
+                      {myPhrases.includes(correctedEnglish.toLowerCase()) ? "✓ 저장됨" : "⭐ 저장"}
+                    </Btn>
+                  </div>
+                  {savedMsg.text && <div style={{ fontSize: "12px", color: savedMsg.type === "success" ? C.success : savedMsg.type === "warn" ? C.retry : C.error, marginBottom: "6px" }}>{savedMsg.text}</div>}
+                  {showCorrectPractice && <MiniPractice phrase={{ english: correctedEnglish, korean: "" }} user={user} isPreview={isPreview} showListen={false} />}
+                </div>
+              )}
             </Card>
           )}
         </div>
@@ -971,7 +1030,7 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
           </Card>
           {savedMsg.text && <Msg text={savedMsg.text} type={savedMsg.type} />}
           <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-            <Input value={situation} onChange={e => { setSituation(e.target.value); if (e.target.value !== situation) setShownPhrases([]); }} placeholder="예: 호텔 체크인, 카페에서 주문, 새로운 친구 만나기" style={{ fontSize: "14px" }} />
+            <Input value={situation} onChange={e => { const v = e.target.value; setSituation(v); if (v !== situation) { setShownPhrases([]); setSituationPhrases([]); } }} placeholder="예: 호텔 체크인, 카페에서 주문, 새로운 친구 만나기" style={{ fontSize: "14px" }} />
             <Btn onClick={generateSituation} disabled={generatingSituation || !situation.trim()} variant="primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{generatingSituation ? React.createElement(Spinner) : situationPhrases.length > 0 ? "다시 생성" : "생성하기"}</Btn>
           </div>
           {situationPhrases.length > 0 && (
