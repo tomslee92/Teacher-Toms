@@ -847,12 +847,18 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
 
   useEffect(() => {
     Promise.all([
-      db.get("students", "select=*,groups(name)&order=created_at.asc"),
-      db.get("phrase_bank", "order=created_at.desc"),
+      db.get("students", "select=*,groups(name)&order=created_at.asc").catch(() => []),
+      db.get("phrase_bank", "order=created_at.desc").catch(() => []),
     ]).then(([s, p]) => { setStudents(s); setPhraseBank(p); setLoading(false); });
   }, []);
 
-  if (loading) return React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" } }, React.createElement(Spinner));
+  if (loading) return (
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: "12px" } },
+      React.createElement(Spinner),
+      React.createElement("div", { style: { fontSize: "13px", color: C.textLight } }, "Loading dashboard…"),
+      React.createElement("button", { onClick: () => setLoading(false), style: { marginTop: "8px", background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: FONT } }, "Skip loading")
+    )
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: C.bgSoft }}>
