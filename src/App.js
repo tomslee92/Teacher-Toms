@@ -1037,36 +1037,59 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank }) {
   };
 
   const addPhrase = async () => {
-    if (!english.trim() || !selectedGroup) return;
+    if (!english.trim()) { showSuccess("⚠️ Please enter an English phrase."); return; }
+    if (!selectedGroup) { showSuccess("⚠️ Please select a group first."); return; }
     try {
-      // Upsert to phrase bank
-      const [phrase] = await db.upsert("phrase_bank", { english: english.trim(), korean: korean.trim(), context: context.trim() });
-      // Check for duplicate in this group
-      const existing = sessionPhrases.find(sp => sp.phrase_id === phrase.id);
-      if (existing) {
-        showSuccess("⚠️ Already in Session " + existing.session_number);
-        return;
+      // First try to find existing phrase in bank
+      let phrase;
+      const existing = await db.get("phrase_bank", `english=eq.${encodeURIComponent(english.trim())}`);
+      if (existing.length > 0) {
+        phrase = existing[0];
+        // Update Korean/context if provided
+        if (korean.trim() || context.trim()) {
+          await db.update("phrase_bank", `id=eq.${phrase.id}`, { korean: korean.trim() || phrase.korean, context: context.trim() || phrase.context });
+          phrase = { ...phrase, korean: korean.trim() || phrase.korean, context: context.trim() || phrase.context };
+        }
+      } else {
+        const result = await db.insert("phrase_bank", { english: english.trim(), korean: korean.trim(), context: context.trim() });
+        phrase = Array.isArray(result) ? result[0] : result;
       }
+      // Check for duplicate in this group
+      const dup = sessionPhrases.find(sp => sp.phrase_id === phrase.id);
+      if (dup) { showSuccess("⚠️ This phrase is already in Session " + dup.session_number + " of this group."); return; }
       // Add to session
-      await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: sessionNum });
+      const spResult = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: sessionNum });
+      const sp = Array.isArray(spResult) ? spResult[0] : spResult;
       setPhraseBank(prev => [phrase, ...prev.filter(p => p.id !== phrase.id)]);
-      setSessionPhrases(prev => [...prev, { phrase_id: phrase.id, session_number: sessionNum, phrase_bank: phrase }]);
+      setSessionPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
       setEnglish(""); setKorean(""); setContext("");
-      showSuccess("Phrase added to Session " + sessionNum + "!");
-    } catch(e) { showSuccess("Error adding phrase. Try again."); }
+      showSuccess("✓ Added to Session " + sessionNum + ": " + phrase.english);
+    } catch(e) {
+      showSuccess("⚠️ Error: " + (e.message || "Could not add phrase. Make sure tables are exposed in Supabase."));
+    }
   };
 
   const addGeneratedPhrase = async (p) => {
     if (!selectedGroup) return;
     try {
-      const [phrase] = await db.upsert("phrase_bank", { english: p.english, korean: p.korean, context: p.context });
-      const existing = sessionPhrases.find(sp => sp.phrase_id === phrase.id);
-      if (existing) { showSuccess("⚠️ '" + p.english + "' already in Session " + existing.session_number); return; }
-      await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: sessionNum });
-      setSessionPhrases(prev => [...prev, { phrase_id: phrase.id, session_number: sessionNum, phrase_bank: phrase }]);
+      let phrase;
+      const existing = await db.get("phrase_bank", `english=eq.${encodeURIComponent(p.english)}`);
+      if (existing.length > 0) {
+        phrase = existing[0];
+      } else {
+        const result = await db.insert("phrase_bank", { english: p.english, korean: p.korean, context: p.context });
+        phrase = Array.isArray(result) ? result[0] : result;
+      }
+      const dup = sessionPhrases.find(sp => sp.phrase_id === phrase.id);
+      if (dup) { showSuccess("⚠️ '" + p.english + "' already in Session " + dup.session_number); return; }
+      const spResult = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: sessionNum });
+      const sp = Array.isArray(spResult) ? spResult[0] : spResult;
+      setSessionPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
       setPhraseBank(prev => [phrase, ...prev.filter(x => x.id !== phrase.id)]);
-      showSuccess("Added: " + p.english);
-    } catch(e) {}
+      showSuccess("✓ Added: " + p.english);
+    } catch(e) {
+      showSuccess("⚠️ Error adding '" + p.english + "': " + (e.message || "Check Supabase table permissions."));
+    }
   };
 
   const deleteSessionPhrase = async (spId) => {
@@ -1085,7 +1108,7 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank }) {
 
   return (
     <div>
-      {success && <div style={{ background: success.includes("⚠️") ? C.retryBg : C.successBg, border: `1px solid ${success.includes("⚠️") ? "#F0C090" : "#A8D5B5"}`, color: success.includes("⚠️") ? C.retry : C.success, padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", fontWeight: "500" }}>{success}</div>}
+      {success && <div style={{ background: success.includes("⚠️") ? C.errorBg : C.successBg, border: `1px solid ${success.includes("⚠️") ? "#F0A8A5" : "#A8D5B5"}`, color: success.includes("⚠️") ? C.error : C.success, padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", fontWeight: "500" }}>{success}</div>}
 
       {/* Group selector */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
@@ -1094,36 +1117,52 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank }) {
 
       {/* Session number picker */}
       <Card style={{ marginBottom: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: "14px", fontWeight: "600" }}>Session Number</div>
-            <div style={{ fontSize: "12px", color: C.textLight, marginTop: "2px" }}>Adding to: Session {sessionNum}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button onClick={() => setSessionNum(n => Math.max(1, n - 1))} style={{ width: "32px", height: "32px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.bg, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-            <span style={{ fontSize: "20px", fontWeight: "700", minWidth: "32px", textAlign: "center" }}>{sessionNum}</span>
-            <button onClick={() => setSessionNum(n => n + 1)} style={{ width: "32px", height: "32px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.bg, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-          </div>
+        <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "10px" }}>Session Number</div>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
+          <input
+            type="number"
+            min="1"
+            value={sessionNum}
+            onChange={e => setSessionNum(Math.max(1, parseInt(e.target.value) || 1))}
+            style={{ width: "80px", padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "16px", fontWeight: "700", textAlign: "center", fontFamily: FONT, outline: "none" }}
+          />
+          <span style={{ fontSize: "13px", color: C.textLight }}>or pick an existing session:</span>
         </div>
-        <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
-          {sessionNums.map(n => React.createElement("button", { key: n, onClick: () => setSessionNum(n), style: { padding: "4px 10px", borderRadius: "16px", border: `1px solid ${sessionNum === n ? C.gold : C.border}`, background: sessionNum === n ? C.goldBg : C.bg, color: sessionNum === n ? C.gold : C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT } }, "Session " + n))}
-        </div>
+        {sessionNums.length > 0 && (
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {sessionNums.map(n => React.createElement("button", { key: n, onClick: () => setSessionNum(n), style: { padding: "4px 12px", borderRadius: "16px", border: `1px solid ${sessionNum === n ? C.gold : C.border}`, background: sessionNum === n ? C.goldBg : C.bg, color: sessionNum === n ? C.gold : C.textMid, fontSize: "12px", fontWeight: sessionNum === n ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, "Session " + n))}
+          </div>
+        )}
       </Card>
 
       {/* AI Generate */}
       <Card style={{ marginBottom: "16px", borderLeft: `3px solid ${C.gold}` }}>
-        <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold, marginBottom: "10px" }}>✨ AI Generate</div>
+        <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold, marginBottom: "10px" }}>✨ AI Generate Phrases</div>
         <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
           <Input value={generateTopic} onChange={e => setGenerateTopic(e.target.value)} onBlur={() => {}} placeholder="Topic (e.g. ordering coffee, making plans)" />
-          <Btn onClick={async () => { setGenerating(true); try { setGenerated(await generateAIPhrases(generateTopic)); } catch(e) {} setGenerating(false); }} disabled={generating || !generateTopic.trim()} variant="secondary" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{generating ? React.createElement(Spinner) : "생성"}</Btn>
+          <Btn
+            onClick={async () => { setGenerating(true); setGenerated([]); try { setGenerated(await generateAIPhrases(generateTopic)); } catch(e) { showSuccess("Error generating phrases. Try again."); } setGenerating(false); }}
+            disabled={generating || !generateTopic.trim()}
+            variant="secondary"
+            style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+          >{generating ? React.createElement(Spinner) : "Generate"}</Btn>
         </div>
-        {generated.map((p, i) => React.createElement("div", { key: i, style: { padding: "8px 0", borderBottom: `1px solid ${C.bgSoft}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" } },
-          React.createElement("div", null,
-            React.createElement("div", { style: { fontSize: "13px", color: C.text, fontStyle: "italic" } }, p.english),
-            React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, p.korean)
-          ),
-          React.createElement(Btn, { onClick: () => addGeneratedPhrase(p), variant: "secondary", style: { fontSize: "11px", padding: "5px 10px", flexShrink: 0 } }, "+ Add")
-        ))}
+        {generated.length > 0 && (
+          <div>
+            {generated.map((p, i) => React.createElement("div", { key: i, style: { padding: "8px 0", borderBottom: `1px solid ${C.bgSoft}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" } },
+              React.createElement("div", { style: { flex: 1 } },
+                React.createElement("div", { style: { fontSize: "13px", color: C.text, fontStyle: "italic" } }, p.english),
+                React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, p.korean)
+              ),
+              React.createElement(Btn, { onClick: () => addGeneratedPhrase(p), variant: "secondary", style: { fontSize: "11px", padding: "5px 10px", flexShrink: 0 } }, "+ Add")
+            ))}
+            <Btn
+              onClick={async () => { for (const p of generated) { await addGeneratedPhrase(p); } setGenerated([]); showSuccess("All phrases added to Session " + sessionNum + "!"); }}
+              variant="primary"
+              style={{ width: "100%", marginTop: "10px" }}
+            >+ Add All to Session {sessionNum}</Btn>
+          </div>
+        )}
       </Card>
 
       {/* Manual add */}
