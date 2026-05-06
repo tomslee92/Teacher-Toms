@@ -1010,7 +1010,7 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
           </Card>
           {translation && (
             <Card className="fade-in">
-              <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.9, whiteSpace: "pre-line", marginBottom: "14px" }}>{translation}</div>
+              <TranslationDisplay text={translation} />
               {englishPhrase && (
                 <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "12px" }}>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
@@ -1054,7 +1054,91 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   );
 }
 
-// ── My Phrases Tab ────────────────────────────────────────────────────────────
+// ── Translation Display — rich formatted Korean→English output ────────────────
+function TranslationDisplay({ text }) {
+  if (!text) return null;
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+
+  const sections = [];
+  let currentSection = null;
+
+  const HEADERS = {
+    "한국어 표현": { icon: "🇰🇷", color: C.textMid, bg: C.bgSoft },
+    "영어 표현": { icon: "🗣", color: C.success, bg: C.successBg },
+    "예문": { icon: "📌", color: C.gold, bg: C.goldBg },
+    "사용 팁": { icon: "💡", color: "#6B5B95", bg: "#F3F0F9" },
+  };
+
+  for (const line of lines) {
+    const headerKey = Object.keys(HEADERS).find(h => line === h || line.startsWith(h));
+    if (headerKey) {
+      currentSection = { header: headerKey, style: HEADERS[headerKey], lines: [] };
+      sections.push(currentSection);
+    } else if (line.startsWith("💪")) {
+      sections.push({ header: null, motivation: true, line });
+    } else if (currentSection) {
+      currentSection.lines.push(line);
+    } else {
+      sections.push({ header: null, plain: true, line });
+    }
+  }
+
+  return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+    sections.map((s, i) => {
+      if (s.motivation) return React.createElement("div", { key: i, style: { textAlign: "center", fontSize: "14px", color: C.textMid, fontWeight: "500", paddingTop: "4px" } }, s.line.replace("💪", "").trim() + " 💪");
+      if (s.plain) return React.createElement("div", { key: i, style: { fontSize: "14px", color: C.text } }, s.line);
+      if (!s.header) return null;
+      const { icon, color, bg } = s.style;
+      return React.createElement("div", { key: i, style: { background: bg, borderRadius: "8px", overflow: "hidden" } },
+        React.createElement("div", { style: { padding: "8px 14px", borderBottom: `1px solid ${color}22`, display: "flex", alignItems: "center", gap: "6px" } },
+          React.createElement("span", { style: { fontSize: "15px" } }, icon),
+          React.createElement("span", { style: { fontSize: "12px", fontWeight: "700", color, textTransform: "uppercase", letterSpacing: "1px" } }, s.header)
+        ),
+        React.createElement("div", { style: { padding: "10px 14px", display: "flex", flexDirection: "column", gap: "4px" } },
+          s.lines.map((l, j) => {
+            const isArrow = l.startsWith("→");
+            const isNumbered = /^\d+\./.test(l);
+            return React.createElement("div", { key: j, style: { fontSize: "14px", color: isArrow ? C.textMid : C.text, fontStyle: isArrow ? "italic" : "normal", paddingLeft: isArrow ? "8px" : "0", lineHeight: 1.7, fontWeight: isNumbered ? "500" : "400" } }, l);
+          })
+        )
+      );
+    })
+  );
+}
+
+// ── Situation Phrase Row ──────────────────────────────────────────────────────
+function SituationPhraseRow({ phrase, user, isPreview, alreadySaved, onSave }) {
+  const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(alreadySaved || false);
+
+  const handleSave = async () => {
+    if (saved) return;
+    await onSave(phrase);
+    setSaved(true);
+  };
+
+  return (
+    <div style={{ borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: "14px", fontStyle: "italic", color: C.text, marginBottom: "3px" }}>"{phrase.english}"</div>
+          {phrase.korean && <div style={{ fontSize: "12px", color: C.textMid }}>{phrase.korean}</div>}
+          {phrase.context && <div style={{ fontSize: "11px", color: C.gold, marginTop: "2px" }}>{phrase.context}</div>}
+        </div>
+        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+          <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "11px", padding: "5px 10px" }}>🔊</Btn>
+          <Btn onClick={() => setOpen(o => !o)} variant={open ? "primary" : "secondary"} style={{ fontSize: "11px", padding: "5px 10px" }}>🎙</Btn>
+          <Btn onClick={handleSave} disabled={saved} variant={saved ? "success" : "ghost"} style={{ fontSize: "11px", padding: "5px 10px" }}>{saved ? "✓ 저장됨" : "⭐ 저장"}</Btn>
+        </div>
+      </div>
+      {open && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: "12px 16px", background: C.bgSoft }} className="fade-in">
+          <MiniPractice phrase={phrase} user={user} isPreview={isPreview} showListen={false} />
+        </div>
+      )}
+    </div>
+  );
+}
 function MyPhrasesTab({ user, isPreview }) {
   const [phrases, setPhrases] = useState([]);
   const [loading, setLoading] = useState(true);
