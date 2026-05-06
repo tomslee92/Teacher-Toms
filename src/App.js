@@ -809,6 +809,7 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   const [englishPhrase, setEnglishPhrase] = useState("");
   const [correctedEnglish, setCorrectedEnglish] = useState("");
   const [showCorrectPractice, setShowCorrectPractice] = useState(false);
+  const [showPractice, setShowPractice] = useState(false);
   const [situation, setSituation] = useState("");
   const [situationPhrases, setSituationPhrases] = useState([]);
   const [generatingSituation, setGeneratingSituation] = useState(false);
@@ -849,10 +850,16 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
     setTranslating(true); setTranslation(null); setEnglishPhrase(""); setShowPractice(false);
     try {
       const said = await transcribe(blob);
+      if (!said || said.trim().length === 0) {
+        setTranslation("음성을 인식하지 못했어요. 다시 시도해 주세요.");
+        setTranslating(false); return;
+      }
       setKoreanText(said);
       const { text, englishPhrase: ep } = await getKoreanTranslation(said);
       setTranslation(text); setEnglishPhrase(ep);
-    } catch(e) { setTranslation("Translation error: " + e.message); }
+    } catch(e) {
+      setTranslation("오류가 발생했어요: " + e.message);
+    }
     setTranslating(false);
   };
 
@@ -869,20 +876,21 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   const generateSituation = async () => {
     if (!situation.trim()) return;
     setGeneratingSituation(true);
-    // Build full exclusion list: already shown + already saved + already in practice
-    const exclusions = [...new Set([
-      ...shownPhrases,
-      ...myPhrases,
-      ...practiceSessionPhrases,
-    ])];
+    const exclusions = [...new Set([...shownPhrases, ...myPhrases, ...practiceSessionPhrases])];
     try {
       const newPhrases = await generateSituationPhrases(situation, exclusions);
-      // Filter client-side too as safety net
-      const filtered = newPhrases.filter(p => !exclusions.includes(p.english.toLowerCase()));
+      if (!Array.isArray(newPhrases) || newPhrases.length === 0) {
+        setSavedMsg({ text: "표현을 생성할 수 없었어요. 다시 시도해 주세요.", type: "error" });
+        setTimeout(() => setSavedMsg({ text: "", type: "success" }), 4000);
+        setGeneratingSituation(false); return;
+      }
+      const filtered = newPhrases.filter(p => p.english && !exclusions.includes(p.english.toLowerCase()));
       setSituationPhrases(filtered.length > 0 ? filtered : newPhrases);
-      // Track all shown phrases for next regeneration
-      setShownPhrases(prev => [...prev, ...newPhrases.map(p => p.english.toLowerCase())]);
-    } catch(e) { setSavedMsg({ text: "Error generating phrases. Try again.", type: "error" }); }
+      setShownPhrases(prev => [...prev, ...newPhrases.map(p => p.english?.toLowerCase()).filter(Boolean)]);
+    } catch(e) {
+      setSavedMsg({ text: "오류: " + e.message, type: "error" });
+      setTimeout(() => setSavedMsg({ text: "", type: "success" }), 4000);
+    }
     setGeneratingSituation(false);
   };
 
