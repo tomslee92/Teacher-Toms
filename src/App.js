@@ -69,7 +69,7 @@ function speak(text, slow = false) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
-  u.rate = slow ? 0.5 : 0.9;
+  u.rate = slow ? 0.3 : 0.85;
   u.pitch = 1.05;
   const go = () => {
     const voices = window.speechSynthesis.getVoices();
