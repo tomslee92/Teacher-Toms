@@ -47,13 +47,18 @@ const GlobalStyle = () => React.createElement("style", null, `
 `);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// Strips everything that isn't Korean hangul, English/Latin, numbers, punctuation, or emoji
 const cleanText = t => {
   if (!t) return t;
   return t.split("").filter(c => {
     const code = c.charCodeAt(0);
-    return (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) ||
-      (code >= 0x3130 && code <= 0x318F) || (code >= 0x0020 && code <= 0x007E) ||
-      (code >= 0x1F300 && code <= 0x1FAFF) || (code >= 0x2600 && code <= 0x27BF) || c === "\n";
+    const isKorean = (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F);
+    const isLatin = code >= 0x0020 && code <= 0x007E;
+    const isEmoji = (code >= 0x1F300 && code <= 0x1FAFF) || (code >= 0x2600 && code <= 0x27BF) || (code >= 0xFE00 && code <= 0xFE0F) || (code >= 0x1F900 && code <= 0x1F9FF);
+    const isNewline = c === "\n";
+    // Explicitly block: CJK (Chinese/Japanese Kanji), Hiragana, Katakana, Cyrillic, Arabic, etc.
+    const isCJK = (code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF) || (code >= 0x3040 && code <= 0x309F) || (code >= 0x30A0 && code <= 0x30FF) || (code >= 0x0400 && code <= 0x04FF) || (code >= 0x0600 && code <= 0x06FF);
+    return (isKorean || isLatin || isEmoji || isNewline) && !isCJK;
   }).join("");
 };
 
@@ -96,10 +101,31 @@ function speak(text) {
 
 // ── Groq ──────────────────────────────────────────────────────────────────────
 const SYSTEM = `You are Tom, a warm English coach for Korean learners at Wayve.
-STRICT RULE: Write ONLY Korean hangul (가-힣) and English (a-z A-Z 0-9 punctuation emoji).
-NEVER use Chinese characters, Japanese kana, Russian, or any other script.
-NEVER output placeholder text like [Korean explanation] or [Corrected English] — always write the actual content.
-Motivation lines must be pure Korean hangul: 잘하고 있어요! 화이팅! 계속 연습해요! 정말 잘했어요!`;
+
+LANGUAGE RULE — THIS IS ABSOLUTE AND NON-NEGOTIABLE:
+You may ONLY use TWO scripts:
+1. Korean HANGUL characters: 가나다라마바사아자차카타파하 and their combinations
+2. English/Latin characters: a-z A-Z 0-9 and standard punctuation
+
+YOU MUST NEVER USE:
+- Chinese characters: 練習努力繼續進步加油表現方法注意 — NEVER
+- Japanese hiragana: あいうえお — NEVER  
+- Japanese katakana: アイウエオ — NEVER
+- Russian/Cyrillic: привет — NEVER
+- ANY other non-Korean, non-Latin script — NEVER
+
+If you want to write "practice" in Korean, write: 연습 (NOT 練習)
+If you want to write "effort" in Korean, write: 노력 (NOT 努力)
+If you want to write "continue" in Korean, write: 계속 (NOT 継続)
+
+Motivational lines MUST be pure Korean hangul only. Examples:
+✓ 잘하고 있어요!
+✓ 화이팅!
+✓ 계속 연습해요!
+✓ 정말 잘했어요!
+✓ 조금만 더 연습해요!
+
+DO NOT write placeholder text like [Korean explanation]. Always write actual content.`;
 
 async function groqCall(prompt) {
   if (!GROQ_KEY) throw new Error("GROQ_KEY not configured in Vercel environment variables");
@@ -227,15 +253,19 @@ Under 130 words. No placeholder text.`);
   return { text, englishPhrase };
 }
 
-async function generateSituationPhrases(situation) {
+async function generateSituationPhrases(situation, excludePhrases = []) {
+  const excludeList = excludePhrases.length > 0
+    ? `\n\nIMPORTANT: Do NOT include any of these phrases (already shown or saved):\n${excludePhrases.map(p => `- "${p}"`).join("\n")}\n\nGenerate completely DIFFERENT phrases that have not been shown before.`
+    : "";
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile", max_tokens: 900,
       messages: [{ role: "user", content: `Generate 8 useful English phrases for this situation: "${situation}"
-For Korean beginners. Return ONLY valid JSON array, no extra text:
-[{"english":"natural English phrase","korean":"Korean hangul translation","context":"Korean hangul explanation of when to use"}]` }]
+For Korean beginners. Korean translations and context must be in Korean HANGUL only (not Chinese characters).
+Return ONLY valid JSON array, no extra text:
+[{"english":"natural English phrase","korean":"Korean hangul translation","context":"Korean hangul explanation of when to use"}]${excludeList}` }]
     })
   });
   const d = await res.json();
@@ -347,7 +377,7 @@ function InlineEdit({ value, onSave, style = {} }) {
 }
 
 // ── Mini Phrase Practice (inline recording + feedback) ────────────────────────
-function MiniPractice({ phrase, user, isPreview }) {
+function MiniPractice({ phrase, user, isPreview, showListen = true }) {
   const [feedback, setFeedback] = useState(null);
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -370,9 +400,9 @@ function MiniPractice({ phrase, user, isPreview }) {
   return (
     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "12px" }}>
-        <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 Listen</Btn>
-        {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 Practice</Btn>}
-        {rec.isRec && <Btn onClick={rec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error, fontSize: "12px", padding: "6px 14px" }}>⏹ Stop ({rec.time}s)</Btn>}
+        {showListen && <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 듣기</Btn>}
+        {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 연습</Btn>}
+        {rec.isRec && <Btn onClick={rec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error, fontSize: "12px", padding: "6px 14px" }}>⏹ 멈추기 ({rec.time}초)</Btn>}
         {loading && React.createElement(Spinner)}
       </div>
       {errMsg && <div style={{ color: C.error, fontSize: "12px", textAlign: "center" }}>{errMsg}</div>}
@@ -741,7 +771,19 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   const [situation, setSituation] = useState("");
   const [situationPhrases, setSituationPhrases] = useState([]);
   const [generatingSituation, setGeneratingSituation] = useState(false);
-  const [savedMsg, setSavedMsg] = useState("");
+  const [savedMsg, setSavedMsg] = useState({ text: "", type: "success" });
+  const [myPhrases, setMyPhrases] = useState([]); // loaded for dedup
+  const [shownPhrases, setShownPhrases] = useState([]); // track shown phrases for regeneration
+  const [practiceSessionPhrases, setPracticeSessionPhrases] = useState([]); // student's practice phrases
+
+  // Load student's existing saved phrases and practice phrases for deduplication
+  useEffect(() => {
+    if (!user?.id || user.id === "preview") return;
+    db.get("student_phrases", `student_id=eq.${user.id}&select=english`).then(r => setMyPhrases(r.map(p => p.english.toLowerCase()))).catch(() => {});
+    db.get("session_phrases", `select=phrase_bank(english)&order=created_at.desc`).then(r => {
+      setPracticeSessionPhrases(r.map(sp => sp.phrase_bank?.english?.toLowerCase()).filter(Boolean));
+    }).catch(() => {});
+  }, [user]);
 
   const handleSpeakStop = async (blob) => {
     if (isPreview) return;
@@ -779,18 +821,47 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
 
   const generateSituation = async () => {
     if (!situation.trim()) return;
-    setGeneratingSituation(true); setSituationPhrases([]);
-    try { setSituationPhrases(await generateSituationPhrases(situation)); } catch(e) {}
+    setGeneratingSituation(true);
+    // Build full exclusion list: already shown + already saved + already in practice
+    const exclusions = [...new Set([
+      ...shownPhrases,
+      ...myPhrases,
+      ...practiceSessionPhrases,
+    ])];
+    try {
+      const newPhrases = await generateSituationPhrases(situation, exclusions);
+      // Filter client-side too as safety net
+      const filtered = newPhrases.filter(p => !exclusions.includes(p.english.toLowerCase()));
+      setSituationPhrases(filtered.length > 0 ? filtered : newPhrases);
+      // Track all shown phrases for next regeneration
+      setShownPhrases(prev => [...prev, ...newPhrases.map(p => p.english.toLowerCase())]);
+    } catch(e) { setSavedMsg({ text: "Error generating phrases. Try again.", type: "error" }); }
     setGeneratingSituation(false);
   };
 
   const saveToMyPhrases = async (p) => {
     if (!user?.id || user.id === "preview") return;
+    // Check if already saved client-side first
+    if (myPhrases.includes(p.english.toLowerCase())) {
+      setSavedMsg({ text: "이미 저장된 표현이에요.", type: "warn" });
+      setTimeout(() => setSavedMsg({ text: "", type: "success" }), 3000);
+      return;
+    }
     try {
-      await db.insert("student_phrases", { student_id: user.id, english: p.english, korean: p.korean, context: p.context || "" });
-      setSavedMsg("✓ Saved: " + p.english);
-      setTimeout(() => setSavedMsg(""), 3000);
-    } catch(e) { setSavedMsg("Already saved or error"); setTimeout(() => setSavedMsg(""), 3000); }
+      await db.insert("student_phrases", { student_id: user.id, english: p.english, korean: p.korean || "", context: p.context || "" });
+      setMyPhrases(prev => [...prev, p.english.toLowerCase()]);
+      setSavedMsg({ text: "✓ 저장됨: " + p.english, type: "success" });
+      setTimeout(() => setSavedMsg({ text: "", type: "success" }), 3000);
+    } catch(e) {
+      // Check if it's a unique constraint violation (already exists)
+      if (e.message.includes("unique") || e.message.includes("duplicate") || e.message.includes("23505")) {
+        setMyPhrases(prev => [...prev, p.english.toLowerCase()]);
+        setSavedMsg({ text: "이미 저장된 표현이에요.", type: "warn" });
+      } else {
+        setSavedMsg({ text: "저장 오류: " + e.message, type: "error" });
+      }
+      setTimeout(() => setSavedMsg({ text: "", type: "success" }), 3000);
+    }
   };
 
   const speakRec = useRecorder(handleSpeakStop);
@@ -873,14 +944,16 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
               <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.9, whiteSpace: "pre-line", marginBottom: "14px" }}>{translation}</div>
               {englishPhrase && (
                 <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "12px" }}>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: showPractice ? "12px" : "0" }}>
-                    <Btn onClick={() => speak(englishPhrase)} variant="secondary" style={{ fontSize: "12px", padding: "7px 14px" }}>🔊 Listen</Btn>
-                    <Btn onClick={() => setShowPractice(p => !p)} variant="secondary" style={{ fontSize: "12px", padding: "7px 14px" }}>🎙 {showPractice ? "Hide Practice" : "Practice Saying It"}</Btn>
-                    <Btn onClick={() => saveToMyPhrases({ english: englishPhrase, korean: koreanText, context: "" })} variant="ghost" style={{ fontSize: "12px", padding: "7px 14px" }}>⭐ Save</Btn>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
+                    <Btn onClick={() => speak(englishPhrase)} variant="secondary" style={{ fontSize: "12px", padding: "7px 14px" }}>🔊 듣기</Btn>
+                    <Btn onClick={() => setShowPractice(p => !p)} variant="secondary" style={{ fontSize: "12px", padding: "7px 14px" }}>🎙 {showPractice ? "닫기" : "연습하기"}</Btn>
+                    <Btn onClick={() => saveToMyPhrases({ english: englishPhrase, korean: koreanText, context: "" })} variant={myPhrases.includes(englishPhrase.toLowerCase()) ? "success" : "ghost"} style={{ fontSize: "12px", padding: "7px 14px" }}>
+                      {myPhrases.includes(englishPhrase.toLowerCase()) ? "✓ 저장됨" : "⭐ 저장"}
+                    </Btn>
                   </div>
-                  {savedMsg && <div style={{ fontSize: "12px", color: C.success, marginTop: "6px" }}>{savedMsg}</div>}
-                  {showPractice && englishPhrase && (
-                    <MiniPractice phrase={{ english: englishPhrase, korean: koreanText }} user={user} isPreview={isPreview} />
+                  {savedMsg.text && <div style={{ fontSize: "12px", color: savedMsg.type === "success" ? C.success : savedMsg.type === "warn" ? C.retry : C.error, marginBottom: "6px" }}>{savedMsg.text}</div>}
+                  {showPractice && (
+                    <MiniPractice phrase={{ english: englishPhrase, korean: koreanText }} user={user} isPreview={isPreview} showListen={false} />
                   )}
                 </div>
               )}
@@ -894,50 +967,21 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
         <div>
           <Card style={{ borderLeft: `3px solid ${C.gold}`, marginBottom: "16px" }}>
             <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>상황별 표현 생성기</div>
-            <div style={{ fontSize: "12px", color: C.textLight }}>상황을 설명하면 유용한 영어 표현을 알려드릴게요. 원하는 표현을 저장해서 연습하세요!</div>
+            <div style={{ fontSize: "12px", color: C.textLight }}>상황을 설명하면 유용한 영어 표현을 알려드릴게요. 새 표현만 생성되고, 이미 저장된 표현은 제외돼요!</div>
           </Card>
-          {savedMsg && <Msg text={savedMsg} type="success" />}
+          {savedMsg.text && <Msg text={savedMsg.text} type={savedMsg.type} />}
           <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-            <Input value={situation} onChange={e => setSituation(e.target.value)} placeholder="예: 호텔 체크인, 카페에서 주문, 새로운 친구 만나기" style={{ fontSize: "14px" }} />
-            <Btn onClick={generateSituation} disabled={generatingSituation || !situation.trim()} variant="primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{generatingSituation ? React.createElement(Spinner) : "생성하기"}</Btn>
+            <Input value={situation} onChange={e => { setSituation(e.target.value); if (e.target.value !== situation) setShownPhrases([]); }} placeholder="예: 호텔 체크인, 카페에서 주문, 새로운 친구 만나기" style={{ fontSize: "14px" }} />
+            <Btn onClick={generateSituation} disabled={generatingSituation || !situation.trim()} variant="primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{generatingSituation ? React.createElement(Spinner) : situationPhrases.length > 0 ? "다시 생성" : "생성하기"}</Btn>
           </div>
           {situationPhrases.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {situationPhrases.map((p, i) => React.createElement(SituationPhraseRow, { key: i, phrase: p, user, isPreview, onSave: saveToMyPhrases }))}
+              {situationPhrases.map((p, i) => React.createElement(SituationPhraseRow, { key: i, phrase: p, user, isPreview, alreadySaved: myPhrases.includes(p.english.toLowerCase()), onSave: async (phrase) => { await saveToMyPhrases(phrase); } }))}
             </div>
           )}
         </div>
       )}
     </div>
-  );
-}
-
-// ── Situation Phrase Row ──────────────────────────────────────────────────────
-function SituationPhraseRow({ phrase, user, isPreview, onSave }) {
-  const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const handleSave = async () => {
-    await onSave(phrase);
-    setSaved(true);
-  };
-
-  return (
-    <Card style={{ padding: "12px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: open ? "0" : "0" }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "14px", fontStyle: "italic", marginBottom: "3px" }}>"{phrase.english}"</div>
-          {phrase.korean && <div style={{ fontSize: "12px", color: C.textMid }}>{phrase.korean}</div>}
-          {phrase.context && <div style={{ fontSize: "11px", color: C.gold, marginTop: "2px" }}>{phrase.context}</div>}
-        </div>
-        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-          <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "11px", padding: "5px 10px" }}>🔊</Btn>
-          <Btn onClick={() => setOpen(o => !o)} variant="secondary" style={{ fontSize: "11px", padding: "5px 10px" }}>🎙</Btn>
-          <Btn onClick={handleSave} disabled={saved} variant={saved ? "success" : "ghost"} style={{ fontSize: "11px", padding: "5px 10px" }}>{saved ? "✓ Saved" : "⭐ Save"}</Btn>
-        </div>
-      </div>
-      {open && <MiniPractice phrase={phrase} user={user} isPreview={isPreview} />}
-    </Card>
   );
 }
 
@@ -950,9 +994,11 @@ function MyPhrasesTab({ user, isPreview }) {
 
   useEffect(() => {
     if (!user?.id || user.id === "preview") { setLoading(false); return; }
+    setLoading(true);
     db.get("student_phrases", `student_id=eq.${user.id}&order=created_at.desc`)
-      .then(setPhrases).catch(() => {}).finally(() => setLoading(false));
-  }, [user]);
+      .then(data => { setPhrases(data || []); setLoading(false); })
+      .catch(e => { console.error("MyPhrases load error:", e); setLoading(false); });
+  }, [user?.id]);
 
   const toggleHide = async (id, hidden) => {
     try {
