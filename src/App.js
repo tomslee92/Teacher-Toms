@@ -324,7 +324,7 @@ export default function App() {
   };
 
   const handleTeacher = (pass) => {
-    if (pass === "wayve2024") { setScreen("teacher"); return null; }
+    if (pass === "wayve2026") { setScreen("teacher"); return null; }
     return "Wrong password";
   };
 
@@ -1139,53 +1139,110 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank }) {
 // ── Students Tab ──────────────────────────────────────────────────────────────
 function StudentsTab({ students, setStudents, groups }) {
   const [newName, setNewName] = useState("");
-  const [newGroupId, setNewGroupId] = useState(groups[0]?.id || "");
-  const [success, setSuccess] = useState("");
-  const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(""), 3000); };
+  const [newGroupId, setNewGroupId] = useState("");
+  const [msg, setMsg] = useState({ text: "", type: "success" });
+  const [loadedGroups, setLoadedGroups] = useState(groups || []);
+
+  // Always load fresh groups from Supabase
+  useEffect(() => {
+    db.get("groups", "order=created_at.asc").then(g => {
+      setLoadedGroups(g);
+      if (g.length > 0 && !newGroupId) setNewGroupId(g[0].id);
+    }).catch(() => {});
+  }, []);
+
+  const showMsg = (text, type = "success") => { setMsg({ text, type }); setTimeout(() => setMsg({ text: "", type: "success" }), 4000); };
 
   const addStudent = async () => {
-    if (!newName.trim()) return;
-    if (students.find(s => s.name.toLowerCase() === newName.trim().toLowerCase())) { setSuccess("⚠️ Name already exists."); setTimeout(() => setSuccess(""), 3000); return; }
+    if (!newName.trim()) { showMsg("Please enter a name.", "error"); return; }
+    if (!newGroupId) { showMsg("Please select a group.", "error"); return; }
+    if (students.find(s => s.name.toLowerCase() === newName.trim().toLowerCase())) {
+      showMsg("A student with this name already exists.", "error"); return;
+    }
     try {
       const [s] = await db.insert("students", { name: newName.trim(), group_id: newGroupId, streak: 0, longest_streak: 0 });
-      setStudents(prev => [...prev, { ...s, groups: groups.find(g => g.id === newGroupId) }]);
-      setNewName(""); showSuccess("Student added!");
-    } catch(e) { setSuccess("Error — name may already exist."); setTimeout(() => setSuccess(""), 3000); }
+      const group = loadedGroups.find(g => g.id === newGroupId);
+      setStudents(prev => [...prev, { ...s, groups: group }]);
+      setNewName("");
+      showMsg("✓ " + s.name + " registered in " + (group?.name || "group") + "!", "success");
+    } catch(e) {
+      showMsg("Could not register student. Please try again.", "error");
+    }
   };
 
   const updateGroup = async (studentId, groupId) => {
     try {
       await db.update("students", `id=eq.${studentId}`, { group_id: groupId });
-      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, group_id: groupId, groups: groups.find(g => g.id === groupId) } : s));
-      showSuccess("Group updated!");
-    } catch(e) {}
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, group_id: groupId, groups: loadedGroups.find(g => g.id === groupId) } : s));
+      showMsg("Group updated!", "success");
+    } catch(e) { showMsg("Could not update group.", "error"); }
   };
+
+  const msgStyle = {
+    success: { background: C.successBg, border: `1px solid #A8D5B5`, color: C.success },
+    error: { background: C.errorBg, border: `1px solid #F0A8A5`, color: C.error },
+  };
+
+  // Group students by group for display
+  const byGroup = {};
+  loadedGroups.forEach(g => { byGroup[g.id] = { group: g, students: [] }; });
+  students.forEach(s => { if (byGroup[s.group_id]) byGroup[s.group_id].students.push(s); });
 
   return (
     <div>
-      {success && <div style={{ background: success.includes("⚠️") ? C.retryBg : C.successBg, border: `1px solid ${success.includes("⚠️") ? "#F0C090" : "#A8D5B5"}`, color: success.includes("⚠️") ? C.retry : C.success, padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", fontWeight: "500" }}>{success}</div>}
+      {msg.text && <div style={{ ...msgStyle[msg.type], padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", fontWeight: "500" }}>{msg.text}</div>}
 
+      {/* Register form */}
       <Card style={{ marginBottom: "20px", borderLeft: `3px solid ${C.gold}` }}>
         <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>+ Register New Student</div>
-        <Input value={newName} onChange={e => setNewName(e.target.value)} onBlur={() => {}} placeholder="Student name" style={{ marginBottom: "8px" }} />
-        <select value={newGroupId} onChange={e => setNewGroupId(e.target.value)} style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", marginBottom: "12px" }}>
-          {groups.map(g => React.createElement("option", { key: g.id, value: g.id }, g.name))}
-        </select>
+        <Input
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onBlur={() => {}}
+          placeholder="Student name"
+          style={{ marginBottom: "8px" }}
+        />
+        <div style={{ marginBottom: "12px" }}>
+          <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>Assign to Group</div>
+          <select
+            value={newGroupId}
+            onChange={e => setNewGroupId(e.target.value)}
+            style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", appearance: "auto" }}
+          >
+            <option value="" disabled>Select a group…</option>
+            {loadedGroups.map(g => React.createElement("option", { key: g.id, value: g.id }, g.name))}
+          </select>
+        </div>
         <Btn onClick={addStudent} style={{ width: "100%" }}>Register Student</Btn>
       </Card>
 
-      <div style={{ fontSize: "12px", letterSpacing: "1px", textTransform: "uppercase", color: C.textLight, marginBottom: "12px" }}>{students.length} Students</div>
-      {students.length === 0
-        ? React.createElement("div", { style: { textAlign: "center", color: C.textLight, padding: "40px", fontStyle: "italic" } }, "No students yet.")
-        : students.map(s => React.createElement(Card, { key: s.id, style: { marginBottom: "8px", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" } },
-          React.createElement("div", null,
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "500" } }, s.name),
-            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "2px" } }, "🔥 " + (s.streak || 0) + " streak")
-          ),
-          React.createElement("select", { value: s.group_id || "", onChange: e => updateGroup(s.id, e.target.value), style: { padding: "6px 10px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "12px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none" } },
-            groups.map(g => React.createElement("option", { key: g.id, value: g.id }, g.name))
-          )
-        ))
+      {/* Students grouped by group */}
+      {loadedGroups.length === 0
+        ? React.createElement("div", { style: { textAlign: "center", color: C.textLight, padding: "40px", fontStyle: "italic" } }, "No groups yet. Create a group first.")
+        : loadedGroups.map(g => {
+          const gs = byGroup[g.id]?.students || [];
+          return React.createElement(Card, { key: g.id, style: { marginBottom: "12px" } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: gs.length > 0 ? "10px" : "0" } },
+              React.createElement("div", { style: { fontSize: "14px", fontWeight: "600" } }, g.name),
+              React.createElement("span", { style: { fontSize: "12px", color: C.textLight } }, gs.length + " students")
+            ),
+            gs.length === 0
+              ? React.createElement("div", { style: { fontSize: "12px", color: C.textLight, fontStyle: "italic", paddingTop: "4px" } }, "No students yet")
+              : gs.map(s => React.createElement("div", { key: s.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${C.bgSoft}`, gap: "10px" } },
+                React.createElement("div", null,
+                  React.createElement("div", { style: { fontSize: "13px", fontWeight: "500" } }, s.name),
+                  React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, "🔥 " + (s.streak || 0) + " day streak")
+                ),
+                React.createElement("select", {
+                  value: s.group_id || "",
+                  onChange: e => updateGroup(s.id, e.target.value),
+                  style: { padding: "5px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "12px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none" }
+                },
+                  loadedGroups.map(grp => React.createElement("option", { key: grp.id, value: grp.id }, grp.name))
+                )
+              ))
+          );
+        })
       }
     </div>
   );
