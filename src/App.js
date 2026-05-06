@@ -101,6 +101,8 @@ function FeedbackDisplay({ text }) {
     })
   );
 }
+
+function highlightMissed(target, spoken) {
   if (!target || !spoken) return React.createElement("span", null, target);
   const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
   const spokenNorm = norm(spoken);
