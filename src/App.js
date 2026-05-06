@@ -87,9 +87,9 @@ function FeedbackDisplay({ text }) {
         React.createElement("span", { style: { fontSize: "18px" } }, "🎯"),
         React.createElement("span", { style: { fontSize: "15px", fontWeight: "700", color: C.text } }, line.replace("🎯", "").trim())
       );
-      if (line === "✅ 잘한 점" || line === "✅ 잘한점") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.success, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "✅ 잘한 점");
-      if (line === "📝 문법 피드백" || line === "📝 문법피드백") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.error, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "📝 문법 피드백");
-      if (line === "💡 이렇게도 말할 수 있어요") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.gold, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "💡 이렇게도 말할 수 있어요");
+      if (line === "✅ 잘한 점" || line === "✅ 잘한점" || line === "잘한 점") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.success, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "✅ 잘한 점");
+      if (line === "📝 문법 피드백" || line === "📝 문법피드백" || line === "문법 피드백") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.error, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "📝 문법 피드백");
+      if (line === "💡 이렇게도 말할 수 있어요" || line === "이렇게도 말할 수 있어요") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.gold, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "💡 이렇게도 말할 수 있어요");
       if (line === "완벽해요!" || line === "완벽해요") return React.createElement("div", { key: i, style: { background: C.successBg, border: `1px solid #A8D5B5`, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.success, fontWeight: "600" } }, "✨ 완벽해요!");
       if (isWrong(line)) return React.createElement("div", { key: i, style: { background: C.errorBg, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.error, fontFamily: "monospace" } }, line);
       if (line.startsWith("✅") && i > 0 && (lines[i-1].startsWith("❌") || lines[i-2]?.startsWith("❌"))) return React.createElement("div", { key: i, style: { background: C.successBg, borderRadius: "6px", padding: "8px 12px", fontSize: "14px", color: C.success, fontFamily: "monospace" } }, line);
@@ -191,35 +191,47 @@ async function transcribe(blob) {
 }
 
 async function getPhraseFeedback(said, phrase) {
+  // Normalize both strings for comparison
+  const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  const saidNorm = normalize(said);
+  const targetNorm = normalize(phrase.english);
+  const isExact = saidNorm === targetNorm;
+  const isVeryClose = targetNorm.length > 5 && (saidNorm.includes(targetNorm) || targetNorm.includes(saidNorm));
+
   const text = await groqCall(`Target phrase: "${phrase.english}"
 Student said: "${said}"
+${isExact || isVeryClose ? `\nNOTE: The student said the phrase correctly (or nearly perfectly). Give a high score of 9 or 10/10. Be very encouraging.` : ""}
 
 Give warm, specific feedback in Korean hangul and English ONLY.
 DO NOT write placeholder text. Write actual content for every section.
 
-Format exactly like this (no brackets, no placeholders):
+Format exactly like this:
 
 🎯 점수: X/10
-[Write actual Korean sentence explaining the score here]
+[Korean sentence explaining the score - if 8+ be very encouraging]
 
 ✅ 잘한 점
-[Write actual Korean encouragement here]
+[Korean encouragement about what they did well]
 
 📝 문법 피드백
-[Write actual Korean explanation of what was wrong]
+[Korean explanation of what was wrong]
 ❌ ${said}
-✅ [Write the corrected English sentence]
-📌 [Write actual Korean explanation of the grammar rule - e.g. 과거형을 써야 해요 because this happened in the past]
+✅ [Corrected English]
+📌 [Korean explanation of WHY the grammar rule matters]
 
 💡 이렇게도 말할 수 있어요
-→ [Write an alternative natural English way to say this]
+→ [Alternative natural English]
 
-💪 [Write one short motivating Korean sentence using pure hangul only]
+💪 [One short Korean hangul motivating sentence]
 
-If grammar was perfect, skip 📝 section entirely and write 완벽해요! instead.
+IMPORTANT: If grammar was perfect, skip 📝 section entirely and write just 완벽해요! instead.
+If the student said it perfectly, give 9 or 10/10.
 Under 150 words. Korean hangul and English ONLY.`);
   const match = text.match(/점수.*?(\d+)\/10/);
-  return { text, score: match ? parseInt(match[1]) : 7 };
+  let score = match ? parseInt(match[1]) : 7;
+  // Override score if we detected exact match but AI gave low score
+  if ((isExact || isVeryClose) && score < 8) score = 9;
+  return { text, score };
 }
 
 async function getFreeTalkFeedback(said) {
@@ -302,16 +314,31 @@ async function generateSituationPhrases(situation, excludePhrases = []) {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile", max_tokens: 900,
-      messages: [{ role: "user", content: `Generate 8 useful English phrases for this situation: "${situation}"
-For Korean beginners. Korean translations and context must be in Korean HANGUL only (not Chinese characters).
-Return ONLY valid JSON array, no extra text:
-[{"english":"natural English phrase","korean":"Korean hangul translation","context":"Korean hangul explanation of when to use"}]${excludeList}` }]
+      messages: [{
+        role: "system",
+        content: `You generate JSON arrays of English phrases for Korean learners.
+STRICT RULE: The "korean" and "context" fields must use ONLY Korean hangul characters (가-힣).
+NEVER use Chinese characters (漢字 like 食べ物, グルテン, etc.) or Japanese kana.
+If you want to write Japanese food terms, write them in Korean hangul only.`
+      }, {
+        role: "user",
+        content: `Generate 8 useful English phrases for this situation: "${situation}"
+Korean translations and context MUST be in Korean HANGUL only — absolutely no Chinese or Japanese characters.
+Return ONLY valid JSON array:
+[{"english":"natural English phrase","korean":"Korean hangul translation ONLY","context":"Korean hangul context ONLY"}]${excludeList}`
+      }]
     })
   });
   const d = await res.json();
   const t = d.choices[0].message.content.replace(/```json|```/g, "").trim();
   const s = t.indexOf("["); const e = t.lastIndexOf("]");
-  return JSON.parse(t.slice(s, e + 1));
+  const parsed = JSON.parse(t.slice(s, e + 1));
+  // Apply cleanText to each field to strip any remaining non-Korean/English chars
+  return parsed.map(p => ({
+    english: p.english || "",
+    korean: cleanText(p.korean || ""),
+    context: cleanText(p.context || ""),
+  }));
 }
 
 async function generateAIPhrases(topic) {
@@ -320,16 +347,28 @@ async function generateAIPhrases(topic) {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile", max_tokens: 800,
-      messages: [{ role: "user", content: `Generate 5 English phrases for Korean learners about: "${topic}".
-Each object MUST have all three fields. The "context" field MUST be in Korean hangul.
+      messages: [{
+        role: "system",
+        content: `You generate JSON arrays of English phrases for Korean learners.
+STRICT: "korean" and "context" fields must use ONLY Korean hangul (가-힣). No Chinese, no Japanese.`
+      }, {
+        role: "user",
+        content: `Generate 5 English phrases for Korean learners about: "${topic}".
+All three fields required. "context" MUST be in Korean hangul only.
 Return ONLY valid JSON array:
-[{"english":"natural English phrase","korean":"Korean hangul translation","context":"Korean hangul explanation of when to use this phrase"}]` }]
+[{"english":"natural English phrase","korean":"Korean hangul translation","context":"Korean hangul explanation of when to use this phrase"}]`
+      }]
     })
   });
   const d = await res.json();
   const t = d.choices[0].message.content.replace(/```json|```/g, "").trim();
   const s = t.indexOf("["); const e = t.lastIndexOf("]");
-  return JSON.parse(t.slice(s, e + 1));
+  const parsed = JSON.parse(t.slice(s, e + 1));
+  return parsed.map(p => ({
+    english: p.english || "",
+    korean: cleanText(p.korean || ""),
+    context: cleanText(p.context || ""),
+  }));
 }
 
 async function autoFillKorean(english) {
@@ -342,7 +381,10 @@ async function autoFillKorean(english) {
     const d = await res.json();
     const t = d.choices[0].message.content.replace(/```json|```/g, "").trim();
     const s = t.indexOf("{"); const e = t.lastIndexOf("}");
-    if (s !== -1 && e !== -1) return JSON.parse(t.slice(s, e + 1));
+    if (s !== -1 && e !== -1) {
+      const p = JSON.parse(t.slice(s, e + 1));
+      return { ko: cleanText(p.ko || ""), context: cleanText(p.context || "") };
+    }
   } catch(e) {}
   return { ko: "", context: "" };
 }
