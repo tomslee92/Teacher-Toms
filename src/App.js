@@ -889,23 +889,52 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
 // ── Groups Tab ────────────────────────────────────────────────────────────────
 function GroupsTab({ groups, setGroups, students, onPreview }) {
   const [newName, setNewName] = useState("");
-  const [success, setSuccess] = useState("");
+  const [msg, setMsg] = useState({ text: "", type: "success" });
+  const [adding, setAdding] = useState(false);
+  const [localGroups, setLocalGroups] = useState(groups || []);
 
-  const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(""), 3000); };
+  // Always reload groups fresh from Supabase
+  useEffect(() => {
+    db.get("groups", "order=created_at.asc")
+      .then(g => { setLocalGroups(g); setGroups(g); })
+      .catch(e => setMsg({ text: "Could not load groups: " + e.message, type: "error" }));
+  }, []);
+
+  const showMsg = (text, type = "success") => { setMsg({ text, type }); setTimeout(() => setMsg({ text: "", type: "success" }), 4000); };
 
   const addGroup = async () => {
     if (!newName.trim()) return;
+    setAdding(true);
     try {
-      const [g] = await db.insert("groups", { name: newName.trim() });
-      setGroups(prev => [...prev, g]);
-      setNewName(""); showSuccess("Group created!");
-    } catch(e) {}
+      const result = await db.insert("groups", { name: newName.trim() });
+      const g = Array.isArray(result) ? result[0] : result;
+      const updated = [...localGroups, g];
+      setLocalGroups(updated);
+      setGroups(updated);
+      setNewName("");
+      showMsg("✓ Group created: " + g.name, "success");
+    } catch(e) {
+      showMsg("Could not create group: " + e.message, "error");
+    }
+    setAdding(false);
+  };
+
+  const msgStyle = {
+    success: { background: C.successBg, border: `1px solid #A8D5B5`, color: C.success },
+    error: { background: C.errorBg, border: `1px solid #F0A8A5`, color: C.error },
   };
 
   return (
     <div>
-      {success && <div style={{ background: C.successBg, border: `1px solid #A8D5B5`, color: C.success, padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", fontWeight: "500" }}>{success}</div>}
-      {groups.map(g => {
+      {msg.text && <div style={{ ...msgStyle[msg.type], padding: "10px 14px", borderRadius: "6px", marginBottom: "16px", fontSize: "13px", fontWeight: "500" }}>{msg.text}</div>}
+
+      {localGroups.length === 0 && (
+        <div style={{ textAlign: "center", color: C.textLight, padding: "30px", fontStyle: "italic", fontSize: "13px" }}>
+          No groups yet. Create your first group below.
+        </div>
+      )}
+
+      {localGroups.map(g => {
         const gs = students.filter(s => s.group_id === g.id);
         return React.createElement(Card, { key: g.id, style: { marginBottom: "12px" } },
           React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" } },
@@ -921,18 +950,21 @@ function GroupsTab({ groups, setGroups, students, onPreview }) {
             )
           ),
           gs.length > 0 && gs.map(s =>
-            React.createElement("div", { key: s.id, style: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.bgSoft}`, fontSize: "13px" } },
+            React.createElement("div", { key: s.id, style: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: `1px solid ${C.bgSoft}`, fontSize: "13px" } },
               React.createElement("span", { style: { color: C.textMid } }, s.name),
-              React.createElement("span", { style: { color: C.textLight } }, "🔥 " + (s.streak || 0) + "일 연속")
+              React.createElement("span", { style: { color: C.textLight } }, "🔥 " + (s.streak || 0) + " day streak")
             )
           )
         );
       })}
+
       <Card>
-        <div style={{ fontSize: "12px", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" }}>New Group</div>
+        <div style={{ fontSize: "12px", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" }}>Create New Group</div>
         <div style={{ display: "flex", gap: "8px" }}>
-          <Input value={newName} onChange={e => setNewName(e.target.value)} onBlur={() => {}} placeholder="Group name" />
-          <Btn onClick={addGroup} variant="primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>만들기</Btn>
+          <Input value={newName} onChange={e => setNewName(e.target.value)} onBlur={() => {}} placeholder="e.g. Tuesday Morning Group" />
+          <Btn onClick={addGroup} disabled={adding || !newName.trim()} variant="primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+            {adding ? React.createElement(Spinner) : "Create"}
+          </Btn>
         </div>
       </Card>
     </div>
