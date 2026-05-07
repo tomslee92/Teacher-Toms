@@ -4880,11 +4880,26 @@ function QodEntryScreen({ user, group, onEnter }) {
         })
       )}
 
+      {/* Streak bar — top of screen */}
+      <div style={{ padding: "12px 24px", display: "flex", justifyContent: "center", animation: "qodEntryFade 0.4s ease both" }}>
+        {streak > 0 ? (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "7px", background: C.bgSoft, borderRadius: "100px", padding: "7px 18px", border: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: "18px", animation: "streakFire 2.5s ease-in-out infinite", display: "inline-block" }}>🔥</span>
+            <span style={{ fontSize: "14px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" }}>{streak} day streak</span>
+            <span style={{ fontSize: "11px", color: C.textLight }}>· Keep it going 💪</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: "12px", color: C.textLight, padding: "7px 0" }}>
+            Answer today to start your streak 🔥
+          </div>
+        )}
+      </div>
+
       {/* Full screen entry */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 28px", textAlign: "center" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 28px 40px", textAlign: "center" }}>
 
         {/* Logo */}
-        <div style={{ marginBottom: "40px", animation: "qodEntryFade 0.5s ease both" }}>
+        <div style={{ marginBottom: "36px", animation: "qodEntryFade 0.5s ease both" }}>
           {WayveLogo({ size: 18, color: C.text })}
         </div>
 
@@ -4943,26 +4958,7 @@ function QodEntryScreen({ user, group, onEnter }) {
           )}
         </div>
 
-        {/* Streak — prominent */}
-        <div style={{ marginTop: "36px", animation: "qodEntryFade 0.6s ease 0.5s both", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-          {streak > 0 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: C.bgSoft, borderRadius: "100px", padding: "8px 20px", border: `1px solid ${C.border}` }}>
-              <span style={{ fontSize: "22px", animation: "streakFire 2.5s ease-in-out infinite", display: "inline-block" }}>🔥</span>
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, lineHeight: 1 }}>{streak} day streak</div>
-                <div style={{ fontSize: "10px", color: C.textLight, marginTop: "1px" }}>
-                  Keep it going 💪
-                </div>
               </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: "12px", color: C.textLight }}>
-              Answer today to start your streak 🔥
-            </div>
-          )}
-
-        </div>
-      </div>
     </div>
   );
 }
