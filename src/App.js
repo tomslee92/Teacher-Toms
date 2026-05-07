@@ -944,6 +944,11 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
   }, []);
 
   return (
+    <div>
+      {phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
+      <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "14px" }}>
+        <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "13px", padding: "7px 14px" }}>🔊 듣기</Btn>
+      </div>
       <div style={{ textAlign: "center" }}>
         {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ padding: "12px 32px", fontSize: "15px" }}>🎙 녹음 시작</Btn>}
         {rec.isRec && (
