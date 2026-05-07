@@ -576,25 +576,46 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState("login");
+  const [screen, setScreen] = useState("loading");
   const [user, setUser] = useState(null);
   const [preview, setPreview] = useState(null);
   const [groups, setGroups] = useState([]);
 
-  useEffect(() => { db.get("groups", "order=created_at.asc").then(setGroups).catch(() => {}); }, []);
+  useEffect(() => {
+    db.get("groups", "order=created_at.asc").then(setGroups).catch(() => {});
+    // Auto-login from saved name
+    const savedName = localStorage.getItem("wayve_student_name");
+    if (savedName) {
+      db.get("students", `name=eq.${encodeURIComponent(savedName)}&select=*,groups(name,id)`)
+        .then(rows => {
+          if (rows.length > 0) { setUser(rows[0]); setScreen("student"); }
+          else { localStorage.removeItem("wayve_student_name"); setScreen("login"); }
+        })
+        .catch(() => setScreen("login"));
+    } else {
+      setScreen("login");
+    }
+  }, []);
 
   const handleLogin = async (name) => {
     try {
       const rows = await db.get("students", `name=eq.${encodeURIComponent(name)}&select=*,groups(name,id)`);
       if (!rows.length) return "이름을 찾을 수 없어요. Teacher Toms에게 등록을 요청해 주세요.";
+      localStorage.setItem("wayve_student_name", rows[0].name);
       setUser(rows[0]); setScreen("student"); return null;
     } catch(e) { return "오류: " + e.message; }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("wayve_student_name");
+    setUser(null); setScreen("login");
+  };
+
+  if (screen === "loading") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" } }, React.createElement(Spinner)));
   if (screen === "login") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(LoginScreen, { onLogin: handleLogin, onTeacher: p => { if (p === TEACHER_PASS) { setScreen("teacher"); return null; } return "Wrong password"; } }));
   if (screen === "teacher") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(TeacherScreen, { groups, setGroups, setScreen, onPreview: g => { setPreview(g); setScreen("preview"); } }));
   if (screen === "preview") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user: { id: "preview", name: "Preview Mode", group_id: preview?.id, streak: 3, longest_streak: 7 }, group: preview, isPreview: true, onBack: () => setScreen("teacher") }));
-  if (screen === "student") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user, group: groups.find(g => g.id === user?.group_id) || user?.groups, isPreview: false, onBack: () => setScreen("login") }));
+  if (screen === "student") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user, group: groups.find(g => g.id === user?.group_id) || user?.groups, isPreview: false, onBack: handleLogout }));
   return null;
 }
 
