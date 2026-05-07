@@ -49,6 +49,10 @@ const GlobalStyle = () => React.createElement("style", null, `
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{font-family:${FONT};background:${C.bg};color:${C.text};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  body[data-fontsize="large"] { font-size: 17px !important; }
+  body[data-fontsize="large"] input, body[data-fontsize="large"] button, body[data-fontsize="large"] select, body[data-fontsize="large"] textarea { font-size: 17px !important; }
+  body[data-fontsize="xlarge"] { font-size: 20px !important; }
+  body[data-fontsize="xlarge"] input, body[data-fontsize="xlarge"] button, body[data-fontsize="xlarge"] select, body[data-fontsize="xlarge"] textarea { font-size: 20px !important; }
   input,button,select,textarea{font-family:${FONT};}
   input::placeholder,textarea::placeholder{color:${C.textLight};}
   ::-webkit-scrollbar{width:4px;height:4px;}
@@ -607,6 +611,12 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [preview, setPreview] = useState(null);
   const [groups, setGroups] = useState([]);
+  const [fontSize, setFontSize] = useState(() => localStorage.getItem("wayve_fontsize") || "default");
+
+  useEffect(() => {
+    document.body.setAttribute("data-fontsize", fontSize);
+    localStorage.setItem("wayve_fontsize", fontSize);
+  }, [fontSize]);
 
   useEffect(() => {
     db.get("groups", "order=created_at.asc").then(setGroups).catch(() => {});
@@ -642,8 +652,8 @@ export default function App() {
   if (screen === "qod_entry") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(QodEntryScreen, { user, group: groups.find(g => g.id === user?.group_id) || user?.groups, onEnter: () => setScreen("student") }));
   if (screen === "login") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(LoginScreen, { onLogin: handleLogin, onTeacher: p => { if (p === TEACHER_PASS) { setScreen("teacher"); return null; } return "Wrong password"; } }));
   if (screen === "teacher") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(TeacherScreen, { groups, setGroups, setScreen, onPreview: g => { setPreview(g); setScreen("preview"); } }));
-  if (screen === "preview") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user: { id: "preview", name: "Preview Mode", group_id: preview?.id, streak: 3, longest_streak: 7 }, group: preview, isPreview: true, onBack: () => setScreen("teacher") }));
-  if (screen === "student") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user, group: groups.find(g => g.id === user?.group_id) || user?.groups, isPreview: false, onBack: handleLogout }));
+  if (screen === "preview") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user: { id: "preview", name: "Preview Mode", group_id: preview?.id, streak: 3, longest_streak: 7 }, group: preview, isPreview: true, onBack: () => setScreen("teacher"), fontSize, setFontSize }));
+  if (screen === "student") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user, group: groups.find(g => g.id === user?.group_id) || user?.groups, isPreview: false, onBack: handleLogout, fontSize, setFontSize }));
   return null;
 }
 
@@ -926,7 +936,7 @@ function Confetti() { return React.createElement(ConfettiEffect); }
 
 
 // ── Student Screen ────────────────────────────────────────────────────────────
-function StudentScreen({ user, group, isPreview, onBack }) {
+function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', setFontSize = () => {} }) {
   const [tab, setTab] = useState("community");
   const [streak, setStreak] = useState(user.streak || 0);
   const [longest, setLongest] = useState(user.longest_streak || 0);
@@ -997,7 +1007,27 @@ function StudentScreen({ user, group, isPreview, onBack }) {
             <div style={{ fontSize: "18px", fontWeight: "800", color: streak > 0 ? C.retry : C.textLight, display: "inline-block", animation: streak > 0 ? "streakFire 2.5s ease-in-out infinite" : "none" }}>🔥{streak}</div>
             {longest > 0 && <div style={{ fontSize: "15px", fontWeight: "700", color: C.gold }}>🏅{longest}</div>}
           </div>
-          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500" }}>Log out</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {/* Font size toggle */}
+            <div style={{ display: "flex", background: C.bgSoft, borderRadius: "100px", padding: "3px", border: `1px solid ${C.border}` }}>
+              {[["default","A"],["large","A"],["xlarge","A"]].map(([size, label], i) => (
+                React.createElement("button", {
+                  key: size,
+                  onClick: () => setFontSize(size),
+                  style: {
+                    width: `${22 + i * 5}px`, height: "24px",
+                    borderRadius: "100px", border: "none",
+                    background: fontSize === size ? C.text : "transparent",
+                    color: fontSize === size ? "#fff" : C.textLight,
+                    fontSize: `${10 + i * 2}px`, fontWeight: "700",
+                    cursor: "pointer", fontFamily: FONT, lineHeight: 1,
+                    transition: "all 0.15s", padding: 0,
+                  }
+                }, label)
+              ))}
+            </div>
+            <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500" }}>Log out</button>
+          </div>
         </div>
       </div>
 
@@ -2222,7 +2252,7 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
       {/* Floating bubble button */}
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ position: "fixed", bottom: "20px", right: "20px", width: "56px", height: "56px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: "0 4px 20px rgba(0,0,0,0.25)", zIndex: 100, transition: "transform 0.2s", transform: open ? "scale(0.9)" : "scale(1)" }}
+        style={{ position: "fixed", bottom: "82px", right: "20px", width: "52px", height: "52px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: "0 4px 20px rgba(0,0,0,0.25)", zIndex: 100, transition: "transform 0.2s", transform: open ? "scale(0.9)" : "scale(1)" }}
       >
         {open ? "✕" : "💬"}
         {unread > 0 && !open && (
@@ -2236,13 +2266,14 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
       {open && (
         <div style={{
           position: "fixed",
-          // Mobile: compact bottom sheet. Desktop: popup near bubble
-          bottom: window.innerWidth < 600 ? "80px" : "86px",
+          // Sits above the nav bar (72px) + bubble gap
+          bottom: window.innerWidth < 600 ? "144px" : "96px",
           right: window.innerWidth < 600 ? "12px" : "16px",
           left: window.innerWidth < 600 ? "12px" : "auto",
-          top: "auto",
+          top: window.innerWidth < 600 ? "12px" : "auto",
           width: window.innerWidth < 600 ? "calc(100vw - 24px)" : "min(380px, calc(100vw - 32px))",
-          height: window.innerWidth < 600 ? "min(480px, 65vh)" : "min(560px, calc(100vh - 110px))",
+          height: window.innerWidth < 600 ? "auto" : "min(520px, calc(100vh - 110px))",
+          maxHeight: window.innerWidth < 600 ? "calc(100vh - 160px)" : "min(520px, calc(100vh - 110px))",
           background: C.bg,
           borderRadius: "16px",
           boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
