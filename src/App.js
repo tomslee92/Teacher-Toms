@@ -880,7 +880,9 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {ordered.map(phrase => React.createElement(ExpandableRow, {
           key: `${phrase.id}-${sessionKey}`,
-          phrase, prog: sessionResets[activeSession] ? null : progress[phrase.id],
+          phrase,
+          progress,
+          sessionReset: !!sessionResets[activeSession],
           user, isPreview,
           onUpdate: handleProgressUpdate,
           onPracticed,
@@ -891,8 +893,10 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
 }
 
 // ── Expandable Row ────────────────────────────────────────────────────────────
-function ExpandableRow({ phrase, prog, user, isPreview, onUpdate, onPracticed }) {
+function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed }) {
   const [open, setOpen] = useState(false);
+  // Always read from live progress map so updates from POD/random modals reflect immediately
+  const prog = sessionReset ? null : (progress[phrase.id] || null);
   const passed = prog?.passed;
   const needsRetry = prog?.needs_retry && !passed;
   let bg = C.bg, border = C.border;
