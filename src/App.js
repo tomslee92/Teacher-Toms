@@ -685,7 +685,7 @@ function LoginScreen({ onLogin, onTeacher }) {
           <div style={{ animation: "fadeIn 0.2s ease both" }}>
             <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "500" }}>이름 / Your Name</div>
             <Input value={name} onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleStudent()}
+              onKeyDown={e => e.key === "Enter" && !loading && name.trim() && handleStudent()}
               placeholder="Enter your name"
               style={{ marginBottom: "14px", fontSize: "16px", padding: "14px 16px", borderRadius: "12px" }} />
             {error && <Msg text={error} type="error" />}
@@ -2156,7 +2156,7 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
           <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", transition: "all 0.15s" }}>Log out</button>
         </div>
         <div style={{ display: "flex", overflowX: "auto" }}>
-          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"]].map(([t, label]) =>
+          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"], ["responses", "🎙 QoD Responses"]].map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
         </div>
@@ -2170,6 +2170,7 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
         {tab === "myphrases" && React.createElement(TeacherMyPhrasesTab, { students, groups })}
         {tab === "cities" && React.createElement(CityGroupsTab, { groups, students, showMsg })}
         {tab === "qod" && React.createElement(QodStudioTab, { showMsg })}
+        {tab === "responses" && React.createElement(QodResponsesTab, { students, showMsg })}
       </div>
       {React.createElement(FloatingChat, { user: { id: "teacher", name: "Teacher Tom" }, group: groups[0], isPreview: false, isTeacher: true, groups, students })}
     </div>
@@ -3579,7 +3580,7 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) 
                 background: filled ? C.text : C.bgMid,
                 opacity: filled ? 1 : 0.35,
                 transform: nearHead && playing ? "scaleY(1.3)" : "scaleY(1)",
-                transition: "background 0.05s, transform 0.05s, opacity 0.05s",
+                transition: "background 0.01s, transform 0.01s, opacity 0.01s",
               }
             });
           })
@@ -3657,6 +3658,16 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
     setMyResponse(newResponse);
     setShowQodFlow(false);
     onPracticed();
+  };
+
+  const handleDeleteResponse = async (responseId) => {
+    try {
+      await db.delete("qod_responses", `id=eq.${responseId}`);
+      setResponses(prev => prev.filter(r => r.id !== responseId));
+      // Allow re-answering after deletion
+      setHasAnsweredToday(false);
+      setMyResponse(null);
+    } catch(e) {}
   };
 
   const handleReaction = async (responseId, emoji) => {
@@ -3785,6 +3796,7 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
                 response={r}
                 isMe={r.student_id === user.id}
                 onReact={(emoji) => handleReaction(r.id, emoji)}
+                onDelete={handleDeleteResponse}
                 userId={user.id}
                 index={i}
               />
@@ -3797,10 +3809,11 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
 }
 
 // ── Response Card ─────────────────────────────────────────────────────────────
-function ResponseCard({ response, isMe, onReact, userId, index }) {
+function ResponseCard({ response, isMe, onReact, onDelete, userId, index }) {
   // Use optimistic reaction data from parent (updated instantly on tap)
   // Fall back to DB fetch only on first load when optimistic data not yet set
   const [dbReactions, setDbReactions] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     db.get("qod_reactions", `response_id=eq.${response.id}`).then(r => {
@@ -3838,7 +3851,7 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
           <div>
             <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, display: "flex", alignItems: "center", gap: "6px" }}>
               {response.nickname || "Anonymous"}
-              {isMe && <span style={{ fontSize: "10px", background: C.text, color: "#fff", padding: "1px 7px", borderRadius: "100px", fontWeight: "600" }}>나</span>}
+              {isMe && <span style={{ fontSize: "10px", background: C.text, color: "#fff", padding: "1px 7px", borderRadius: "100px", fontWeight: "600" }}>Me</span>}
             </div>
             <div style={{ fontSize: "11px", color: C.textLight }}>{timeAgo(response.created_at)}</div>
           </div>
@@ -3856,20 +3869,37 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
         )
       )}
 
-      {/* Reactions — always show all 6, filled if reacted, tappable always */}
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-        {REACTION_EMOJIS.map(emoji => {
-          const count = reactionCounts[emoji] || 0;
-          const isMine = myReactions.has(emoji);
-          // On other people's cards, hide reactions with 0 count
-          if (count === 0 && !isMe) return null;
-          return (
-            <button key={emoji} onClick={() => onReact(emoji)} className="reaction-btn"
-              style={{ background: isMine ? C.bgDark : C.bgSoft, color: isMine ? "#fff" : C.text, border: `1px solid ${isMine ? C.text : C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "13px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px", fontWeight: isMine ? "700" : "400" }}>
-              {emoji}{count > 0 && <span style={{ fontSize: "11px" }}>{count}</span>}
+      {/* Reactions + delete */}
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+          {REACTION_EMOJIS.map(emoji => {
+            const count = reactionCounts[emoji] || 0;
+            const isMine = myReactions.has(emoji);
+            if (count === 0 && !isMe) return null;
+            return (
+              <button key={emoji} onClick={() => onReact(emoji)} className="reaction-btn"
+                style={{ background: isMine ? C.bgDark : C.bgSoft, color: isMine ? "#fff" : C.text, border: `1px solid ${isMine ? C.text : C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "13px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px", fontWeight: isMine ? "700" : "400" }}>
+                {emoji}{count > 0 && <span style={{ fontSize: "11px" }}>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+        {isMe && onDelete && (
+          confirmDelete ? (
+            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", color: C.error }}>삭제할까요?</span>
+              <button onClick={() => onDelete(response.id)}
+                style={{ background: C.error, border: "none", borderRadius: "100px", padding: "4px 10px", fontSize: "11px", color: "#fff", cursor: "pointer", fontFamily: FONT, fontWeight: "600" }}>삭제</button>
+              <button onClick={() => setConfirmDelete(false)}
+                style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "11px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>취소</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "12px", fontFamily: FONT, padding: "4px 6px", opacity: 0.6 }}>
+              🗑 삭제
             </button>
-          );
-        })}
+          )
+        )}
       </div>
     </div>
   );
@@ -4327,6 +4357,150 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
         )}
 
       </div>
+    </div>
+  );
+}
+
+// ── QoD Responses Tab (Teacher) ───────────────────────────────────────────────
+function QodResponsesTab({ students, showMsg }) {
+  const [prompts, setPrompts] = useState([]);
+  const [selectedPrompt, setSelectedPrompt] = useState(null);
+  const [responses, setResponses] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [loadingResponses, setLoadingResponses] = useState(false);
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    Promise.all([
+      db.get("qod_prompts", "order=scheduled_date.desc&limit=30").catch(() => []),
+      db.get("city_groups", "order=name.asc").catch(() => []),
+    ]).then(([p, c]) => {
+      setPrompts(p);
+      setCities(c);
+      // Auto-select today's prompt if exists
+      const todayPrompt = p.find(x => x.scheduled_date === today);
+      if (todayPrompt) { setSelectedPrompt(todayPrompt); loadResponses(todayPrompt.id); }
+      setLoading(false);
+    });
+  }, []);
+
+  const loadResponses = async (promptId) => {
+    setLoadingResponses(true);
+    try {
+      const r = await db.get("qod_responses", `prompt_id=eq.${promptId}&order=created_at.asc`);
+      setResponses(r);
+    } catch(e) { showMsg("Error loading responses", "error"); }
+    setLoadingResponses(false);
+  };
+
+  const handleSelectPrompt = (prompt) => {
+    setSelectedPrompt(prompt);
+    loadResponses(prompt.id);
+  };
+
+  const deleteResponse = async (id) => {
+    try {
+      await db.delete("qod_responses", `id=eq.${id}`);
+      setResponses(prev => prev.filter(r => r.id !== id));
+      showMsg("✓ Response removed");
+    } catch(e) { showMsg("Error", "error"); }
+  };
+
+  const filtered = selectedCity === "all" ? responses : responses.filter(r => r.city_group_id === selectedCity);
+  const cityName = (id) => cities.find(c => c.id === id)?.name || "—";
+
+  if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "60px" } }, React.createElement(Spinner));
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ background: C.bgDark, borderRadius: "14px", padding: "22px 24px", marginBottom: "20px", color: "#fff" }}>
+        <div style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "3px", textTransform: "uppercase", opacity: 0.5, marginBottom: "4px" }}>Community Feed</div>
+        <div style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>🎙 QoD Responses</div>
+        <div style={{ fontSize: "13px", opacity: 0.65 }}>Listen to student voice responses for each question.</div>
+      </div>
+
+      {/* Prompt selector */}
+      <Card style={{ marginBottom: "16px" }}>
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>Select Question</div>
+        {prompts.length === 0 ? (
+          <div style={{ fontSize: "13px", color: C.textLight, fontStyle: "italic" }}>No scheduled prompts yet. Create some in QoD Studio.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {prompts.filter(p => p.scheduled_date).map(p => (
+              <button key={p.id} onClick={() => handleSelectPrompt(p)}
+                style={{ padding: "10px 14px", borderRadius: "10px", border: `1px solid ${selectedPrompt?.id === p.id ? C.text : C.border}`, background: selectedPrompt?.id === p.id ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.12s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: selectedPrompt?.id === p.id ? "700" : "500", color: C.text, fontStyle: "italic", flex: 1 }}>
+                    "{p.prompt}"
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: p.scheduled_date === today ? C.success : C.textLight, background: p.scheduled_date === today ? C.successBg : C.bgSoft, padding: "2px 8px", borderRadius: "100px" }}>
+                      {p.scheduled_date === today ? "Today" : p.scheduled_date}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Responses */}
+      {selectedPrompt && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" }}>
+              {filtered.length} Response{filtered.length !== 1 ? "s" : ""}
+            </div>
+            {cities.length > 0 && (
+              <select value={selectedCity} onChange={e => setSelectedCity(e.target.value)}
+                style={{ padding: "6px 12px", border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "12px", fontFamily: FONT, outline: "none", background: C.bg, color: C.text, cursor: "pointer" }}>
+                <option value="all">All Cities</option>
+                {cities.map(c => React.createElement("option", { key: c.id, value: c.id }, c.emoji + " " + c.name))}
+              </select>
+            )}
+          </div>
+
+          {loadingResponses ? (
+            React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner))
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 20px", background: C.bgSoft, borderRadius: "12px" }}>
+              <div style={{ fontSize: "32px", marginBottom: "12px" }}>🌊</div>
+              <div style={{ fontSize: "15px", fontWeight: "700", marginBottom: "6px" }}>No responses yet</div>
+              <div style={{ fontSize: "13px", color: C.textMid }}>Students haven't answered this question yet.</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {filtered.map((r, i) => {
+                const student = students.find(s => s.id === r.student_id);
+                return (
+                  <Card key={r.id} style={{ position: "relative" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: C.bgMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", flexShrink: 0 }}>
+                          {(r.nickname || "?")[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: "14px", fontWeight: "700" }}>{r.nickname || "Unknown"}</div>
+                          <div style={{ fontSize: "11px", color: C.textLight }}>
+                            {student?.name || "—"} · {cityName(r.city_group_id)} · {new Date(r.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => deleteResponse(r.id)}
+                        style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px", padding: "2px 4px", opacity: 0.5 }}>×</button>
+                    </div>
+                    {React.createElement(RichAudioPlayer, { src: r.audio_url || "", label: r.nickname + "'s answer", transcript: r.transcript || "" })}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
