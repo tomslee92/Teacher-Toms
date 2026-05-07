@@ -3392,11 +3392,16 @@ English: "${prompt}"`);
 }
 
 async function scaffoldKoreanAnswer(koreanAnswer, englishQuestion) {
-  const text = await groqCall(`A Korean adult English learner wants to answer this question in English:
-Question: "${englishQuestion}"
-They expressed their answer in Korean: "${koreanAnswer}"
+  const text = await groqCall(`Translate this Korean sentence into natural spoken English. 
 
-Write a natural English answer they could say out loud in 20-40 seconds. Make it conversational, warm, first-person. Return ONLY the English answer, nothing else.`);
+STRICT RULES:
+- Translate the EXACT meaning only — no additions, no explanations, no extra sentences
+- No filler words like "you know", "I think", "basically", "actually"
+- Keep the same length and structure as the Korean original
+- First-person, spoken English — simple and direct
+- Return ONLY the English translation, nothing else
+
+Korean: "${koreanAnswer}"`);
   return cleanText(text.trim());
 }
 
@@ -3420,6 +3425,91 @@ Format:
   const match = text.match(/점수.*?(\d+)\/10/);
   const score = match ? parseInt(match[1]) : 7;
   return { text, score };
+}
+
+// ── Rich Audio Player ────────────────────────────────────────────────────────
+function RichAudioPlayer({ src, label = "내 녹음 듣기" }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
+    };
+    const onEnded = () => { setPlaying(false); setProgress(0); setCurrentTime(0); };
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [src]);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) { audio.pause(); setPlaying(false); }
+    else { audio.play(); setPlaying(true); }
+  };
+
+  const seek = (e) => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    audio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+  };
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+
+  return React.createElement("div", { style: { marginBottom: "12px" } },
+    React.createElement("audio", { ref: audioRef, src, preload: "metadata" }),
+    React.createElement("div", {
+      style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "10px 14px", display: "flex", flexDirection: "column", gap: "8px" }
+    },
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+        React.createElement("div", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid, display: "flex", alignItems: "center", gap: "6px" } },
+          React.createElement("span", null, "🎙"), React.createElement("span", null, label)
+        ),
+        React.createElement("span", { style: { fontSize: "11px", color: C.textLight } },
+          duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : "--:--"
+        )
+      ),
+      React.createElement("div", {
+        onClick: seek,
+        style: { position: "relative", height: "28px", cursor: "pointer", display: "flex", alignItems: "center", gap: "2px" }
+      },
+        Array.from({ length: 36 }, (_, i) => {
+          const h = 30 + Math.sin(i * 0.9) * 20 + Math.sin(i * 2.1) * 15;
+          const filled = (i / 36) * 100 < progress;
+          return React.createElement("div", {
+            key: i,
+            style: { flex: 1, height: `${h}%`, borderRadius: "2px", background: filled ? C.text : C.bgMid, transition: "background 0.1s" }
+          });
+        }),
+        progress > 0 && React.createElement("div", {
+          style: { position: "absolute", left: `calc(${progress}% - 5px)`, width: "10px", height: "10px", borderRadius: "50%", background: C.text, pointerEvents: "none", zIndex: 2 }
+        })
+      ),
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+        React.createElement("button", {
+          onClick: togglePlay,
+          style: { width: "32px", height: "32px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", flexShrink: 0 }
+        }, playing ? "⏸" : "▶"),
+        React.createElement("div", { style: { flex: 1, fontSize: "11px", color: C.textLight } },
+          playing ? "재생 중…" : duration > 0 ? "탭하여 재생" : ""
+        )
+      )
+    )
+  );
 }
 
 // ── Community Tab ─────────────────────────────────────────────────────────────
@@ -3567,7 +3657,7 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
         </div>
         {!hasAnsweredToday ? (
           <button onClick={() => setShowQodFlow(true)}
-            style={{ background: "#fff", color: C.text, border: "none", borderRadius: "100px", padding: "12px 24px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s" }}>
+            style={{ background: "#fff", color: C.text, border: "none", borderRadius: "100px", padding: "12px 28px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s", margin: "0 auto" }}>
             <span>🎙</span> 답하기 · Answer Now
           </button>
         ) : (
@@ -3956,7 +4046,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             {/* Path B — Type in Korean */}
             <div style={{ marginBottom: "8px" }}>
               <button onClick={() => setPath(path === "korean_type" ? null : "korean_type")}
-                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${path === "korean_type" ? C.text : C.border}`, background: path === "korean_type" ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
+                style={{ width: "100%", padding: "14px 16px", borderRadius: path === "korean_type" ? "12px 12px 0 0" : "12px", border: `1px solid ${C.border}`, background: path === "korean_type" ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: path === "korean_type" ? C.text : C.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>⌨️</div>
                 <div>
                   <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>한국어로 먼저 써볼게요</div>
@@ -3964,7 +4054,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                 </div>
               </button>
               {path === "korean_type" && (
-                <div style={{ padding: "14px", background: C.bgSoft, borderRadius: "0 0 12px 12px", border: `1px solid ${C.text}`, borderTop: "none", marginTop: "-1px", animation: "fadeIn 0.2s ease" }}>
+                <div style={{ padding: "14px", background: C.bgSoft, borderRadius: "0 0 12px 12px", border: `1px solid ${C.border}`, borderTop: "none", marginTop: "0px", animation: "fadeIn 0.2s ease" }}>
                   <textarea value={koreanInput} onChange={e => setKoreanInput(e.target.value)}
                     placeholder="한국어로 답변을 써보세요…"
                     style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "none", minHeight: "72px", lineHeight: 1.6, background: C.bg, marginBottom: "10px" }} />
@@ -3996,7 +4086,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             {/* Path C — Speak in Korean */}
             <div style={{ marginBottom: "20px" }}>
               <button onClick={() => setPath(path === "korean_voice" ? null : "korean_voice")}
-                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${path === "korean_voice" ? C.text : C.border}`, background: path === "korean_voice" ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
+                style={{ width: "100%", padding: "14px 16px", borderRadius: path === "korean_voice" ? "12px 12px 0 0" : "12px", border: `1px solid ${C.border}`, background: path === "korean_voice" ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: path === "korean_voice" ? C.text : C.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>🎙</div>
                 <div>
                   <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>한국어로 먼저 말할게요</div>
@@ -4004,7 +4094,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                 </div>
               </button>
               {path === "korean_voice" && (
-                <div style={{ padding: "16px", background: C.bgSoft, borderRadius: "0 0 12px 12px", border: `1px solid ${C.text}`, borderTop: "none", marginTop: "-1px", textAlign: "center", animation: "fadeIn 0.2s ease" }}>
+                <div style={{ padding: "16px", background: C.bgSoft, borderRadius: "0 0 12px 12px", border: `1px solid ${C.border}`, borderTop: "none", marginTop: "0px", textAlign: "center", animation: "fadeIn 0.2s ease" }}>
                   {koreanVoiceStep === "idle" && (
                     <div>
                       <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "12px" }}>한국어로 답변을 말해보세요</div>
