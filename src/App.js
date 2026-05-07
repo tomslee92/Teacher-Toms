@@ -713,6 +713,7 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   const [randomPhrase, setRandomPhrase] = useState(null);
   const [phraseOfDay, setPhraseOfDay] = useState(null);
   const [showPOD, setShowPOD] = useState(true);
+  const [podOpen, setPodOpen] = useState(false);
   const [myPhrases, setMyPhrases] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [sessionResets, setSessionResets] = useState({}); // tracks local resets per session
@@ -764,9 +765,10 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   };
 
   const handleProgressUpdate = (phraseId, prog) => {
-    const wasFirstPass = !progress[phraseId]?.passed && prog.passed;
+    const prevProg = progress[phraseId];
+    const wasFirstPass = !(prevProg?.passed) && prog?.passed;
     setProgress(prev => ({ ...prev, [phraseId]: prog }));
-    if (wasFirstPass) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2000); }
+    if (wasFirstPass) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2200); }
   };
 
   const resetSession = (sessionNum) => {
@@ -807,7 +809,23 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
           <div style={{ fontSize: "11px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>⭐ 오늘의 표현</div>
           <div style={{ fontSize: "18px", fontStyle: "italic", color: C.text, marginBottom: "4px" }}>"{phraseOfDay.english}"</div>
           {phraseOfDay.korean && <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "10px" }}>{phraseOfDay.korean}</div>}
-          <Btn onClick={() => { setRandomPhrase(phraseOfDay); setShowPOD(false); }} variant="gold" style={{ fontSize: "12px", padding: "6px 14px" }}>🎙 지금 연습하기</Btn>
+          <Btn onClick={() => { setPodOpen(true); setShowPOD(false); }} variant="gold" style={{ fontSize: "12px", padding: "6px 14px" }}>🎙 지금 연습하기</Btn>
+        </div>
+      )}
+
+      {/* Phrase of Day practice modal */}
+      {podOpen && phraseOfDay && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={e => { if (e.target === e.currentTarget) setPodOpen(false); }}>
+          <div style={{ background: C.bg, borderRadius: "12px", padding: "24px", maxWidth: "520px", width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold }}>⭐ 오늘의 표현</div>
+              <button onClick={() => setPodOpen(false)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ fontSize: "20px", fontStyle: "italic", marginBottom: "6px" }}>"{phraseOfDay.english}"</div>
+            {phraseOfDay.korean && <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "6px" }}>{phraseOfDay.korean}</div>}
+            {phraseOfDay.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", marginBottom: "12px", fontSize: "13px", color: C.textMid }}>{phraseOfDay.context}</div>}
+            <PhraseCard phrase={phraseOfDay} user={user} prog={progress[phraseOfDay.id]} isPreview={isPreview} onUpdate={handleProgressUpdate} onPracticed={onPracticed} hideContext={true} />
+          </div>
         </div>
       )}
 
@@ -831,7 +849,7 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
             <div style={{ fontSize: "20px", fontStyle: "italic", marginBottom: "6px" }}>"{randomPhrase.english}"</div>
             {randomPhrase.korean && <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "6px" }}>{randomPhrase.korean}</div>}
             {randomPhrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", marginBottom: "12px", fontSize: "13px", color: C.textMid }}>{randomPhrase.context}</div>}
-            <PhraseCard phrase={randomPhrase} user={user} prog={progress[randomPhrase.id]} isPreview={isPreview} onUpdate={handleProgressUpdate} onPracticed={onPracticed} />
+            <PhraseCard phrase={randomPhrase} user={user} prog={progress[randomPhrase.id]} isPreview={isPreview} onUpdate={handleProgressUpdate} onPracticed={onPracticed} hideContext={true} />
           </div>
         </div>
       )}
@@ -898,7 +916,7 @@ function ExpandableRow({ phrase, prog, user, isPreview, onUpdate, onPracticed })
       </div>
       {open && (
         <div style={{ borderTop: `1px solid ${border}`, padding: "16px" }} className="fade-in">
-          <PhraseCard phrase={phrase} user={user} prog={prog} isPreview={isPreview} onUpdate={onUpdate} onPracticed={onPracticed} onClose={() => setOpen(false)} autoStart={true} />
+          <PhraseCard phrase={phrase} user={user} prog={prog} isPreview={isPreview} onUpdate={onUpdate} onPracticed={onPracticed} onClose={() => setOpen(false)} />
         </div>
       )}
     </div>
@@ -906,7 +924,7 @@ function ExpandableRow({ phrase, prog, user, isPreview, onUpdate, onPracticed })
 }
 
 // ── Phrase Card ───────────────────────────────────────────────────────────────
-function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onClose, autoStart = false }) {
+function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onClose, autoStart = false, hideContext = false }) {
   const [feedback, setFeedback] = useState(null);
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -945,7 +963,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
 
   return (
     <div>
-      {phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
+      {!hideContext && phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "14px" }}>
         <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "13px", padding: "7px 14px" }}>🔊 듣기</Btn>
       </div>
