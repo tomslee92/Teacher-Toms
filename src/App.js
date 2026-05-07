@@ -4600,67 +4600,59 @@ function WayveLogo({ size = 22, color = "#1A1A1A" }) {
 
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
-  const [phase, setPhase] = useState("hidden");
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase("logo"), 200);
-    const t2 = setTimeout(() => setPhase("line"), 1000);
-    const t3 = setTimeout(() => setPhase("sub"), 1600);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, []);
-
+  // Pure CSS animation — no React state changes = no re-render glitches
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
       <style>{`
-        @keyframes introLogoRise {
-          0%   { opacity: 0; transform: translateY(20px); }
+        @keyframes wv-logo {
+          0%   { opacity: 0; transform: translateY(18px); }
           100% { opacity: 1; transform: translateY(0px); }
         }
-        @keyframes introLineGrow {
-          0%   { width: 0px; }
-          100% { width: 48px; }
+        @keyframes wv-line {
+          0%   { transform: scaleX(0); opacity: 0; }
+          10%  { opacity: 1; }
+          100% { transform: scaleX(1); opacity: 1; }
         }
-        @keyframes introSubFade {
-          0%   { opacity: 0; transform: translateY(6px); }
+        @keyframes wv-sub {
+          0%   { opacity: 0; transform: translateY(5px); }
           100% { opacity: 1; transform: translateY(0px); }
+        }
+        .wv-logo {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          font-size: 34px;
+          font-weight: 800;
+          letter-spacing: 10px;
+          color: #1A1A1A;
+          line-height: 1;
+          -webkit-font-smoothing: antialiased;
+          opacity: 0;
+          animation: wv-logo 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+        }
+        .wv-line {
+          height: 1.5px;
+          width: 48px;
+          background: #1A1A1A;
+          margin-top: 14px;
+          border-radius: 1px;
+          transform-origin: left center;
+          transform: scaleX(0);
+          opacity: 0;
+          animation: wv-line 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.9s forwards;
+        }
+        .wv-sub {
+          font-size: 10px;
+          color: #999999;
+          letter-spacing: 3.5px;
+          text-transform: uppercase;
+          margin-top: 12px;
+          opacity: 0;
+          animation: wv-sub 0.9s ease 1.5s forwards;
         }
       `}</style>
-
-      {/* Logo wordmark */}
-      <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        animation: phase !== "hidden" ? "introLogoRise 1.0s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
-        opacity: phase === "hidden" ? 0 : undefined,
-      }}>
-        <div style={{
-          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-          fontSize: "34px", fontWeight: "800", letterSpacing: "10px",
-          color: "#1A1A1A", lineHeight: 1,
-          WebkitFontSmoothing: "antialiased",
-        }}>
-          WAYVE
-        </div>
-
-        {/* Underline — draws in after logo */}
-        {(phase === "line" || phase === "sub") && (
-          <div style={{
-            height: "1.5px", background: "#1A1A1A",
-            marginTop: "14px", borderRadius: "1px",
-            animation: "introLineGrow 0.7s cubic-bezier(0.22,1,0.36,1) forwards",
-          }} />
-        )}
-
-        {/* Tagline — last to appear */}
-        {phase === "sub" && (
-          <div style={{
-            fontSize: "10px", color: "#999999",
-            letterSpacing: "3.5px", textTransform: "uppercase",
-            marginTop: "12px", fontFamily: FONT,
-            animation: "introSubFade 0.8s ease forwards",
-          }}>
-            English · Made for Korea
-          </div>
-        )}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div className="wv-logo">WAYVE</div>
+        <div className="wv-line" />
+        <div className="wv-sub">English · Made for Korea</div>
       </div>
     </div>
   );
