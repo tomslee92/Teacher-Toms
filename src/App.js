@@ -593,12 +593,7 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
               🎙 {highlightMissed(phrase.english, transcription)}
             </div>
           )}
-          {recordingUrl && (
-            <div style={{ marginBottom: "8px" }}>
-              <div style={{ fontSize: "10px", color: C.textLight, marginBottom: "3px" }}>▶ 내 목소리 듣기</div>
-              <audio src={recordingUrl} controls style={{ width: "100%", height: "36px" }} />
-            </div>
-          )}
+          {recordingUrl && React.createElement(RichAudioPlayer, { src: recordingUrl, label: "내 목소리 듣기" })}
           <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8
             ? <div style={{ marginTop: "8px", padding: "8px 10px", background: C.successBg, borderRadius: "6px", fontSize: "12px", color: C.success, fontWeight: "500" }}>🎉 잘했어요!</div>
@@ -1432,12 +1427,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
               🎙 {highlightMissed(phrase.english, transcription)}
             </div>
           )}
-          {recordingUrl && (
-            <div style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "4px", letterSpacing: "0.5px" }}>▶ 내 목소리 듣기</div>
-              <audio src={recordingUrl} controls style={{ width: "100%", height: "40px" }} />
-            </div>
-          )}
+          {recordingUrl && React.createElement(RichAudioPlayer, { src: recordingUrl, label: "내 목소리 듣기" })}
           <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8 ? (
             <div style={{ marginTop: "12px" }}>
