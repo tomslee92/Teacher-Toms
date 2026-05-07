@@ -65,6 +65,8 @@ const GlobalStyle = () => React.createElement("style", null, `
   .fade-in-up{animation:fadeInUp 0.25s ease both;}
   .scale-in{animation:scaleIn 0.18s ease both;}
   .rec-pulse{animation:recPulse 1.5s ease-in-out infinite;}
+  .tab-nav::-webkit-scrollbar{display:none;}
+  .tab-nav{-webkit-overflow-scrolling:touch;touch-action:pan-x;}
 `);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -718,32 +720,209 @@ function LoginScreen({ onLogin, onTeacher }) {
 }
 
 
-// ── Confetti ──────────────────────────────────────────────────────────────────
-function Confetti() {
-  const colors = ["#B8973A", "#1A7A45", "#C0392B", "#3498DB", "#9B59B6"];
-  const pieces = Array.from({ length: 32 }, (_, i) => ({
+// ── Celebration Effects ──────────────────────────────────────────────────────
+// Randomly picks a celebration effect each time a phrase is passed
+const CELEBRATION_TYPES = ["confetti", "balloons", "stars", "fireworks", "wave"];
+
+function CelebrationEffect({ type }) {
+  const t = type || CELEBRATION_TYPES[Math.floor(Math.random() * CELEBRATION_TYPES.length)];
+
+  if (t === "confetti") return React.createElement(ConfettiEffect);
+  if (t === "balloons") return React.createElement(BalloonsEffect);
+  if (t === "stars") return React.createElement(StarsEffect);
+  if (t === "fireworks") return React.createElement(FireworksEffect);
+  if (t === "wave") return React.createElement(WaveEffect);
+  return React.createElement(ConfettiEffect);
+}
+
+function ConfettiEffect() {
+  const colors = ["#1A1A1A", "#B8973A", "#1A7A45", "#C0392B", "#2563EB", "#7C3AED"];
+  const pieces = Array.from({ length: 60 }, (_, i) => ({
     id: i, color: colors[i % colors.length],
-    left: Math.random() * 100, delay: Math.random() * 0.6,
-    size: 6 + Math.random() * 6,
+    left: Math.random() * 100,
+    delay: Math.random() * 0.8,
+    size: 5 + Math.random() * 8,
+    spin: Math.random() > 0.5,
+    drift: (Math.random() - 0.5) * 120,
   }));
   return React.createElement(React.Fragment, null,
     React.createElement("style", null, `
       @keyframes confettiFall {
-        0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
-        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        0% { transform: translateY(-30px) translateX(0) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(105vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
       }
     `),
     ...pieces.map(p => React.createElement("div", {
       key: p.id,
       style: {
-        position: "fixed", top: 0, left: `${p.left}%`, width: `${p.size}px`, height: `${p.size}px`,
-        background: p.color, borderRadius: p.id % 3 === 0 ? "50%" : "2px",
-        animation: `confettiFall 1.8s ease-in ${p.delay}s forwards`,
+        position: "fixed", top: 0, left: `${p.left}%`,
+        width: `${p.size}px`, height: `${p.size * (p.spin ? 1 : 2.5)}px`,
+        background: p.color,
+        borderRadius: p.spin ? "50%" : "2px",
+        animation: `confettiFall 2s ease-in ${p.delay}s forwards`,
+        "--drift": `${p.drift}px`,
         zIndex: 999, pointerEvents: "none",
       }
     }))
   );
 }
+
+function BalloonsEffect() {
+  const balloons = Array.from({ length: 12 }, (_, i) => ({
+    id: i,
+    emoji: ["🎈", "🎉", "🎊", "🥳"][i % 4],
+    left: 5 + (i * 8) + Math.random() * 5,
+    delay: Math.random() * 0.6,
+    size: 28 + Math.random() * 20,
+    sway: (Math.random() - 0.5) * 60,
+  }));
+  return React.createElement(React.Fragment, null,
+    React.createElement("style", null, `
+      @keyframes balloonRise {
+        0% { transform: translateY(110vh) translateX(0) rotate(-5deg); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translateY(-20vh) translateX(var(--sway)) rotate(5deg); opacity: 0; }
+      }
+    `),
+    ...balloons.map(b => React.createElement("div", {
+      key: b.id,
+      style: {
+        position: "fixed", bottom: 0, left: `${b.left}%`,
+        fontSize: `${b.size}px`,
+        animation: `balloonRise 2.2s ease-out ${b.delay}s forwards`,
+        "--sway": `${b.sway}px`,
+        zIndex: 999, pointerEvents: "none",
+        filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))",
+      }
+    }, b.emoji))
+  );
+}
+
+function StarsEffect() {
+  const stars = Array.from({ length: 30 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    delay: Math.random() * 0.5,
+    size: 16 + Math.random() * 24,
+    dir: Math.random() > 0.5 ? 1 : -1,
+  }));
+  return React.createElement(React.Fragment, null,
+    React.createElement("style", null, `
+      @keyframes starBurst {
+        0% { transform: scale(0) rotate(0deg); opacity: 0; }
+        30% { transform: scale(1.3) rotate(var(--spin)); opacity: 1; }
+        70% { transform: scale(1) rotate(var(--spin)); opacity: 1; }
+        100% { transform: scale(0) rotate(var(--spin)); opacity: 0; }
+      }
+    `),
+    ...stars.map(s => React.createElement("div", {
+      key: s.id,
+      style: {
+        position: "fixed",
+        left: `${s.left}%`, top: `${s.top}%`,
+        fontSize: `${s.size}px`,
+        animation: `starBurst 1.8s ease ${s.delay}s forwards`,
+        "--spin": `${s.dir * (180 + Math.random() * 180)}deg`,
+        zIndex: 999, pointerEvents: "none",
+      }
+    }, "⭐"))
+  );
+}
+
+function FireworksEffect() {
+  const bursts = Array.from({ length: 8 }, (_, i) => ({
+    id: i,
+    left: 10 + Math.random() * 80,
+    top: 10 + Math.random() * 60,
+    delay: i * 0.18,
+    emoji: ["✨", "💥", "🌟", "⚡"][i % 4],
+    size: 24 + Math.random() * 20,
+  }));
+  const sparks = Array.from({ length: 40 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    top: Math.random() * 70,
+    delay: Math.random() * 1.2,
+    color: ["#B8973A", "#1A1A1A", "#C0392B", "#1A7A45", "#2563EB"][i % 5],
+    size: 4 + Math.random() * 6,
+    angle: Math.random() * 360,
+    dist: 40 + Math.random() * 80,
+  }));
+  return React.createElement(React.Fragment, null,
+    React.createElement("style", null, `
+      @keyframes fireworkBurst {
+        0% { transform: scale(0); opacity: 0; }
+        40% { transform: scale(1.4); opacity: 1; }
+        100% { transform: scale(0.8); opacity: 0; }
+      }
+      @keyframes sparkFly {
+        0% { transform: translate(0,0) scale(1); opacity: 1; }
+        100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+      }
+    `),
+    ...bursts.map(b => React.createElement("div", {
+      key: "b" + b.id,
+      style: {
+        position: "fixed", left: `${b.left}%`, top: `${b.top}%`,
+        fontSize: `${b.size}px`,
+        animation: `fireworkBurst 0.8s ease ${b.delay}s forwards`,
+        zIndex: 999, pointerEvents: "none",
+      }
+    }, b.emoji)),
+    ...sparks.map(s => {
+      const rad = s.angle * Math.PI / 180;
+      return React.createElement("div", {
+        key: "s" + s.id,
+        style: {
+          position: "fixed", left: `${s.left}%`, top: `${s.top}%`,
+          width: `${s.size}px`, height: `${s.size}px`,
+          borderRadius: "50%", background: s.color,
+          animation: `sparkFly 1s ease ${s.delay}s forwards`,
+          "--tx": `${Math.cos(rad) * s.dist}px`,
+          "--ty": `${Math.sin(rad) * s.dist}px`,
+          zIndex: 999, pointerEvents: "none",
+        }
+      });
+    })
+  );
+}
+
+function WaveEffect() {
+  const waves = Array.from({ length: 6 }, (_, i) => ({
+    id: i, delay: i * 0.12,
+    color: i % 2 === 0 ? "rgba(26,26,26,0.06)" : "rgba(184,151,58,0.08)",
+  }));
+  return React.createElement(React.Fragment, null,
+    React.createElement("style", null, `
+      @keyframes waveExpand {
+        0% { transform: translate(-50%,-50%) scale(0); opacity: 0.8; }
+        100% { transform: translate(-50%,-50%) scale(4); opacity: 0; }
+      }
+    `),
+    React.createElement("div", {
+      style: { position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, pointerEvents: "none" }
+    },
+      ...waves.map(w => React.createElement("div", {
+        key: w.id,
+        style: {
+          position: "absolute", top: "50%", left: "50%",
+          width: "200px", height: "200px", borderRadius: "50%",
+          background: w.color,
+          animation: `waveExpand 1.4s ease ${w.delay}s forwards`,
+        }
+      })),
+      React.createElement("div", {
+        style: { fontSize: "72px", animation: "starBurst 1.2s ease forwards", zIndex: 1000, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.2))" }
+      }, "🌊")
+    )
+  );
+}
+
+// Legacy Confetti alias
+function Confetti() { return React.createElement(ConfettiEffect); }
+
 
 // ── Student Screen ────────────────────────────────────────────────────────────
 function StudentScreen({ user, group, isPreview, onBack }) {
@@ -813,9 +992,9 @@ function StudentScreen({ user, group, isPreview, onBack }) {
               <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{group?.name || ""}</div>
             </div>
           </div>
-          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, transition: "all 0.15s", fontWeight: "500" }}>나가기</button>
+          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, transition: "all 0.15s", fontWeight: "500" }}>Log out</button>
         </div>
-        <div style={{ display: "flex", padding: "0 20px", overflowX: "auto" }}>
+        <div className="tab-nav" style={{ display: "flex", padding: "0 20px", overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
           {tabs.map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
@@ -854,6 +1033,7 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   const [podOpen, setPodOpen] = useState(false);
   const [myPhrases, setMyPhrases] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [celebrationType, setCelebrationType] = useState(null);
   const [sessionResets, setSessionResets] = useState({}); // tracks local resets per session
 
   const loadData = useCallback(async () => {
@@ -904,19 +1084,37 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
 
   const handleProgressUpdate = (phraseId, prog) => {
     const prevProg = progress[phraseId];
-    // Fire confetti on first-time pass OR when passing again after a session reset
     const wasFirstPass = !(prevProg?.passed) && prog?.passed;
     const wasResetPass = sessionResets[activeSession] && prog?.passed;
     setProgress(prev => ({ ...prev, [phraseId]: prog }));
     if (wasFirstPass || wasResetPass) {
+      const type = CELEBRATION_TYPES[Math.floor(Math.random() * CELEBRATION_TYPES.length)];
+      setCelebrationType(type);
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2200);
+      setTimeout(() => { setShowConfetti(false); setCelebrationType(null); }, 2400);
     }
   };
 
-  const resetSession = (sessionNum) => {
-    // Mark session as reset locally - clears visual color state
-    // Does NOT touch Supabase - real progress persists and shows on next login
+  const resetSession = async (sessionNum) => {
+    const phrases = sessions[sessionNum] || [];
+    const phraseIds = phrases.map(p => p.id);
+    // Clear progress in Supabase so reset persists across logins
+    try {
+      for (const id of phraseIds) {
+        const existing = await db.get("student_progress", `student_id=eq.${user.id}&phrase_id=eq.${id}`).catch(() => []);
+        if (existing.length > 0) {
+          await db.update("student_progress", `student_id=eq.${user.id}&phrase_id=eq.${id}`, {
+            passed: false, needs_retry: false, attempts: 0, best_score: 0, updated_at: new Date().toISOString()
+          });
+        }
+      }
+    } catch(e) {}
+    // Also update local progress state so UI clears immediately
+    setProgress(prev => {
+      const updated = { ...prev };
+      phraseIds.forEach(id => { delete updated[id]; });
+      return updated;
+    });
     setSessionResets(prev => ({ ...prev, [sessionNum]: Date.now() }));
   };
 
@@ -945,7 +1143,7 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
 
   return (
     <div>
-      {showConfetti && React.createElement(Confetti)}
+      {showConfetti && React.createElement(CelebrationEffect, { type: celebrationType })}
 
       {/* Phrase of the Day */}
       {phraseOfDay && showPOD && !isPreview && (
@@ -1369,7 +1567,7 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
 
   return (
     <div>
-      <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "20px", overflowX: "auto" }}>
+      <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "20px", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", msOverflowStyle: "none" }}>
         {tabs.map(([m, label]) =>
           React.createElement("button", { key: m, onClick: () => { setMode(m); setFeedback(null); setTranslation(null); speakRec.reset(); askRec.reset(); setErrMsg(""); setShowPractice(false); setCorrectedEnglish(""); setShowCorrectPractice(false); }, style: { padding: "11px 14px", background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.text}` : "2px solid transparent", color: mode === m ? C.text : C.textLight, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap" } }, label)
         )}
@@ -1994,16 +2192,16 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
       {open && (
         <div style={{
           position: "fixed",
-          // Mobile: full screen. Desktop: popup near bubble
-          bottom: window.innerWidth < 600 ? 0 : "86px",
-          right: window.innerWidth < 600 ? 0 : "16px",
-          left: window.innerWidth < 600 ? 0 : "auto",
-          top: window.innerWidth < 600 ? 0 : "auto",
-          width: window.innerWidth < 600 ? "100%" : "min(380px, calc(100vw - 32px))",
-          height: window.innerWidth < 600 ? "100%" : "min(560px, calc(100vh - 110px))",
+          // Mobile: compact bottom sheet. Desktop: popup near bubble
+          bottom: window.innerWidth < 600 ? "80px" : "86px",
+          right: window.innerWidth < 600 ? "12px" : "16px",
+          left: window.innerWidth < 600 ? "12px" : "auto",
+          top: "auto",
+          width: window.innerWidth < 600 ? "calc(100vw - 24px)" : "min(380px, calc(100vw - 32px))",
+          height: window.innerWidth < 600 ? "min(480px, 65vh)" : "min(560px, calc(100vh - 110px))",
           background: C.bg,
-          borderRadius: window.innerWidth < 600 ? 0 : "16px",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+          borderRadius: "16px",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
           zIndex: 200,
           display: "flex",
           flexDirection: "column",
@@ -2155,7 +2353,7 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
           </div>
           <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", transition: "all 0.15s" }}>Log out</button>
         </div>
-        <div style={{ display: "flex", overflowX: "auto" }}>
+        <div style={{ display: "flex", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", msOverflowStyle: "none" }}>
           {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"], ["responses", "🎙 QoD Responses"]].map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
