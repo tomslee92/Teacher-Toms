@@ -4701,9 +4701,55 @@ function WayveLogo({ size = 22, color = "#1A1A1A" }) {
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFFFF" }}>
-      <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", fontSize: "32px", fontWeight: "800", letterSpacing: "10px", color: "#1A1A1A", WebkitFontSmoothing: "antialiased" }}>
-        WAYVE
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFFFF", flexDirection: "column" }}>
+      <style>{`
+        @keyframes wvLogoUp {
+          0%   { opacity: 0; transform: translateY(24px); }
+          100% { opacity: 1; transform: translateY(0px); }
+        }
+        @keyframes wvLineIn {
+          0%   { transform: scaleX(0); }
+          100% { transform: scaleX(1); }
+        }
+        @keyframes wvSubIn {
+          0%   { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        .wv-logo-text {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          font-size: 34px;
+          font-weight: 800;
+          letter-spacing: 10px;
+          color: #1A1A1A;
+          line-height: 1;
+          -webkit-font-smoothing: antialiased;
+          opacity: 0;
+          animation: wvLogoUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+        }
+        .wv-line {
+          height: 1.5px;
+          width: 48px;
+          background: #1A1A1A;
+          margin-top: 16px;
+          border-radius: 1px;
+          transform-origin: left center;
+          transform: scaleX(0);
+          animation: wvLineIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 1.4s both;
+        }
+        .wv-sub {
+          font-size: 10px;
+          color: #AAAAAA;
+          letter-spacing: 3.5px;
+          text-transform: uppercase;
+          margin-top: 14px;
+          opacity: 0;
+          animation: wvSubIn 1.0s ease 2.0s both;
+        }
+      `}</style>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div className="wv-logo-text">WAYVE</div>
+        <div className="wv-line" />
+        <div className="wv-sub">English · Made for Korea</div>
       </div>
     </div>
   );
@@ -4803,7 +4849,6 @@ function QodEntryScreen({ user, group, onEnter }) {
   const [showKorean, setShowKorean] = useState(false);
   const [loadingKorean, setLoadingKorean] = useState(false);
   const [milestoneEffect, setMilestoneEffect] = useState(null);
-  const [introVisible, setIntroVisible] = useState(true);
   const today = new Date().toISOString().split("T")[0];
   const streak = user.streak || 0;
   const isMilestone = streak > 0 && streak % 7 === 0;
@@ -4835,28 +4880,11 @@ function QodEntryScreen({ user, group, onEnter }) {
   if (loading) return React.createElement(LoadingScreen);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", animation: "screenFadeIn 0.8s ease both" }}>
       <style>{`
         @keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes wv-logo { 0%{opacity:0;transform:translateY(18px)} 100%{opacity:1;transform:translateY(0)} }
-        @keyframes wv-line { 0%{transform:scaleX(0);opacity:0} 10%{opacity:1} 100%{transform:scaleX(1);opacity:1} }
-        @keyframes wv-sub  { 0%{opacity:0;transform:translateY(5px)} 100%{opacity:1;transform:translateY(0)} }
-        @keyframes wv-out  { 0%{opacity:1} 100%{opacity:0;pointer-events:none} }
-        .wv-logo { font-family:'Inter',-apple-system,sans-serif; font-size:34px; font-weight:800; letter-spacing:10px; color:#1A1A1A; line-height:1; -webkit-font-smoothing:antialiased; opacity:0; animation:wv-logo 1.1s cubic-bezier(0.22,1,0.36,1) 0.2s forwards; }
-        .wv-line { height:1.5px; width:48px; background:#1A1A1A; margin-top:14px; border-radius:1px; transform-origin:left center; transform:scaleX(0); opacity:0; animation:wv-line 0.7s cubic-bezier(0.22,1,0.36,1) 1.0s forwards; }
-        .wv-sub  { font-size:10px; color:#999; letter-spacing:3.5px; text-transform:uppercase; margin-top:12px; font-family:${FONT}; opacity:0; animation:wv-sub 0.8s ease 1.6s forwards; }
-        .wv-out  { animation:wv-out 0.6s ease 2.4s forwards; }
+        @keyframes screenFadeIn { from{opacity:0} to{opacity:1} }
       `}</style>
-
-      {/* Intro overlay — sits on top, fades away, no component swap */}
-      {introVisible && (
-        <div className="wv-out" onAnimationEnd={() => setIntroVisible(false)}
-          style={{ position: "fixed", inset: 0, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, flexDirection: "column" }}>
-          <div className="wv-logo">WAYVE</div>
-          <div className="wv-line" />
-          <div className="wv-sub">English · Made for Korea</div>
-        </div>
-      )}
 
       {showFlow && qodPrompt && cityGroup && React.createElement(QodAnswerFlow, { prompt: qodPrompt, user, cityGroup, onPost: onEnter, onClose: () => setShowFlow(false) })}
       {milestoneEffect === "playing" && React.createElement(StreakMilestone, { streak, type: getMilestoneType(streak), onDone: () => setMilestoneEffect("done") })}
