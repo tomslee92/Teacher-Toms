@@ -3385,8 +3385,7 @@ English: "${prompt}"`);
   const korean = text.trim().split("").filter(c => {
     const code = c.charCodeAt(0);
     const isKorean = (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F);
-    const isAllowed = [" ", "?", "!", ".", ",", "·", "…", "
-"].includes(c);
+    const isAllowed = c === " " || c === "?" || c === "!" || c === "." || c === ",";
     return isKorean || isAllowed;
   }).join("").trim();
   return korean || text.trim(); // fallback to raw if filter removes everything
