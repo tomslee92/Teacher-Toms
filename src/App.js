@@ -4808,37 +4808,46 @@ function QodEntryScreen({ user, group, onEnter }) {
   const [loading, setLoading] = useState(true);
   const [showFlow, setShowFlow] = useState(false);
   const [cityGroup, setCityGroup] = useState(null);
+  const [koreanTranslation, setKoreanTranslation] = useState(null);
+  const [showKorean, setShowKorean] = useState(false);
+  const [loadingKorean, setLoadingKorean] = useState(false);
+  const [milestoneEffect, setMilestoneEffect] = useState(null); // null | "playing" | "done"
   const today = new Date().toISOString().split("T")[0];
+  const streak = user.streak || 0;
+
+  // Check if this login is a streak milestone (multiple of 7)
+  const isMilestone = streak > 0 && streak % 7 === 0;
+  const milestoneType = getMilestoneType(streak);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // Get today's prompt
         let prompts = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
         let prompt = prompts[0] || null;
-        // Auto-generate if none exists
-        if (!prompt) {
-          prompt = await autoGenerateQod();
-        }
+        if (!prompt) prompt = await autoGenerateQod();
         setQodPrompt(prompt);
-        // Get city group
         if (group?.id) {
           const cm = await db.get("city_group_members", `group_id=eq.${group.id}&select=*,city_groups(*)`).catch(() => []);
           setCityGroup(cm[0]?.city_groups || null);
         }
       } catch(e) {}
       setLoading(false);
+      // Show milestone after brief delay if applicable
+      if (isMilestone) {
+        setTimeout(() => setMilestoneEffect("playing"), 400);
+      }
     };
     load();
   }, []);
 
-  // Check if already answered today
-  const checkAnswered = async () => {
-    if (!qodPrompt?.id || qodPrompt.id.startsWith("temp_")) return false;
+  const handleRevealKorean = async () => {
+    if (koreanTranslation) { setShowKorean(s => !s); return; }
+    setLoadingKorean(true);
     try {
-      const r = await db.get("qod_responses", `student_id=eq.${user.id}&prompt_id=eq.${qodPrompt.id}&limit=1`);
-      return r.length > 0;
-    } catch(e) { return false; }
+      const t = await translateQodToKorean(qodPrompt.prompt);
+      setKoreanTranslation(t); setShowKorean(true);
+    } catch(e) {}
+    setLoadingKorean(false);
   };
 
   const handleAnswer = () => setShowFlow(true);
@@ -4851,7 +4860,6 @@ function QodEntryScreen({ user, group, onEnter }) {
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
       <style>{`
         @keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes subtlePulse { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
       `}</style>
 
       {/* QoD Flow Modal */}
@@ -4863,30 +4871,54 @@ function QodEntryScreen({ user, group, onEnter }) {
         })
       )}
 
+      {/* Milestone celebration overlay */}
+      {milestoneEffect === "playing" && (
+        React.createElement(StreakMilestone, {
+          streak,
+          type: milestoneType,
+          onDone: () => setMilestoneEffect("done")
+        })
+      )}
+
       {/* Full screen entry */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 28px", textAlign: "center" }}>
 
         {/* Logo */}
-        <div style={{ marginBottom: "48px", animation: "qodEntryFade 0.5s ease both" }}>
+        <div style={{ marginBottom: "40px", animation: "qodEntryFade 0.5s ease both" }}>
           {WayveLogo({ size: 18, color: C.text })}
         </div>
 
-        {/* Date pill */}
-        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "24px", animation: "qodEntryFade 0.5s ease 0.1s both" }}>
+        {/* Date */}
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "20px", animation: "qodEntryFade 0.5s ease 0.1s both" }}>
           {new Date().toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })}
         </div>
 
-        {/* The question — hero moment */}
+        {/* Question */}
         <div style={{ animation: "qodEntryFade 0.6s ease 0.2s both", maxWidth: "420px" }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "20px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "16px" }}>
             오늘의 질문
           </div>
-          <div style={{ fontSize: "clamp(22px, 5vw, 28px)", fontWeight: "700", lineHeight: 1.45, color: C.text, letterSpacing: "-0.5px", marginBottom: "36px", fontStyle: "italic" }}>
+          <div style={{ fontSize: "clamp(20px, 5vw, 26px)", fontWeight: "700", lineHeight: 1.45, color: C.text, letterSpacing: "-0.3px", marginBottom: "16px", fontStyle: "italic" }}>
             "{qodPrompt?.prompt || "Loading…"}"
           </div>
+
+          {/* Korean translation — tap to reveal, visible right here */}
+          {!showKorean ? (
+            <button onClick={handleRevealKorean} disabled={loadingKorean}
+              style={{ background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "8px 18px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: "6px", marginBottom: "28px", transition: "all 0.15s" }}>
+              {loadingKorean ? React.createElement(Spinner) : "🇰🇷"}
+              <span>{loadingKorean ? "번역 중…" : "한국어로 보기"}</span>
+            </button>
+          ) : (
+            <div style={{ background: C.bgSoft, borderRadius: "12px", padding: "12px 16px", marginBottom: "28px", fontSize: "14px", color: C.textMid, lineHeight: 1.7, display: "flex", alignItems: "flex-start", gap: "8px", textAlign: "left", position: "relative" }}>
+              <span>🇰🇷</span>
+              <span style={{ flex: 1 }}>{koreanTranslation}</span>
+              <button onClick={() => setShowKorean(false)} style={{ background: "none", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px", flexShrink: 0 }}>×</button>
+            </div>
+          )}
         </div>
 
-        {/* CTA */}
+        {/* CTAs */}
         <div style={{ animation: "qodEntryFade 0.6s ease 0.35s both", width: "100%", maxWidth: "360px" }}>
           {(!cityGroup) ? (
             <div>
@@ -4905,24 +4937,40 @@ function QodEntryScreen({ user, group, onEnter }) {
               </button>
               <button onClick={handleSkip}
                 style={{ width: "100%", padding: "14px", background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: FONT }}>
-                Skip for today →
+                Skip for now →
               </button>
             </div>
           )}
         </div>
 
-        {/* City + streak context */}
-        {cityGroup && (
-          <div style={{ marginTop: "32px", animation: "qodEntryFade 0.6s ease 0.5s both" }}>
-            <div style={{ fontSize: "12px", color: C.textLight }}>
-              {cityGroup.emoji} {cityGroup.name} · 🔥 {user.streak || 0} day streak
+        {/* Streak — prominent */}
+        <div style={{ marginTop: "36px", animation: "qodEntryFade 0.6s ease 0.5s both", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+          {streak > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: C.bgSoft, borderRadius: "100px", padding: "8px 20px", border: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "22px", animation: "streakFire 2.5s ease-in-out infinite", display: "inline-block" }}>🔥</span>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, lineHeight: 1 }}>{streak} day streak</div>
+                <div style={{ fontSize: "10px", color: C.textLight, marginTop: "1px" }}>
+                  {streak % 7 === 0 ? "🏆 Milestone reached!" : `${7 - (streak % 7)} days to next milestone`}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ fontSize: "12px", color: C.textLight }}>
+              Answer today to start your streak 🔥
+            </div>
+          )}
+          {cityGroup && (
+            <div style={{ fontSize: "11px", color: C.textLight }}>
+              {cityGroup.emoji} {cityGroup.name}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
 
 // ── Home Grid ─────────────────────────────────────────────────────────────────
 function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
@@ -5157,6 +5205,195 @@ function TeacherCommentDisplay({ responseId }) {
         </div>
       )}
       {comment.audio_url && React.createElement(RichAudioPlayer, { src: comment.audio_url, label: "Voice feedback" })}
+    </div>
+  );
+}
+
+// ── Streak Milestone System ───────────────────────────────────────────────────
+function getMilestoneType(streak) {
+  if (streak >= 70) return "crown";
+  if (streak >= 63) return "launch";
+  if (streak >= 56) return "diamond";
+  if (streak >= 49) return "aurora";
+  if (streak >= 42) return "lightning";
+  if (streak >= 35) return "sakura";
+  if (streak >= 28) return "confetti_parade";
+  if (streak >= 21) return "starfield";
+  if (streak >= 14) return "firestorm";
+  if (streak >= 7)  return "wave";
+  return "wave";
+}
+
+function StreakMilestone({ streak, type, onDone }) {
+  const [phase, setPhase] = useState("enter"); // enter | celebrate | exit
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase("celebrate"), 300);
+    const t2 = setTimeout(() => setPhase("exit"), 4000);
+    const t3 = setTimeout(() => onDone(), 4600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  const config = {
+    wave:           { emoji: "🌊", title: "7-Day Wave",      sub: "You're riding it!",           color: "#2563EB", bg: "linear-gradient(135deg, #0D1B2A, #1E3A5F)" },
+    firestorm:      { emoji: "🔥", title: "14-Day Fire",      sub: "The heat is real!",           color: "#E8913A", bg: "linear-gradient(135deg, #1A0800, #3D1500)" },
+    starfield:      { emoji: "⭐", title: "21-Day Stars",     sub: "You're shining bright",       color: "#F9D923", bg: "linear-gradient(135deg, #05050F, #0D0D2B)" },
+    confetti_parade:{ emoji: "🎊", title: "28-Day Parade",    sub: "Now THAT'S a streak!",        color: "#C0392B", bg: "linear-gradient(135deg, #1A0A0A, #2D0A0A)" },
+    sakura:         { emoji: "🌸", title: "35-Day Bloom",     sub: "Beautiful — like spring",     color: "#F48FB1", bg: "linear-gradient(135deg, #1A0A10, #2D0D1A)" },
+    lightning:      { emoji: "⚡", title: "42-Day Strike",    sub: "Electrifying progress",       color: "#FDD835", bg: "linear-gradient(135deg, #0A0A1A, #12122D)" },
+    aurora:         { emoji: "🌌", title: "49-Day Aurora",    sub: "Rare & extraordinary",        color: "#00E5FF", bg: "linear-gradient(135deg, #010D10, #021A20)" },
+    diamond:        { emoji: "💎", title: "56-Day Diamond",   sub: "Forged under pressure",       color: "#80DEEA", bg: "linear-gradient(135deg, #050A10, #0A1520)" },
+    launch:         { emoji: "🚀", title: "63-Day Launch",    sub: "You're in orbit now",         color: "#B2EBF2", bg: "linear-gradient(135deg, #020508, #050D15)" },
+    crown:          { emoji: "👑", title: "Legend",           sub: `${streak} days — unstoppable`, color: "#FFD700", bg: "linear-gradient(135deg, #0A0800, #1A1200)" },
+  };
+
+  const c = config[type] || config.wave;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: c.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: phase === "exit" ? 0 : 1, transition: "opacity 0.6s ease" }}
+      onClick={onDone}>
+      <style>{`
+        @keyframes milestoneEmoji { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.3) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+        @keyframes milestoneTitle { 0%{transform:translateY(30px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+        @keyframes milestoneSub { 0%{transform:translateY(20px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+        @keyframes milestoneStreak { 0%{transform:scale(0.5);opacity:0} 80%{transform:scale(1.1);opacity:1} 100%{transform:scale(1);opacity:1} }
+        @keyframes shimmerGold { 0%,100%{opacity:0.6} 50%{opacity:1} }
+        /* Wave effect */
+        @keyframes waveRipple { 0%{transform:translate(-50%,-50%) scale(0);opacity:0.6} 100%{transform:translate(-50%,-50%) scale(8);opacity:0} }
+        /* Fire particles */
+        @keyframes fireRise { 0%{transform:translateY(0) scale(1);opacity:1} 100%{transform:translateY(-120px) scale(0.3);opacity:0} }
+        /* Stars */
+        @keyframes starTwinkle { 0%,100%{opacity:0.2;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.2)} }
+        /* Sakura petals */
+        @keyframes petalFall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(110vh) rotate(720deg);opacity:0} }
+        /* Lightning */
+        @keyframes boltFlash { 0%,100%{opacity:0} 10%,30%{opacity:1} 20%,40%{opacity:0.3} }
+        /* Aurora waves */
+        @keyframes auroraFlow { 0%{transform:translateX(-100%) skewX(-15deg)} 100%{transform:translateX(200%) skewX(-15deg)} }
+        /* Diamond sparkle */
+        @keyframes diamondSpin { 0%{transform:rotate(0deg) scale(1)} 50%{transform:rotate(180deg) scale(1.2)} 100%{transform:rotate(360deg) scale(1)} }
+        /* Rocket */
+        @keyframes rocketLaunch { 0%{transform:translateY(60px);opacity:0} 100%{transform:translateY(-20px);opacity:1} }
+        /* Crown */
+        @keyframes crownFloat { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-12px) rotate(3deg)} }
+        /* Gold particles */
+        @keyframes goldFall { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(540deg);opacity:0} }
+      `}</style>
+
+      {/* Type-specific background effects */}
+      {type === "wave" && (
+        <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{ position: "absolute", top: "50%", left: "50%", width: "200px", height: "200px", borderRadius: "50%", border: `2px solid ${c.color}40`, animation: `waveRipple 3s ease-out ${i * 0.5}s infinite` }} />
+          ))}
+        </div>
+      )}
+
+      {type === "firestorm" && (
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40%", pointerEvents: "none", overflow: "hidden" }}>
+          {Array.from({length: 20}, (_, i) => (
+            <div key={i} style={{ position: "absolute", bottom: 0, left: `${Math.random() * 100}%`, fontSize: `${16 + Math.random() * 24}px`, animation: `fireRise ${1 + Math.random()}s ease-out ${Math.random() * 2}s infinite` }}>🔥</div>
+          ))}
+        </div>
+      )}
+
+      {type === "starfield" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          {Array.from({length: 40}, (_, i) => (
+            <div key={i} style={{ position: "absolute", left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, fontSize: `${8 + Math.random() * 16}px`, animation: `starTwinkle ${1 + Math.random() * 2}s ease-in-out ${Math.random() * 2}s infinite` }}>⭐</div>
+          ))}
+        </div>
+      )}
+
+      {type === "confetti_parade" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          {Array.from({length: 50}, (_, i) => (
+            <div key={i} style={{ position: "absolute", top: 0, left: `${Math.random() * 100}%`, width: `${4 + Math.random() * 8}px`, height: `${8 + Math.random() * 16}px`, background: ["#C0392B","#F9D923","#2563EB","#1A7A45","#E8913A"][i%5], borderRadius: "2px", animation: `petalFall ${2 + Math.random()}s ease-in ${Math.random() * 2}s infinite` }} />
+          ))}
+        </div>
+      )}
+
+      {type === "sakura" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          {Array.from({length: 30}, (_, i) => (
+            <div key={i} style={{ position: "absolute", top: `-10%`, left: `${Math.random() * 110}%`, fontSize: `${14 + Math.random() * 20}px`, animation: `petalFall ${3 + Math.random() * 2}s ease-in ${Math.random() * 3}s infinite` }}>🌸</div>
+          ))}
+        </div>
+      )}
+
+      {type === "lightning" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          {Array.from({length: 8}, (_, i) => (
+            <div key={i} style={{ position: "absolute", left: `${10 + i * 12}%`, top: `${Math.random() * 40}%`, fontSize: `${24 + Math.random() * 32}px`, animation: `boltFlash ${0.5 + Math.random() * 0.5}s ease ${i * 0.2}s infinite` }}>⚡</div>
+          ))}
+        </div>
+      )}
+
+      {type === "aurora" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          {["#00E5FF","#00BFA5","#1DE9B6","#40C4FF"].map((clr, i) => (
+            <div key={i} style={{ position: "absolute", top: `${15 + i * 15}%`, left: "-100%", width: "300%", height: "60px", background: `linear-gradient(90deg, transparent, ${clr}40, transparent)`, animation: `auroraFlow ${4 + i * 0.8}s linear ${i * 0.5}s infinite` }} />
+          ))}
+        </div>
+      )}
+
+      {type === "diamond" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          {Array.from({length: 15}, (_, i) => (
+            <div key={i} style={{ position: "absolute", left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, fontSize: `${12 + Math.random() * 20}px`, animation: `diamondSpin ${2 + Math.random() * 2}s linear ${Math.random()}s infinite` }}>💎</div>
+          ))}
+        </div>
+      )}
+
+      {type === "launch" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+          {Array.from({length: 20}, (_, i) => (
+            <div key={i} style={{ position: "absolute", left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, width: "2px", height: `${10 + Math.random() * 20}px`, background: `rgba(178,235,242,${0.3 + Math.random() * 0.5})`, borderRadius: "1px", animation: `starTwinkle ${0.5 + Math.random()}s ease-in-out ${Math.random()}s infinite` }} />
+          ))}
+        </div>
+      )}
+
+      {type === "crown" && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          {Array.from({length: 40}, (_, i) => (
+            <div key={i} style={{ position: "absolute", top: 0, left: `${Math.random() * 100}%`, width: "3px", height: `${6 + Math.random() * 10}px`, background: ["#FFD700","#FFC107","#FFEB3B","#FFF9C4"][i%4], borderRadius: "2px", animation: `goldFall ${2 + Math.random() * 2}s ease-in ${Math.random() * 1.5}s infinite` }} />
+          ))}
+        </div>
+      )}
+
+      {/* Center content */}
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "40px 32px" }}>
+        {/* Big emoji */}
+        <div style={{ fontSize: "88px", lineHeight: 1, marginBottom: "24px", animation: "milestoneEmoji 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.2s both" }}>
+          {c.emoji}
+        </div>
+
+        {/* Streak number */}
+        <div style={{ fontSize: "72px", fontWeight: "900", color: c.color, lineHeight: 1, marginBottom: "8px", animation: "milestoneStreak 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.5s both", textShadow: `0 0 40px ${c.color}60`, letterSpacing: "-2px" }}>
+          {streak}
+        </div>
+        <div style={{ fontSize: "13px", fontWeight: "700", color: c.color, letterSpacing: "4px", textTransform: "uppercase", marginBottom: "20px", animation: "milestoneTitle 0.5s ease 0.7s both", opacity: 0.8 }}>
+          DAYS
+        </div>
+
+        {/* Title */}
+        <div style={{ fontSize: "28px", fontWeight: "800", color: "#fff", letterSpacing: "-0.5px", marginBottom: "8px", animation: "milestoneTitle 0.5s ease 0.8s both" }}>
+          {c.title}
+        </div>
+
+        {/* Subtitle */}
+        <div style={{ fontSize: "16px", color: "rgba(255,255,255,0.65)", marginBottom: "40px", animation: "milestoneSub 0.5s ease 1s both" }}>
+          {c.sub}
+        </div>
+
+        {/* Tap to continue + discovery hint */}
+        <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", letterSpacing: "2px", textTransform: "uppercase", animation: "shimmerGold 2s ease 1.5s infinite", marginBottom: "10px" }}>
+          Tap to continue
+        </div>
+        <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", letterSpacing: "0.5px", animation: "milestoneSub 0.5s ease 1.8s both" }}>
+          ✨ New celebrations unlock as you grow
+        </div>
+      </div>
     </div>
   );
 }
