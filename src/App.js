@@ -1107,17 +1107,34 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
     setRandomPhrase(pool[Math.floor(Math.random() * pool.length)]);
   };
 
-  const handleProgressUpdate = (phraseId, prog) => {
-    const prevProg = progress[phraseId];
-    const wasFirstPass = !(prevProg?.passed) && prog?.passed;
-    const wasResetPass = sessionResets[activeSession] && prog?.passed;
-    setProgress(prev => ({ ...prev, [phraseId]: prog }));
-    if (wasFirstPass || wasResetPass) {
-      const type = CELEBRATION_TYPES[Math.floor(Math.random() * CELEBRATION_TYPES.length)];
-      setCelebrationType(type);
-      setShowConfetti(true);
-      setTimeout(() => { setShowConfetti(false); setCelebrationType(null); }, 2400);
-    }
+  const handleProgressUpdate = (phraseIdOrProg, progArg) => {
+    // PhraseCard calls onUpdate(progObj) with ONE arg — phraseId is inside the object
+    // ExpandableRow calls onUpdate(phraseId, prog) with TWO args
+    // Handle both conventions:
+    const phraseId = progArg !== undefined ? phraseIdOrProg : phraseIdOrProg?.phrase_id;
+    const prog = progArg !== undefined ? progArg : phraseIdOrProg;
+    if (!phraseId || !prog) return;
+
+    // Use functional update to avoid stale closure
+    setProgress(prev => {
+      const updated = { ...prev, [phraseId]: prog };
+
+      // Check for full session completion using fresh state
+      const sessionPhrases = sessions[activeSession] || [];
+      if (sessionPhrases.length > 0) {
+        const allPassedNow = sessionPhrases.every(p => updated[p.id]?.passed);
+        const allPassedBefore = sessionPhrases.every(p => prev[p.id]?.passed);
+        if (allPassedNow && !allPassedBefore) {
+          // Use setTimeout to fire celebration outside of setState
+          setTimeout(() => {
+            setCelebrationType("confetti");
+            setShowConfetti(true);
+            setTimeout(() => { setShowConfetti(false); setCelebrationType(null); }, 3000);
+          }, 50);
+        }
+      }
+      return updated;
+    });
   };
 
   const resetSession = async (sessionNum) => {
@@ -3581,53 +3598,23 @@ Format:
 }
 
 // ── Rich Audio Player ────────────────────────────────────────────────────────
+// Clean minimal iMessage-style player — thin progress line, perfectly smooth
 function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) {
   const audioRef = useRef(null);
+  const rafRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [waveform, setWaveform] = useState([]);
-  const rafRef = useRef(null);
 
-  // Decode real waveform from audio data
   useEffect(() => {
-    if (!src) return;
-    setWaveform([]);
     setPlaying(false);
     setProgress(0);
     setCurrentTime(0);
     setDuration(0);
-    const decode = async () => {
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) throw new Error("no AudioContext");
-        const ctx = new AudioCtx();
-        const res = await fetch(src);
-        const buf = await res.arrayBuffer();
-        const decoded = await ctx.decodeAudioData(buf);
-        const raw = decoded.getChannelData(0);
-        const N = 50;
-        const block = Math.floor(raw.length / N);
-        const bars = Array.from({ length: N }, (_, i) => {
-          let s = 0;
-          for (let j = 0; j < block; j++) s += Math.abs(raw[i * block + j]);
-          return s / block;
-        });
-        const max = Math.max(...bars, 0.001);
-        setWaveform(bars.map(v => v / max));
-        ctx.close();
-      } catch(e) {
-        // Smooth fallback shape
-        setWaveform(Array.from({ length: 50 }, (_, i) =>
-          Math.max(0.08, 0.35 + Math.sin(i * 0.45) * 0.28 + Math.sin(i * 0.95 + 1.1) * 0.2 + Math.sin(i * 1.9) * 0.12)
-        ));
-      }
-    };
-    decode();
+    cancelAnimationFrame(rafRef.current);
   }, [src]);
 
-  // Audio metadata
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -3646,20 +3633,18 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) 
     };
   }, [src]);
 
-  // 60fps RAF loop — only runs while playing
+  // 60fps RAF — only runs while playing
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const tick = () => {
-      if (!audio.paused && audio.duration) {
-        const t = audio.currentTime;
-        const p = (t / audio.duration) * 100;
-        setCurrentTime(t);
-        setProgress(p);
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
     if (playing) {
+      const tick = () => {
+        if (audio.duration) {
+          setCurrentTime(audio.currentTime);
+          setProgress(audio.currentTime / audio.duration);
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
       rafRef.current = requestAnimationFrame(tick);
     } else {
       cancelAnimationFrame(rafRef.current);
@@ -3680,71 +3665,62 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) 
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audio.currentTime = ratio * duration;
-    setProgress(ratio * 100);
+    setProgress(ratio);
     setCurrentTime(ratio * duration);
   };
 
-  const fmt = s => isNaN(s) ? "0:00" : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
-  const bars = waveform.length > 0 ? waveform : Array.from({ length: 50 }, (_, i) =>
-    Math.max(0.08, 0.35 + Math.sin(i * 0.45) * 0.28 + Math.sin(i * 0.95 + 1.1) * 0.2)
-  );
+  const fmt = s => isNaN(s) || !isFinite(s) ? "0:00" : `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
 
-  return React.createElement("div", { style: { marginBottom: "12px" } },
+  return React.createElement("div", { style: { marginBottom: "10px" } },
     React.createElement("audio", { ref: audioRef, src, preload: "auto" }),
     React.createElement("div", {
-      style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px", display: "flex", flexDirection: "column", gap: "10px" }
+      style: { background: C.bgSoft, borderRadius: "12px", padding: "10px 14px", border: `1px solid ${C.border}` }
     },
-      // Label + timestamp
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-        React.createElement("span", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid, display: "flex", alignItems: "center", gap: "5px" } },
-          React.createElement("span", null, "🎙"),
-          React.createElement("span", null, label)
+      // Top row: label + time
+      React.createElement("div", {
+        style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }
+      },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+          // Play/pause button
+          React.createElement("button", {
+            onClick: togglePlay,
+            style: { width: "32px", height: "32px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", flexShrink: 0, transition: "transform 0.1s", transform: playing ? "scale(0.92)" : "scale(1)" }
+          }, playing ? "⏸" : "▶"),
+          React.createElement("span", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid } }, label)
         ),
-        React.createElement("span", { style: { fontSize: "11px", color: C.textLight, fontVariantNumeric: "tabular-nums", minWidth: "72px", textAlign: "right" } },
+        React.createElement("span", { style: { fontSize: "11px", color: C.textLight, fontVariantNumeric: "tabular-nums", minWidth: "80px", textAlign: "right" } },
           duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : "—"
         )
       ),
-      // Play button + waveform
-      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
-        React.createElement("button", {
-          onClick: togglePlay,
-          style: { width: "36px", height: "36px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", color: "#fff", fontSize: "12px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.1s", transform: playing ? "scale(0.93)" : "scale(1)" }
-        }, playing ? "⏸" : "▶"),
-        // Waveform — clickable, progress driven by RAF state
+      // Progress track — thin clean line
+      React.createElement("div", {
+        onClick: seek,
+        style: { position: "relative", height: "20px", cursor: "pointer", display: "flex", alignItems: "center" }
+      },
+        // Track background
         React.createElement("div", {
-          onClick: seek,
-          style: { flex: 1, height: "36px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer", position: "relative", overflow: "hidden" }
-        },
-          bars.map((amp, i) => {
-            const pct = (i / bars.length) * 100;
-            const filled = pct < progress;
-            const nearHead = Math.abs(pct - progress) < 4;
-            const minPx = 3;
-            const maxPx = 28;
-            const h = Math.round(minPx + amp * (maxPx - minPx));
-            return React.createElement("div", {
-              key: i,
-              style: {
-                width: "3px",
-                height: `${h}px`,
-                borderRadius: "100px",
-                flexShrink: 0,
-                background: filled ? C.text : C.bgMid,
-                opacity: filled ? 1 : 0.35,
-                transform: nearHead && playing ? "scaleY(1.3)" : "scaleY(1)",
-                transition: "background 0.01s, transform 0.01s, opacity 0.01s",
-              }
-            });
-          })
-        )
+          style: { position: "absolute", left: 0, right: 0, height: "3px", background: C.bgMid, borderRadius: "100px" }
+        }),
+        // Filled portion — width driven by RAF at 60fps
+        React.createElement("div", {
+          style: { position: "absolute", left: 0, height: "3px", background: C.text, borderRadius: "100px", width: `${progress * 100}%` }
+        }),
+        // Thumb dot
+        duration > 0 && React.createElement("div", {
+          style: {
+            position: "absolute",
+            left: `calc(${progress * 100}% - 6px)`,
+            width: "12px", height: "12px",
+            borderRadius: "50%", background: C.text,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            transition: playing ? "none" : "left 0.1s",
+          }
+        })
       ),
       // Transcript
       (transcript && transcript.trim().length > 0) && React.createElement("div", {
-        style: { fontSize: "13px", color: C.textMid, lineHeight: 1.65, paddingTop: "8px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", gap: "6px" }
-      },
-        React.createElement("span", { style: { fontSize: "11px", flexShrink: 0, marginTop: "2px", opacity: 0.6 } }, "🎙"),
-        React.createElement("span", { style: { fontStyle: "italic" } }, `"${transcript}"`)
-      )
+        style: { fontSize: "13px", color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }
+      }, `"${transcript}"`)
     )
   );
 }
@@ -4675,55 +4651,28 @@ function WayveLogo({ size = 22, color = "#1A1A1A" }) {
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFFFF", flexDirection: "column" }}>
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "#FFFFFF",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
       <style>{`
-        @keyframes wvLogoUp {
-          0%   { opacity: 0; transform: translateY(24px); }
-          100% { opacity: 1; transform: translateY(0px); }
-        }
-        @keyframes wvLineIn {
-          0%   { transform: scaleX(0); }
-          100% { transform: scaleX(1); }
-        }
-        @keyframes wvSubIn {
+        @keyframes wvFadeIn {
           0%   { opacity: 0; }
           100% { opacity: 1; }
         }
-        .wv-logo-text {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          font-size: 34px;
-          font-weight: 800;
-          letter-spacing: 10px;
-          color: #1A1A1A;
-          line-height: 1;
-          -webkit-font-smoothing: antialiased;
-          opacity: 0;
-          animation: wvLogoUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
-        }
-        .wv-line {
-          height: 1.5px;
-          width: 48px;
-          background: #1A1A1A;
-          margin-top: 16px;
-          border-radius: 1px;
-          transform-origin: left center;
-          transform: scaleX(0);
-          animation: wvLineIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 1.4s both;
-        }
-        .wv-sub {
-          font-size: 10px;
-          color: #AAAAAA;
-          letter-spacing: 3.5px;
-          text-transform: uppercase;
-          margin-top: 14px;
-          opacity: 0;
-          animation: wvSubIn 1.0s ease 2.0s both;
-        }
       `}</style>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div className="wv-logo-text">WAYVE</div>
-        <div className="wv-line" />
-        <div className="wv-sub">English · Made for Korea</div>
+      <div style={{
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontSize: "32px",
+        fontWeight: "800",
+        letterSpacing: "10px",
+        color: "#1A1A1A",
+        WebkitFontSmoothing: "antialiased",
+        opacity: 0,
+        animation: "wvFadeIn 1.8s ease 0.4s forwards",
+      }}>
+        WAYVE
       </div>
     </div>
   );
@@ -4854,10 +4803,10 @@ function QodEntryScreen({ user, group, onEnter }) {
   if (loading) return React.createElement(LoadingScreen);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", animation: "screenFadeIn 0.8s ease both" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", animation: "wvFadeIn 1.0s ease 0.1s both" }}>
       <style>{`
         @keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes screenFadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes wvFadeIn { from{opacity:0} to{opacity:1} }
       `}</style>
 
       {showFlow && qodPrompt && cityGroup && React.createElement(QodAnswerFlow, { prompt: qodPrompt, user, cityGroup, onPost: onEnter, onClose: () => setShowFlow(false) })}
