@@ -50,6 +50,8 @@ const GlobalStyle = () => React.createElement("style", null, `
   html{scroll-behavior:smooth;}
   body{font-family:${FONT};background:${C.bg};color:${C.text};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-size:16px;overflow-x:hidden;width:100%;}
   *{box-sizing:border-box;max-width:100%;}
+  button{transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease, opacity 0.15s ease;}
+  .reaction-btn{transition:background 0.12s ease, border-color 0.12s ease, color 0.12s ease !important;}
   body[data-fontsize="large"] { zoom: 1.18; }
   body[data-fontsize="xlarge"] { zoom: 1.38; }
   input,button,select,textarea{font-family:${FONT};}
@@ -1034,7 +1036,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
           return React.createElement("button", { key: id, className: "nav-btn", onClick: () => setTab(id), style: { flex: 1, padding: "10px 4px 8px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" } },
             React.createElement("div", { style: { fontSize: "20px", lineHeight: 1 } }, icon),
             React.createElement("div", { style: { fontSize: "10px", fontWeight: active ? "700" : "400", color: active ? C.text : C.textLight } }, label),
-            active && React.createElement("div", { style: { width: "4px", height: "4px", borderRadius: "50%", background: C.text, marginTop: "1px" } })
+            React.createElement("div", { style: { width: "4px", height: "4px", borderRadius: "50%", background: active ? C.text : "transparent", marginTop: "1px", transition: "background 0.2s ease" } })
           );
         })}
       </div>
