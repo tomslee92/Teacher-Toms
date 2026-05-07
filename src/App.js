@@ -491,11 +491,14 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
   const [errMsg, setErrMsg] = useState("");
   const [started, setStarted] = useState(autoRecord);
   const [recordingBlob, setRecordingBlob] = useState(null);
+  const [recordingUrl, setRecordingUrl] = useState(null);
   const autoStarted = useRef(false);
 
   const handleStop = async (blob) => {
     if (isPreview) return;
     setRecordingBlob(blob);
+    const url = URL.createObjectURL(blob);
+    setRecordingUrl(url);
     setLoading(true); setFeedback(null); setTranscription(null); setErrMsg("");
     try {
       const said = await transcribe(blob);
@@ -541,22 +544,13 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
           {transcription && (
             <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "10px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
               <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
-              {recordingBlob && (
-                <button onClick={() => {
-                  try {
-                    const url = URL.createObjectURL(recordingBlob);
-                    const a = document.createElement("audio");
-                    a.src = url;
-                    document.body.appendChild(a);
-                    a.play().then(() => {
-                      a.onended = () => { URL.revokeObjectURL(url); document.body.removeChild(a); };
-                    }).catch(() => {
-                      a.controls = true;
-                      a.style.cssText = "position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;width:200px;";
-                      setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e) {} }, 10000);
-                    });
-                  } catch(e) {}
-                }} style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "5px", padding: "2px 7px", cursor: "pointer", fontSize: "10px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}>▶ 내 목소리</button>
+              {recordingUrl && (
+                <audio
+                  src={recordingUrl}
+                  controls
+                  style={{ height: "26px", maxWidth: "120px", flexShrink: 0 }}
+                  title="내 목소리"
+                />
               )}
             </div>
           )}
@@ -1088,10 +1082,14 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
   const autoStarted = useRef(false);
 
   const [recordingBlob, setRecordingBlob] = useState(null);
+  const [recordingUrl, setRecordingUrl] = useState(null);
 
   const handleStop = async (blob) => {
     if (isPreview) return;
     setRecordingBlob(blob);
+    // Create URL immediately so playback is synchronous on tap
+    const url = URL.createObjectURL(blob);
+    setRecordingUrl(url);
     setLoading(true); setFeedback(null); setTranscription(null); setErrMsg("");
     try {
       const said = await transcribe(blob);
@@ -1145,28 +1143,13 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
           {transcription && (
             <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
               <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
-              {recordingBlob && (
-                <button
-                  onClick={() => {
-                    try {
-                      const url = URL.createObjectURL(recordingBlob);
-                      const a = document.createElement("audio");
-                      a.src = url;
-                      a.controls = false;
-                      document.body.appendChild(a);
-                      a.play().then(() => {
-                        a.onended = () => { URL.revokeObjectURL(url); document.body.removeChild(a); };
-                      }).catch(e => {
-                        // Fallback: show audio element briefly
-                        a.controls = true;
-                        a.style.cssText = "position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;width:200px;";
-                        setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e) {} }, 10000);
-                      });
-                    } catch(e) { console.error("Playback error:", e); }
-                  }}
-                  title="내 목소리 듣기"
-                  style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "5px", padding: "3px 8px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}
-                >▶ 내 목소리</button>
+              {recordingUrl && (
+                <audio
+                  src={recordingUrl}
+                  controls
+                  style={{ height: "28px", maxWidth: "140px", flexShrink: 0 }}
+                  title="내 목소리"
+                />
               )}
             </div>
           )}
