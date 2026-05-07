@@ -1316,17 +1316,22 @@ function SessionFeed({ sessionNums, sessions, progress, sessionResets, user, isP
 // ── Expandable Row ────────────────────────────────────────────────────────────
 function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed }) {
   const [open, setOpen] = useState(false);
-  // Always read from live progress map so updates from POD/random modals reflect immediately
-  const prog = sessionReset ? null : (progress[phrase.id] || null);
+  // Force local re-render whenever progress prop changes for this phrase
+  const [localProg, setLocalProg] = useState(() => sessionReset ? null : (progress[phrase.id] || null));
+  useEffect(() => {
+    setLocalProg(sessionReset ? null : (progress[phrase.id] || null));
+  }, [progress, phrase.id, sessionReset]);
+
+  const prog = localProg;
   const passed = prog?.passed;
   const needsRetry = prog?.needs_retry && !passed;
   let bg = C.bg, border = C.border;
-  if (passed) { bg = C.successBg; border = "#A8D5B5"; }
-  else if (needsRetry) { bg = C.retryBg; border = "#F0C090"; }
-  else if (prog?.attempts > 0) { bg = C.errorBg; border = "#F0A8A5"; }
+  if (passed) { bg = C.successBg; border = C.successBorder || "#A8D5B5"; }
+  else if (needsRetry) { bg = C.retryBg; border = C.retryBorder || "#F0C090"; }
+  else if (prog?.attempts > 0) { bg = C.errorBg; border = C.errorBorder || "#F0A8A5"; }
 
   return (
-    <div style={{ borderRadius: "12px", border: `1px solid ${border}`, background: bg, overflow: "hidden", transition: "box-shadow 0.15s" }}>
+    <div style={{ borderRadius: "12px", border: `1px solid ${border}`, background: bg, overflow: "hidden", transition: "background 0.3s ease, border-color 0.3s ease, box-shadow 0.15s" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "15px", fontStyle: "italic", marginBottom: "2px" }}>"{phrase.english}"</div>
