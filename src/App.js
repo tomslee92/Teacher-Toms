@@ -3721,10 +3721,6 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
 function ResponseCard({ response, isMe, onReact, userId, index }) {
   const [reactions, setReactions] = useState({});
   const [loadingReactions, setLoadingReactions] = useState(true);
-  const audioRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
 
   useEffect(() => {
     db.get("qod_reactions", `response_id=eq.${response.id}`).then(r => {
@@ -3739,33 +3735,6 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
     }).catch(() => setLoadingReactions(false));
   }, [response.id]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onLoaded = () => setDuration(audio.duration || 0);
-    const onTime = () => { setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0); };
-    const onEnded = () => { setPlaying(false); setProgress(0); };
-    audio.addEventListener("loadedmetadata", onLoaded);
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("ended", onEnded);
-    return () => { audio.removeEventListener("loadedmetadata", onLoaded); audio.removeEventListener("timeupdate", onTime); audio.removeEventListener("ended", onEnded); };
-  }, [response.audio_url]);
-
-  const togglePlay = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing) { audio.pause(); setPlaying(false); }
-    else { audio.play(); setPlaying(true); }
-  };
-
-  const seek = (e) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
-  };
-
-  const fmt = s => `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
   const timeAgo = (dateStr) => {
     const mins = Math.floor((Date.now() - new Date(dateStr)) / 60000);
     if (mins < 1) return "just now";
@@ -3777,8 +3746,6 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
 
   return (
     <div className="response-card" style={{ background: C.bgCard, border: `1px solid ${isMe ? C.text : C.border}`, borderRadius: "14px", padding: "16px", animationDelay: `${index * 0.05}s`, ...(isMe ? { borderWidth: "1.5px" } : {}) }}>
-      {response.audio_url && <audio ref={audioRef} src={response.audio_url} preload="metadata" />}
-
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -3795,26 +3762,9 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
         </div>
       </div>
 
-      {/* Audio player */}
+      {/* Audio player — use RichAudioPlayer if audio exists, else show transcript */}
       {response.audio_url ? (
-        <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "10px 14px", marginBottom: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <button onClick={togglePlay} style={{ width: "32px", height: "32px", borderRadius: "50%", background: C.text, border: "none", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", flexShrink: 0 }}>
-              {playing ? "⏸" : "▶"}
-            </button>
-            {/* Waveform bar viz */}
-            <div onClick={seek} style={{ flex: 1, height: "28px", cursor: "pointer", display: "flex", alignItems: "center", gap: "2px", position: "relative" }}>
-              {Array.from({ length: 32 }, (_, i) => {
-                const h = 30 + Math.sin(i * 1.1) * 22 + Math.sin(i * 2.3) * 14;
-                const filled = (i / 32) * 100 < progress;
-                return React.createElement("div", { key: i, style: { flex: 1, height: `${h}%`, borderRadius: "2px", background: filled ? C.text : C.bgMid, transition: "background 0.1s" } });
-              })}
-            </div>
-            <div style={{ fontSize: "11px", color: C.textLight, minWidth: "36px", textAlign: "right" }}>
-              {duration > 0 ? fmt(playing ? (audioRef.current?.currentTime || 0) : duration) : "—"}
-            </div>
-          </div>
-        </div>
+        React.createElement(RichAudioPlayer, { src: response.audio_url, label: `${response.nickname || "Student"}'s answer` })
       ) : (
         response.transcript && (
           <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "10px 14px", marginBottom: "10px", fontSize: "14px", color: C.text, fontStyle: "italic", lineHeight: 1.5 }}>
@@ -3823,12 +3773,13 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
         )
       )}
 
-      {/* Reactions */}
+      {/* Reactions — always show all 6, filled if reacted, tappable always */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
         {REACTION_EMOJIS.map(emoji => {
           const count = reactions.counts?.[emoji] || 0;
           const isMine = reactions.mine?.has(emoji);
-          if (count === 0 && !isMe) return null; // hide unused reactions unless it's your card
+          // On other people's cards, hide reactions with 0 count
+          if (count === 0 && !isMe) return null;
           return (
             <button key={emoji} onClick={() => onReact(emoji)} className="reaction-btn"
               style={{ background: isMine ? C.bgDark : C.bgSoft, color: isMine ? "#fff" : C.text, border: `1px solid ${isMine ? C.text : C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "13px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px", fontWeight: isMine ? "700" : "400" }}>
@@ -3836,13 +3787,6 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
             </button>
           );
         })}
-        {/* Show all reactions on own card */}
-        {isMe && REACTION_EMOJIS.filter(e => !reactions.counts?.[e]).map(emoji => (
-          <button key={emoji} onClick={() => {}} className="reaction-btn"
-            style={{ background: "transparent", color: C.textLight, border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "13px", cursor: "default", fontFamily: FONT, opacity: 0.5 }}>
-            {emoji}
-          </button>
-        ))}
       </div>
     </div>
   );
@@ -3971,6 +3915,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
     try {
       let audioUrl = null;
       if (finalBlob) {
+        // Try Supabase Storage first
         try {
           const fileName = `qod_${user.id}_${Date.now()}.webm`;
           const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/qod-audio/${fileName}`, {
@@ -3978,15 +3923,34 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "audio/webm" },
             body: finalBlob
           });
-          if (uploadRes.ok) audioUrl = `${SUPABASE_URL}/storage/v1/object/public/qod-audio/${fileName}`;
-        } catch(e) {}
+          if (uploadRes.ok) {
+            audioUrl = `${SUPABASE_URL}/storage/v1/object/public/qod-audio/${fileName}`;
+          } else {
+            console.warn("Storage upload failed:", await uploadRes.text());
+          }
+        } catch(e) {
+          console.warn("Storage upload error:", e.message);
+        }
+        // Fallback: convert to base64 and store directly in the DB
+        if (!audioUrl) {
+          try {
+            audioUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(finalBlob);
+            });
+          } catch(e) {
+            console.warn("Base64 fallback failed:", e.message);
+          }
+        }
       }
       const r = await db.insert("qod_responses", {
         prompt_id: prompt.id, student_id: user.id, nickname: nick,
         audio_url: audioUrl, transcript: finalTranscript, city_group_id: cityGroup.id,
       });
       onPost(Array.isArray(r) ? r[0] : r);
-    } catch(e) { setPosting(false); }
+    } catch(e) { console.error("Post failed:", e); setPosting(false); }
   };
 
   // ── Shared header shown on all steps
@@ -4252,10 +4216,6 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             <Btn onClick={() => setStep("posting")} disabled={!nickname.trim()} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
               완료 → Confirm Nickname
             </Btn>
-            <button onClick={() => { setNickname(user.name); setStep("posting"); }}
-              style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "10px" }}>
-              실명({user.name})으로 올리기
-            </button>
           </div>
         )}
 
