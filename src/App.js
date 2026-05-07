@@ -48,11 +48,9 @@ const GlobalStyle = () => React.createElement("style", null, `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
-  body{font-family:${FONT};background:${C.bg};color:${C.text};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
-  body[data-fontsize="large"] { font-size: 17px !important; }
-  body[data-fontsize="large"] input, body[data-fontsize="large"] button, body[data-fontsize="large"] select, body[data-fontsize="large"] textarea { font-size: 17px !important; }
-  body[data-fontsize="xlarge"] { font-size: 20px !important; }
-  body[data-fontsize="xlarge"] input, body[data-fontsize="xlarge"] button, body[data-fontsize="xlarge"] select, body[data-fontsize="xlarge"] textarea { font-size: 20px !important; }
+  body{font-family:${FONT};background:${C.bg};color:${C.text};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-size:16px;}
+  body[data-fontsize="large"] { zoom: 1.18; }
+  body[data-fontsize="xlarge"] { zoom: 1.38; }
   input,button,select,textarea{font-family:${FONT};}
   input::placeholder,textarea::placeholder{color:${C.textLight};}
   ::-webkit-scrollbar{width:4px;height:4px;}
@@ -732,17 +730,11 @@ function LoginScreen({ onLogin, onTeacher }) {
 
 
 // ── Celebration Effects ──────────────────────────────────────────────────────
-// Randomly picks a celebration effect each time a phrase is passed
-const CELEBRATION_TYPES = ["confetti", "balloons", "stars", "fireworks", "wave"];
+// "confetti" = session complete. Streak milestone types are in StreakMilestone.
+const CELEBRATION_TYPES = ["confetti"]; // kept for legacy compatibility
 
 function CelebrationEffect({ type }) {
-  const t = type || CELEBRATION_TYPES[Math.floor(Math.random() * CELEBRATION_TYPES.length)];
-
-  if (t === "confetti") return React.createElement(ConfettiEffect);
-  if (t === "balloons") return React.createElement(BalloonsEffect);
-  if (t === "stars") return React.createElement(StarsEffect);
-  if (t === "fireworks") return React.createElement(FireworksEffect);
-  if (t === "wave") return React.createElement(WaveEffect);
+  // Phrases always get confetti — clean, consistent, earned
   return React.createElement(ConfettiEffect);
 }
 
@@ -1156,16 +1148,23 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
     setRandomPhrase(pool[Math.floor(Math.random() * pool.length)]);
   };
 
-  const handleProgressUpdate = (phraseId, prog) => {
-    const prevProg = progress[phraseId];
-    const wasFirstPass = !(prevProg?.passed) && prog?.passed;
-    const wasResetPass = sessionResets[activeSession] && prog?.passed;
-    setProgress(prev => ({ ...prev, [phraseId]: prog }));
-    if (wasFirstPass || wasResetPass) {
-      const type = CELEBRATION_TYPES[Math.floor(Math.random() * CELEBRATION_TYPES.length)];
-      setCelebrationType(type);
-      setShowConfetti(true);
-      setTimeout(() => { setShowConfetti(false); setCelebrationType(null); }, 2400);
+  const handleProgressUpdate = (phraseIdOrProg, progArg) => {
+    // Support both (phraseId, prog) and (prog) calling conventions
+    const phraseId = progArg ? phraseIdOrProg : phraseIdOrProg?.phrase_id;
+    const prog = progArg || phraseIdOrProg;
+    if (!phraseId) return;
+    const updatedProgress = { ...progress, [phraseId]: prog };
+    setProgress(updatedProgress);
+    // Check if ALL phrases in the active session are now passed
+    const sessionPhrases = sessions[activeSession] || [];
+    if (sessionPhrases.length > 0) {
+      const allPassed = sessionPhrases.every(p => updatedProgress[p.id]?.passed);
+      if (allPassed && !sessionPhrases.every(p => progress[p.id]?.passed)) {
+        // Session just completed — fire confetti
+        setCelebrationType("confetti");
+        setShowConfetti(true);
+        setTimeout(() => { setShowConfetti(false); setCelebrationType(null); }, 3000);
+      }
     }
   };
 
@@ -1380,10 +1379,10 @@ function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpda
   const prog = sessionReset ? null : (progress[phrase.id] || null);
   const passed = prog?.passed;
   const needsRetry = prog?.needs_retry && !passed;
-  let bg = C.bg, border = C.border;
-  if (passed) { bg = C.successBg; border = "#A8D5B5"; }
-  else if (needsRetry) { bg = C.retryBg; border = "#F0C090"; }
-  else if (prog?.attempts > 0) { bg = C.errorBg; border = "#F0A8A5"; }
+  let bg = C.bgCard || C.bg, border = C.border;
+  if (passed) { bg = C.successBg; border = C.successBorder || "#A8D5B5"; }
+  else if (needsRetry) { bg = C.retryBg; border = C.retryBorder || "#F0C090"; }
+  else if (prog?.attempts > 0) { bg = C.errorBg; border = C.errorBorder || "#F0A8A5"; }
 
   return (
     <div style={{ borderRadius: "12px", border: `1px solid ${border}`, background: bg, overflow: "hidden", transition: "box-shadow 0.15s" }}>
