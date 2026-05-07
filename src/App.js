@@ -3859,13 +3859,20 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
   };
 
   const handleDeleteResponse = async (responseId) => {
+    if (!responseId) { console.error("Delete called with no responseId"); return; }
+    console.log("Deleting response:", responseId);
+    // Optimistically remove from UI immediately
+    setResponses(prev => prev.filter(r => r.id !== responseId));
+    setHasAnsweredToday(false);
+    setMyResponse(null);
     try {
       await db.delete("qod_responses", `id=eq.${responseId}`);
-      setResponses(prev => prev.filter(r => r.id !== responseId));
-      // Allow re-answering after deletion
-      setHasAnsweredToday(false);
-      setMyResponse(null);
-    } catch(e) {}
+      console.log("Delete successful");
+    } catch(e) {
+      console.error("Delete failed:", e.message);
+      // Re-load responses if delete failed
+      loadCommunityData();
+    }
   };
 
   const handleReaction = async (responseId, emoji) => {
@@ -4086,7 +4093,7 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index }) {
           confirmDelete ? (
             <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
               <span style={{ fontSize: "11px", color: C.error }}>삭제할까요?</span>
-              <button onClick={() => onDelete(response.id)}
+              <button onClick={() => { onDelete(response.id); setConfirmDelete(false); }}
                 style={{ background: C.error, border: "none", borderRadius: "100px", padding: "4px 10px", fontSize: "11px", color: "#fff", cursor: "pointer", fontFamily: FONT, fontWeight: "600" }}>삭제</button>
               <button onClick={() => setConfirmDelete(false)}
                 style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "11px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>취소</button>
