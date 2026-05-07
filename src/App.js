@@ -5,8 +5,8 @@ const SUPABASE_URL = "https://ulpnmewvejvpancvqnrp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_sDP-kuCv5E2LmpDMPp8Y4A_n1ryWhNO";
 const GROQ_KEY = process.env.REACT_APP_GROQ_KEY;
 const TEACHER_PASS = "wayve2026";
-const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-const FONT_DISPLAY = "'DM Serif Display', Georgia, serif";
+const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const FONT_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const sb = async (path, opts = {}) => {
@@ -28,25 +28,24 @@ const db = {
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
-  bg: "#0F1117", bgSoft: "#161B27", bgMid: "#1E2535", bgCard: "#1A2030",
-  bgGlass: "rgba(255,255,255,0.04)",
-  text: "#F0EDE8", textMid: "#A8A39B", textLight: "#5C5850",
-  border: "#2A3145", borderLight: "#222840",
-  gold: "#C9A84C", goldBright: "#E8C56A", goldDim: "#8B6E2E",
-  goldBg: "rgba(201,168,76,0.1)", goldBorder: "rgba(201,168,76,0.25)",
-  success: "#2ECC7A", successBg: "rgba(46,204,122,0.1)", successBorder: "rgba(46,204,122,0.2)",
-  error: "#E05555", errorBg: "rgba(224,85,85,0.1)", errorBorder: "rgba(224,85,85,0.2)",
-  retry: "#E8913A", retryBg: "rgba(232,145,58,0.1)", retryBorder: "rgba(232,145,58,0.2)",
-  gradGold: "linear-gradient(135deg, #C9A84C 0%, #E8C56A 50%, #C9A84C 100%)",
-  gradDark: "linear-gradient(135deg, #0F1117 0%, #161B27 100%)",
-  gradCard: "linear-gradient(145deg, #1A2030, #161B27)",
-  gradSuccess: "linear-gradient(135deg, #1A7A45, #2ECC7A)",
-  gradNight: "linear-gradient(135deg, #0D1B2A 0%, #1A1035 50%, #0D1B2A 100%)",
+  // Surfaces — pure white like wayve.tiiny.site
+  bg: "#FFFFFF", bgSoft: "#F5F5F5", bgMid: "#EBEBEB", bgCard: "#FFFFFF",
+  bgDark: "#1E1E1E", bgDarker: "#141414",
+  // Text
+  text: "#1A1A1A", textMid: "#555555", textLight: "#999999",
+  // Borders
+  border: "#E5E5E5", borderDark: "#2E2E2E",
+  // Gold — kept subtle, only for scores/streaks
+  gold: "#B8973A", goldBg: "#FBF6EC", goldBorder: "rgba(184,151,58,0.2)",
+  // Semantic
+  success: "#1A7A45", successBg: "#EBF7F0", successBorder: "#A8D5B5",
+  error: "#C0392B", errorBg: "#FCECEA", errorBorder: "#F0A8A5",
+  retry: "#C96A1A", retryBg: "#FEF3E8", retryBorder: "#F0C090",
 };
 
 // ── Global Style ──────────────────────────────────────────────────────────────
 const GlobalStyle = () => React.createElement("style", null, `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{font-family:${FONT};background:${C.bg};color:${C.text};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
@@ -54,22 +53,18 @@ const GlobalStyle = () => React.createElement("style", null, `
   input::placeholder,textarea::placeholder{color:${C.textLight};}
   ::-webkit-scrollbar{width:4px;height:4px;}
   ::-webkit-scrollbar-track{background:transparent;}
-  ::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}
-  ::-webkit-scrollbar-thumb:hover{background:${C.textLight};}
+  ::-webkit-scrollbar-thumb{background:${C.bgMid};border-radius:2px;}
+  select option{background:${C.bgCard};color:${C.text};}
   @keyframes spin{to{transform:rotate(360deg);}}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-  @keyframes fadeInUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-  @keyframes scaleIn{from{opacity:0;transform:scale(0.95);}to{opacity:1;transform:scale(1);}}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
-  @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,85,85,0.4);}50%{box-shadow:0 0 0 10px rgba(224,85,85,0);}}
-  @keyframes goldShimmer{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
-  @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
-  @keyframes streakFire{0%,100%{transform:scale(1) rotate(-2deg);}50%{transform:scale(1.15) rotate(2deg);}}
-  .fade-in{animation:fadeIn 0.25s ease both;}
-  .fade-in-up{animation:fadeInUp 0.3s ease both;}
-  .scale-in{animation:scaleIn 0.2s ease both;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes scaleIn{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}
+  @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,0.3);}50%{box-shadow:0 0 0 9px rgba(192,57,43,0);}}
+  @keyframes streakFire{0%,100%{transform:scale(1) rotate(-1deg);}50%{transform:scale(1.1) rotate(1deg);}}
+  .fade-in{animation:fadeIn 0.2s ease both;}
+  .fade-in-up{animation:fadeInUp 0.25s ease both;}
+  .scale-in{animation:scaleIn 0.18s ease both;}
   .rec-pulse{animation:recPulse 1.5s ease-in-out infinite;}
-  select option{background:${C.bgMid};color:${C.text};}
 `);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,9 +104,9 @@ function FeedbackDisplay({ text }) {
 
   return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
     lines.map((line, i) => {
-      if (isScore(line)) return React.createElement("div", { key: i, style: { background: C.bgMid, borderRadius: "10px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "8px" } },
+      if (isScore(line)) return React.createElement("div", { key: i, style: { background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "8px" } },
         React.createElement("span", { style: { fontSize: "18px" } }, "🎯"),
-        React.createElement("span", { style: { fontSize: "15px", fontWeight: "700", color: C.gold } }, line.replace("🎯", "").trim())
+        React.createElement("span", { style: { fontSize: "15px", fontWeight: "700", color: C.text } }, line.replace("🎯", "").trim())
       );
       if (line === "✅ 잘한 점" || line === "✅ 잘한점" || line === "잘한 점") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.success, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "✅ 잘한 점");
       if (line === "📝 문법 피드백" || line === "📝 문법피드백" || line === "문법 피드백") return React.createElement("div", { key: i, style: { fontSize: "13px", fontWeight: "700", color: C.error, textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "4px" } }, "📝 문법 피드백");
@@ -483,30 +478,30 @@ function useRecorder(onDone) {
 // ── UI Components ─────────────────────────────────────────────────────────────
 const Btn = ({ onClick, children, variant = "primary", disabled, style = {} }) => {
   const variants = {
-    primary: { background: C.text, color: C.bg, border: "none", boxShadow: "0 2px 8px rgba(240,237,232,0.12)" },
-    secondary: { background: C.bgMid, color: C.text, border: `1px solid ${C.border}` },
-    gold: { background: C.gradGold, backgroundSize: "200% 200%", color: "#0F1117", border: "none", boxShadow: "0 2px 12px rgba(201,168,76,0.3)", fontWeight: "700" },
-    ghost: { background: "transparent", color: C.textMid, border: `1px solid ${C.border}` },
-    danger: { background: C.error, color: "#fff", border: "none", boxShadow: `0 2px 8px ${C.errorBg}` },
-    success: { background: C.success, color: "#fff", border: "none", boxShadow: `0 2px 8px ${C.successBg}` },
+    primary: { background: C.text, color: "#fff", border: "none" },
+    secondary: { background: C.bgSoft, color: C.text, border: `1px solid ${C.border}` },
+    gold: { background: C.text, color: "#fff", border: "none" }, // WAYVE: black not gold
+    ghost: { background: "transparent", color: C.text, border: `1px solid ${C.border}` },
+    danger: { background: C.error, color: "#fff", border: "none" },
+    success: { background: C.success, color: "#fff", border: "none" },
   };
-  return React.createElement("button", { onClick, disabled, style: { padding: "9px 18px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1, fontFamily: FONT, transition: "all 0.15s", letterSpacing: "0.1px", ...variants[variant], ...style } }, children);
+  return React.createElement("button", { onClick, disabled, style: { padding: "9px 20px", borderRadius: "100px", fontSize: "14px", fontWeight: "600", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1, fontFamily: FONT, transition: "all 0.15s", letterSpacing: "-0.1px", ...variants[variant], ...style } }, children);
 };
 
 const Input = ({ value, onChange, onBlur, placeholder, type = "text", style = {} }) =>
-  React.createElement("input", { value, onChange, onBlur: onBlur || (() => {}), placeholder, type, style: { width: "100%", padding: "11px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", background: C.bgMid, color: C.text, fontFamily: FONT, transition: "border-color 0.15s", ...style } });
+  React.createElement("input", { value, onChange, onBlur: onBlur || (() => {}), placeholder, type, style: { width: "100%", padding: "11px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", background: C.bg, color: C.text, fontFamily: FONT, transition: "border-color 0.15s", ...style } });
 
 const Card = ({ children, style = {} }) =>
   React.createElement("div", { style: { background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "18px", ...style } }, children);
 
-const Spinner = () => React.createElement("span", { style: { display: "inline-block", width: "16px", height: "16px", border: `2px solid ${C.border}`, borderTop: `2px solid ${C.gold}`, borderRadius: "50%", animation: "spin 0.7s linear infinite", verticalAlign: "middle" } });
+const Spinner = () => React.createElement("span", { style: { display: "inline-block", width: "16px", height: "16px", border: `2px solid ${C.border}`, borderTop: `2px solid ${C.text}`, borderRadius: "50%", animation: "spin 0.6s linear infinite", verticalAlign: "middle" } });
 
 const Msg = ({ text, type = "success" }) => {
   if (!text) return null;
   const s = {
     success: { background: C.successBg, border: `1px solid ${C.successBorder}`, color: C.success },
     error: { background: C.errorBg, border: `1px solid ${C.errorBorder}`, color: C.error },
-    warn: { background: C.retryBg, border: `1px solid ${C.retryBorder}`, color: C.retry }
+    warn: { background: C.retryBg, border: `1px solid ${C.retryBorder}`, color: C.retry },
   };
   return React.createElement("div", { style: { ...s[type], padding: "10px 14px", borderRadius: "8px", marginBottom: "14px", fontSize: "13px", fontWeight: "500" } }, text);
 };
@@ -517,7 +512,7 @@ function InlineEdit({ value, onSave, style = {} }) {
   const ref = useRef(null);
   useEffect(() => { if (editing && ref.current) ref.current.focus(); }, [editing]);
   const save = () => { if (val.trim() && val.trim() !== value) onSave(val.trim()); setEditing(false); };
-  if (!editing) return React.createElement("span", { onClick: () => { setVal(value); setEditing(true); }, style: { cursor: "text", borderBottom: `1px dashed ${C.goldDim}`, paddingBottom: "1px", color: C.text, ...style }, title: "Click to edit" }, value);
+  if (!editing) return React.createElement("span", { onClick: () => { setVal(value); setEditing(true); }, style: { cursor: "text", borderBottom: `1px dashed ${C.border}`, paddingBottom: "1px", ...style }, title: "Click to edit" }, value);
   return React.createElement("input", { ref, value: val, onChange: e => setVal(e.target.value), onBlur: save, onKeyDown: e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }, style: { border: `1px solid ${C.gold}`, borderRadius: "4px", padding: "2px 6px", fontSize: "inherit", fontFamily: FONT, outline: "none", fontWeight: "inherit", ...style } });
 }
 
@@ -592,7 +587,7 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
           )}
           <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8
-            ? <div style={{ marginTop: "8px", padding: "10px 14px", background: C.successBg, borderRadius: "8px", fontSize: "13px", color: C.success, fontWeight: "700", border: `1px solid ${C.successBorder}`, display: "flex", alignItems: "center", gap: "6px" }}><span style={{ fontSize: "18px" }}>🎉</span> 잘했어요!</div>
+            ? <div style={{ marginTop: "8px", padding: "8px 10px", background: C.successBg, borderRadius: "6px", fontSize: "12px", color: C.success, fontWeight: "500" }}>🎉 잘했어요!</div>
             : <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
                 <div style={{ fontSize: "12px", color: C.retry }}>계속 연습해요! 💪</div>
                 <Btn onClick={() => { rec.reset(); setFeedback(null); setTranscription(null); rec.start(); }} variant="secondary" style={{ fontSize: "11px", padding: "4px 10px" }}>🔄 다시</Btn>
@@ -641,7 +636,7 @@ export default function App() {
     setUser(null); setScreen("login");
   };
 
-  if (screen === "loading") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, flexDirection: "column", gap: "16px" } }, React.createElement(Spinner), React.createElement("div", { style: { fontSize: "12px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" } }, "WAYVE")));
+  if (screen === "loading") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" } }, React.createElement(Spinner)));
   if (screen === "login") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(LoginScreen, { onLogin: handleLogin, onTeacher: p => { if (p === TEACHER_PASS) { setScreen("teacher"); return null; } return "Wrong password"; } }));
   if (screen === "teacher") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(TeacherScreen, { groups, setGroups, setScreen, onPreview: g => { setPreview(g); setScreen("preview"); } }));
   if (screen === "preview") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user: { id: "preview", name: "Preview Mode", group_id: preview?.id, streak: 3, longest_streak: 7 }, group: preview, isPreview: true, onBack: () => setScreen("teacher") }));
@@ -656,7 +651,6 @@ function LoginScreen({ onLogin, onTeacher }) {
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState(false);
 
   const handleStudent = async () => {
     if (!name.trim()) return;
@@ -667,63 +661,62 @@ function LoginScreen({ onLogin, onTeacher }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, padding: "24px", position: "relative", overflow: "hidden" }}>
-      {/* Background atmosphere */}
-      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
-        <div style={{ position: "absolute", top: "-20%", left: "-10%", width: "60vw", height: "60vw", borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", bottom: "-20%", right: "-10%", width: "50vw", height: "50vw", borderRadius: "50%", background: "radial-gradient(circle, rgba(46,204,122,0.04) 0%, transparent 70%)" }} />
-      </div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, padding: "24px" }}>
+      <div style={{ width: "100%", maxWidth: "400px", animation: "fadeInUp 0.4s ease both" }}>
 
-      <div style={{ width: "100%", maxWidth: "380px", position: "relative", zIndex: 1 }}>
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: "52px", animation: "fadeInUp 0.5s ease both" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "64px", height: "64px", borderRadius: "18px", background: "linear-gradient(135deg, #C9A84C, #E8C56A)", marginBottom: "20px", boxShadow: "0 8px 32px rgba(201,168,76,0.35)" }}>
-            <span style={{ fontSize: "28px" }}>🌊</span>
-          </div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: "42px", fontWeight: "400", letterSpacing: "4px", color: C.text, lineHeight: 1, marginBottom: "8px" }}>WAYVE</div>
-          <div style={{ fontSize: "11px", color: C.gold, letterSpacing: "4px", textTransform: "uppercase", fontWeight: "500" }}>More than English</div>
+        {/* Logo — matches wayve.tiiny.site wordmark */}
+        <div style={{ textAlign: "center", marginBottom: "56px" }}>
+          <div style={{ fontSize: "32px", fontWeight: "800", letterSpacing: "6px", color: C.text, marginBottom: "10px", textTransform: "uppercase" }}>WAYVE</div>
+          <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "4px", textTransform: "uppercase", fontWeight: "400" }}>More than English</div>
         </div>
 
         {/* Mode tabs */}
-        <div style={{ display: "flex", background: C.bgMid, borderRadius: "10px", padding: "3px", marginBottom: "28px", animation: "fadeInUp 0.5s ease 0.1s both" }}>
+        <div style={{ display: "flex", background: C.bgSoft, borderRadius: "100px", padding: "4px", marginBottom: "32px" }}>
           {[["student", "Student"], ["teacher", "Teacher"]].map(([m, label]) =>
-            React.createElement("button", { key: m, onClick: () => { setMode(m); setError(""); }, style: { flex: 1, padding: "9px", background: mode === m ? C.bgCard : "transparent", border: mode === m ? `1px solid ${C.border}` : "1px solid transparent", borderRadius: "8px", color: mode === m ? C.text : C.textLight, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" } }, label)
+            React.createElement("button", { key: m, onClick: () => { setMode(m); setError(""); }, style: {
+              flex: 1, padding: "9px", background: mode === m ? C.text : "transparent",
+              border: "none", borderRadius: "100px", color: mode === m ? "#fff" : C.textLight,
+              fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s"
+            } }, label)
           )}
         </div>
 
-        <div style={{ animation: "fadeInUp 0.5s ease 0.15s both" }}>
-          {mode === "student" && (
-            <div>
-              <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>이름 / Your Name</div>
-              <Input value={name} onChange={e => setName(e.target.value)}
-                onBlur={() => setFocused(false)}
-                placeholder="Enter your name"
-                style={{ marginBottom: "14px", fontSize: "16px", padding: "14px 16px", borderColor: focused ? C.gold : C.border, background: C.bgSoft }}
-                onFocus={() => setFocused(true)}
-              />
-              {error && <Msg text={error} type="error" />}
-              <Btn onClick={handleStudent} disabled={loading || !name.trim()} style={{ width: "100%", padding: "14px", fontSize: "15px", borderRadius: "10px" }} variant="gold">
-                {loading ? React.createElement(Spinner) : "입장하기  →"}
-              </Btn>
-            </div>
-          )}
-          {mode === "teacher" && (
-            <div>
-              <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "600" }}>Password</div>
-              <Input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Teacher password" style={{ marginBottom: "14px", fontSize: "16px", padding: "14px 16px", background: C.bgSoft }} />
-              {error && <Msg text={error} type="error" />}
-              <Btn onClick={() => { const err = onTeacher(pass); if (err) setError(err); }} variant="gold" style={{ width: "100%", padding: "14px", fontSize: "15px", borderRadius: "10px" }}>Teacher Dashboard →</Btn>
-            </div>
-          )}
-        </div>
+        {mode === "student" && (
+          <div style={{ animation: "fadeIn 0.2s ease both" }}>
+            <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "500" }}>이름 / Your Name</div>
+            <Input value={name} onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleStudent()}
+              placeholder="Enter your name"
+              style={{ marginBottom: "14px", fontSize: "16px", padding: "14px 16px", borderRadius: "12px" }} />
+            {error && <Msg text={error} type="error" />}
+            <Btn onClick={handleStudent} disabled={loading || !name.trim()} style={{ width: "100%", padding: "14px", fontSize: "15px", fontWeight: "700" }}>
+              {loading ? React.createElement(Spinner) : "입장하기  →"}
+            </Btn>
+          </div>
+        )}
 
-        <div style={{ textAlign: "center", marginTop: "40px", fontSize: "11px", color: C.textLight, animation: "fadeInUp 0.5s ease 0.25s both" }}>
+        {mode === "teacher" && (
+          <div style={{ animation: "fadeIn 0.2s ease both" }}>
+            <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px", fontWeight: "500" }}>Password</div>
+            <Input type="password" value={pass} onChange={e => setPass(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && (() => { const err = onTeacher(pass); if (err) setError(err); })()}
+              placeholder="Teacher password"
+              style={{ marginBottom: "14px", fontSize: "16px", padding: "14px 16px", borderRadius: "12px" }} />
+            {error && <Msg text={error} type="error" />}
+            <Btn onClick={() => { const err = onTeacher(pass); if (err) setError(err); }} style={{ width: "100%", padding: "14px", fontSize: "15px", fontWeight: "700" }}>
+              Teacher Dashboard →
+            </Btn>
+          </div>
+        )}
+
+        <div style={{ textAlign: "center", marginTop: "48px", fontSize: "11px", color: C.textLight, letterSpacing: "1px" }}>
           Powered by AI · Built for Korean learners
         </div>
       </div>
     </div>
   );
 }
+
 
 // ── Confetti ──────────────────────────────────────────────────────────────────
 function Confetti() {
@@ -793,44 +786,44 @@ function StudentScreen({ user, group, isPreview, onBack }) {
   const tabs = [["practice", "🎙 Practice"], ["freetalk", "💬 Free Talk"], ["myphrases", "⭐ My Phrases"], ["notes", "📝 Notes"]];
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg }}>
-      <div style={{ background: C.bgSoft, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
+    <div style={{ minHeight: "100vh", background: C.bgSoft }}>
+      <div style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10 }}>
         {isPreview && (
-          <div style={{ background: C.goldBg, borderBottom: `1px solid ${C.goldBorder}`, padding: "7px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "600", color: C.gold }}>
-            <span>👁 Preview Mode — {group?.name}</span>
-            <button onClick={onBack} style={{ background: C.goldBorder, border: `1px solid ${C.gold}`, color: C.gold, padding: "3px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontFamily: FONT }}>← Dashboard</button>
+          <div style={{ background: C.bgDark, color: "#fff", padding: "7px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "500", letterSpacing: "0.2px" }}>
+            <span>👁 Preview — {group?.name}</span>
+            <button onClick={onBack} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.5)", color: "#fff", padding: "3px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT }}>← Dashboard</button>
           </div>
         )}
         <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "20px", fontWeight: "800", color: streak > 0 ? C.retry : C.textLight, lineHeight: 1, animation: streak > 0 ? "streakFire 2s ease-in-out infinite" : "none", display: "inline-block" }}>🔥 {streak}</div>
+                <div style={{ fontSize: "20px", fontWeight: "800", color: streak > 0 ? C.retry : C.textLight, lineHeight: 1, display: "inline-block", animation: streak > 0 ? "streakFire 2.5s ease-in-out infinite" : "none" }}>🔥 {streak}</div>
                 <div style={{ fontSize: "8px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: "2px" }}>연속 일</div>
               </div>
               {longest > 0 && (
-                <div style={{ textAlign: "center", paddingLeft: "12px", borderLeft: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: "16px", fontWeight: "700", color: C.gold, lineHeight: 1 }}>🏅 {longest}</div>
+                <div style={{ textAlign: "center", paddingLeft: "10px", borderLeft: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: "15px", fontWeight: "700", color: C.gold, lineHeight: 1 }}>🏅 {longest}</div>
                   <div style={{ fontSize: "8px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: "2px" }}>최고 기록</div>
                 </div>
               )}
             </div>
             <div>
-              <div style={{ fontSize: "15px", fontWeight: "700", color: C.text }}>안녕하세요, {user.name}! 👋</div>
-              <div style={{ fontSize: "11px", color: C.gold, fontWeight: "500" }}>{group?.name || ""}</div>
+              <div style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.2px" }}>안녕하세요, {user.name}! 👋</div>
+              <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{group?.name || ""}</div>
             </div>
           </div>
-          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 14px", borderRadius: "8px", fontSize: "12px", fontFamily: FONT, transition: "all 0.15s" }}>나가기</button>
+          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, transition: "all 0.15s", fontWeight: "500" }}>나가기</button>
         </div>
-        <div style={{ display: "flex", padding: "0 20px", overflowX: "auto", gap: "2px" }}>
+        <div style={{ display: "flex", padding: "0 20px", overflowX: "auto" }}>
           {tabs.map(([t, label]) =>
-            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.gold}` : "2px solid transparent", color: tab === t ? C.gold : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap", transition: "color 0.15s" } }, label)
+            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
         </div>
       </div>
       <div style={{ maxWidth: "700px", margin: "0 auto", padding: "20px 16px" }}>
         {showStreakBanner && !isPreview && (
-          <div style={{ background: "linear-gradient(135deg, #8B4A1A, #C9A84C)", borderRadius: "12px", padding: "14px 18px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff", border: "1px solid rgba(201,168,76,0.3)", boxShadow: "0 4px 20px rgba(201,168,76,0.15)" }}>
+          <div style={{ background: C.bgDark, borderRadius: "12px", padding: "14px 18px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" }}>
             <div>
               <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "2px" }}>오늘 아직 연습 안 했어요! 🔥</div>
               <div style={{ fontSize: "12px", opacity: 0.9 }}>연속 {streak}일 streak을 지키세요!</div>
@@ -955,9 +948,9 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
 
       {/* Phrase of the Day */}
       {phraseOfDay && showPOD && !isPreview && (
-        <div style={{ background: `linear-gradient(135deg, rgba(201,168,76,0.12), rgba(201,168,76,0.06))`, border: `1px solid ${C.goldBorder}`, borderRadius: "14px", padding: "16px 18px", marginBottom: "16px", position: "relative" }}>
+        <div style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", marginBottom: "16px", position: "relative" }}>
           <button onClick={() => setShowPOD(false)} style={{ position: "absolute", top: "10px", right: "12px", background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px" }}>×</button>
-          <div style={{ fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}><span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: C.gold }}></span>오늘의 표현</div>
+          <div style={{ fontSize: "10px", fontWeight: "700", color: C.text, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "8px" }}>⭐ 오늘의 표현</div>
           <div style={{ fontSize: "18px", fontStyle: "italic", color: C.text, marginBottom: "4px" }}>"{phraseOfDay.english}"</div>
           {phraseOfDay.korean && <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "10px" }}>{phraseOfDay.korean}</div>}
           <Btn onClick={() => { setPodOpen(true); setShowPOD(false); }} variant="gold" style={{ fontSize: "12px", padding: "6px 14px" }}>🎙 지금 연습하기</Btn>
@@ -981,7 +974,7 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
       )}
 
       {/* Random practice */}
-      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", marginBottom: "16px", background: "linear-gradient(135deg, rgba(46,204,122,0.06), rgba(46,204,122,0.02))", border: `1px solid ${C.successBorder}` }}>
+      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", marginBottom: "16px", background: C.bgSoft }}>
         <div>
           <div style={{ fontSize: "14px", fontWeight: "600" }}>🎲 랜덤 연습</div>
           <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>연습 문장 + 나의 표현 모두에서 랜덤 선택</div>
@@ -1066,7 +1059,7 @@ function SessionFeed({ sessionNums, sessions, progress, sessionResets, user, isP
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 {isLatest && (
-                  <span style={{ background: "linear-gradient(135deg, #C9A84C, #E8C56A)", color: "#0F1117", fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "10px", letterSpacing: "0.5px", boxShadow: "0 2px 8px rgba(201,168,76,0.3)" }}>✨ 최신</span>
+                  <span style={{ background: C.text, color: "#fff", fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", letterSpacing: "0.5px" }}>✨ 최신</span>
                 )}
                 <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>Session {n}</div>
                 <span style={{ fontSize: "12px", color: allDone ? C.success : C.textLight, background: allDone ? C.successBg : C.bgSoft, padding: "2px 8px", borderRadius: "10px", fontWeight: "600" }}>
@@ -1114,13 +1107,13 @@ function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpda
   const prog = sessionReset ? null : (progress[phrase.id] || null);
   const passed = prog?.passed;
   const needsRetry = prog?.needs_retry && !passed;
-  let bg = C.bgCard, border = C.border;
-  if (passed) { bg = C.successBg; border = C.successBorder; }
-  else if (needsRetry) { bg = C.retryBg; border = C.retryBorder; }
-  else if (prog?.attempts > 0) { bg = C.errorBg; border = C.errorBorder; }
+  let bg = C.bg, border = C.border;
+  if (passed) { bg = C.successBg; border = "#A8D5B5"; }
+  else if (needsRetry) { bg = C.retryBg; border = "#F0C090"; }
+  else if (prog?.attempts > 0) { bg = C.errorBg; border = "#F0A8A5"; }
 
   return (
-    <div style={{ borderRadius: "8px", border: `1px solid ${border}`, background: bg, overflow: "hidden", transition: "box-shadow 0.15s" }}>
+    <div style={{ borderRadius: "12px", border: `1px solid ${border}`, background: bg, overflow: "hidden", transition: "box-shadow 0.15s" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "15px", fontStyle: "italic", marginBottom: "2px" }}>"{phrase.english}"</div>
@@ -1189,7 +1182,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
 
   return (
     <div>
-      {!hideContext && phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "10px 14px", borderRadius: "0 8px 8px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid, fontWeight: "500" }}>{phrase.context}</div>}
+      {!hideContext && phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "14px", flexWrap: "wrap" }}>
         <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "13px", padding: "7px 14px" }}>🔊 듣기</Btn>
         {[1.0, 0.75, 0.5].map(s => (
@@ -1205,7 +1198,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
         {rec.isRec && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "12px" }}>
-              <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: C.error, animation: "recPulse 1.5s ease-in-out infinite" }} />
+              <div style={{ width: "9px", height: "9px", borderRadius: "50%", background: C.error, animation: "recPulse 1.5s ease-in-out infinite" }} />
               <span style={{ color: C.error, fontSize: "14px", fontWeight: "500" }}>녹음 중… {rec.time}초</span>
             </div>
             <Btn onClick={rec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error }}>⏹ 멈추기 (자동 분석)</Btn>
@@ -1235,7 +1228,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
             </div>
           ) : (
             <div style={{ marginTop: "12px", padding: "12px", background: C.retryBg, border: `1px solid #F0C090`, borderRadius: "6px" }}>
-              <div style={{ fontSize: "13px", color: C.retry, fontWeight: "600", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}><span style={{ fontSize: "18px" }}>💪</span> 8점 이상이 될 때까지 계속 연습해 보세요!</div>
+              <div style={{ fontSize: "13px", color: C.retry, fontWeight: "500", marginBottom: "8px" }}>8점 이상이 될 때까지 계속 연습해 보세요! 💪</div>
               <Btn onClick={() => { rec.reset(); setFeedback(null); setTranscription(null); }} variant="secondary" style={{ fontSize: "12px", padding: "7px 14px" }}>🔄 다시 시도</Btn>
             </div>
           )}
@@ -1384,16 +1377,16 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
       {/* SPEAK ENGLISH */}
       {mode === "speak" && (
         <div>
-          <Card style={{ borderLeft: `3px solid ${C.gold}`, marginBottom: "16px", background: C.goldBg }}>
-            <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px", color: C.text }}>자유롭게 영어로 말해보세요!</div>
-            <div style={{ fontSize: "12px", color: C.textMid }}>오늘 있었던 일, 여행 계획, 하고 싶은 말 — 무엇이든 영어로 말하고 피드백을 받아보세요.</div>
+          <Card style={{ borderLeft: `3px solid ${C.gold}`, marginBottom: "16px" }}>
+            <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>자유롭게 영어로 말해보세요!</div>
+            <div style={{ fontSize: "12px", color: C.textLight }}>오늘 있었던 일, 여행 계획, 하고 싶은 말 — 무엇이든 영어로 말하고 피드백을 받아보세요.</div>
           </Card>
           <div style={{ textAlign: "center" }}>
             {!speakRec.isRec && !loading && <Btn onClick={speakRec.start} style={{ padding: "12px 32px", fontSize: "15px" }}>🎙 말하기 시작</Btn>}
             {speakRec.isRec && (
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "12px" }}>
-                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: C.error, animation: "recPulse 1.5s ease-in-out infinite" }} />
+                  <div style={{ width: "9px", height: "9px", borderRadius: "50%", background: C.error, animation: "recPulse 1.5s ease-in-out infinite" }} />
                   <span style={{ color: C.error, fontSize: "14px", fontWeight: "500" }}>녹음 중… {speakRec.time}초</span>
                 </div>
                 <Btn onClick={speakRec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error }}>⏹ 멈추기 (자동 분석)</Btn>
@@ -1800,7 +1793,7 @@ function NoteCard({ note, noteType, user, isTeacher }) {
   const isPersonal = noteType === "student";
 
   return (
-    <Card style={{ marginBottom: "12px", borderLeft: `3px solid ${isPersonal ? C.success : C.gold}`, background: C.bgCard }}>
+    <Card style={{ marginBottom: "12px", borderLeft: `3px solid ${isPersonal ? C.success : C.gold}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
         <div style={{ fontSize: "11px", fontWeight: "700", color: isPersonal ? C.success : C.gold, letterSpacing: "1px", textTransform: "uppercase" }}>
           {isPersonal ? "📝 개인 피드백" : "📋 Session " + note.session_number + " 노트"}
@@ -2097,7 +2090,7 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
               onKeyDown={handleKeyDown}
               placeholder="메시지 입력…"
               rows={1}
-              style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "22px", fontSize: "15px", fontFamily: FONT, outline: "none", resize: "none", maxHeight: "100px", overflowY: "auto", lineHeight: 1.4, background: C.bgMid, WebkitAppearance: "none" }}
+              style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "22px", fontSize: "15px", fontFamily: FONT, outline: "none", resize: "none", maxHeight: "100px", overflowY: "auto", lineHeight: 1.4, background: C.bgSoft, WebkitAppearance: "none" }}
             />
             <button onClick={send} disabled={sending || !input.trim()} style={{ width: "42px", height: "42px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", cursor: input.trim() ? "pointer" : "default", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
               {sending ? "⋯" : "➤"}
@@ -2152,21 +2145,18 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg }}>
-      <div style={{ background: C.bgSoft, borderBottom: `1px solid ${C.border}`, padding: "0 24px", position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(12px)" }}>
+    <div style={{ minHeight: "100vh", background: C.bgSoft }}>
+      <div style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: "0 24px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "linear-gradient(135deg, #C9A84C, #E8C56A)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>🌊</div>
-            <div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: "18px", fontWeight: "400", letterSpacing: "2px", color: C.text }}>WAYVE</div>
-              <div style={{ fontSize: "10px", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", fontWeight: "600" }}>Teacher Dashboard</div>
-            </div>
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: "800", letterSpacing: "4px", textTransform: "uppercase" }}>WAYVE</div>
+            <div style={{ fontSize: "10px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginTop: "2px", fontWeight: "500" }}>Teacher Dashboard</div>
           </div>
-          <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 14px", borderRadius: "8px", fontSize: "12px", fontFamily: FONT }}>Log out</button>
+          <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", transition: "all 0.15s" }}>Log out</button>
         </div>
         <div style={{ display: "flex", overflowX: "auto" }}>
           {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"]].map(([t, label]) =>
-            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.gold}` : "2px solid transparent", color: tab === t ? C.gold : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", transition: "color 0.15s" } }, label)
+            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
         </div>
       </div>
@@ -2420,7 +2410,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
   const today = new Date().toISOString().split("T")[0];
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
   const getActivity = s => { if (!s.last_practice) return "inactive"; if (s.last_practice === today) return "active"; if (s.last_practice >= sevenDaysAgo) return "recent"; return "inactive"; };
-  const activityStyle = { active: { label: "🟢 Active Today", color: C.success, bg: "rgba(46,204,122,0.08)" }, recent: { label: "🟡 Active This Week", color: "#B7860B", bg: "#FEFCE8" }, inactive: { label: "🔴 Inactive (7+ days)", color: C.error, bg: C.errorBg } };
+  const activityStyle = { active: { label: "🟢 Active Today", color: C.success, bg: C.successBg }, recent: { label: "🟡 Active This Week", color: "#B7860B", bg: "#FEFCE8" }, inactive: { label: "🔴 Inactive (7+ days)", color: C.error, bg: C.errorBg } };
 
   const addGroup = async () => {
     if (!newName.trim()) return;
@@ -2476,7 +2466,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
       {/* View toggle */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
         {[["overview", "📊 Overview"], ["activity", "🟢 Activity"]].map(([v, label]) =>
-          React.createElement("button", { key: v, onClick: () => setActiveView(v), style: { padding: "7px 16px", borderRadius: "20px", border: `1px solid ${activeView === v ? C.gold : C.border}`, background: activeView === v ? C.bgMid : "transparent", color: activeView === v ? C.gold : C.textMid, fontSize: "13px", fontWeight: activeView === v ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
+          React.createElement("button", { key: v, onClick: () => setActiveView(v), style: { padding: "7px 16px", borderRadius: "20px", border: `1px solid ${activeView === v ? C.text : C.border}`, background: activeView === v ? C.text : C.bg, color: activeView === v ? "#fff" : C.textMid, fontSize: "13px", fontWeight: activeView === v ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
         )}
       </div>
 
@@ -2515,7 +2505,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
 
       {groups.map(g => {
         const gs = students.filter(s => s.group_id === g.id);
-        return React.createElement(Card, { key: g.id, style: { marginBottom: "12px", background: C.bgCard } },
+        return React.createElement(Card, { key: g.id, style: { marginBottom: "12px" } },
           React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
             React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", flex: 1 } }, React.createElement(InlineEdit, { value: g.name, onSave: n => renameGroup(g.id, n) })),
             React.createElement("div", { style: { display: "flex", gap: "6px" } },
@@ -2820,7 +2810,7 @@ function StudentsTab({ students, setStudents, groups, showMsg }) {
 
       {localGroups.map(g => {
         const gs = byGroup[g.id] || [];
-        return React.createElement(Card, { key: g.id, style: { marginBottom: "12px", background: C.bgCard } },
+        return React.createElement(Card, { key: g.id, style: { marginBottom: "12px" } },
           React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: gs.length > 0 ? "10px" : "0" } },
             React.createElement("div", { style: { fontSize: "14px", fontWeight: "600" } }, g.name),
             React.createElement("span", { style: { fontSize: "12px", color: C.textLight } }, gs.length + " students")
@@ -2899,7 +2889,6 @@ function CityGroupsTab({ groups, students, showMsg }) {
     return students.filter(s => gIds.includes(s.group_id)).length;
   };
   const unassignedGroups = groups.filter(g => !members.find(m => m.group_id === g.id));
-
   const capacityColor = (n) => n === 0 ? C.textLight : n <= 15 ? C.success : n <= 25 ? C.gold : C.error;
   const capacityLabel = (n) => n === 0 ? "Empty" : n <= 15 ? "Great size" : n <= 25 ? "Ideal" : n <= 35 ? "Getting big" : "Too large";
 
@@ -2908,28 +2897,24 @@ function CityGroupsTab({ groups, students, showMsg }) {
   return (
     <div>
       <style>{`
-        @keyframes citySlideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        .city-card { transition: box-shadow 0.2s, transform 0.15s; }
-        .city-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(201,168,76,0.1); }
-        .drop-zone { transition: background 0.15s, border-color 0.15s; }
-        .drop-zone.drag-over { background: rgba(201,168,76,0.08) !important; border-color: #C9A84C !important; }
-        .group-chip:hover { transform: translateY(-1px); }
+        .city-card { transition: box-shadow 0.2s; }
+        .city-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .drop-zone.drag-over { background: #F5F5F5 !important; border-color: #1A1A1A !important; }
       `}</style>
 
-      {/* Hero header */}
-      <div style={{ background: "linear-gradient(135deg, #0D1B2A 0%, #1A1035 60%, #0D1B2A 100%)", borderRadius: "16px", padding: "28px", marginBottom: "24px", position: "relative", overflow: "hidden", border: `1px solid ${C.border}` }}>
-        <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "130px", opacity: 0.05, filter: "blur(2px)" }}>🌍</div>
-        <div style={{ position: "absolute", bottom: "-20px", left: "30px", fontSize: "80px", opacity: 0.04 }}>✈️</div>
-        <div style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "4px", textTransform: "uppercase", color: C.gold, marginBottom: "6px", opacity: 0.8 }}>Community Architecture</div>
-        <div style={{ fontSize: "26px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "10px", color: C.text }}>🏙 City Groups</div>
-        <div style={{ fontSize: "13px", color: C.textMid, lineHeight: 1.7, maxWidth: "460px" }}>
-          Cluster your practice groups into city communities for the Question of the Day. Keep cities between <strong style={{ color: C.gold }}>15–25 students</strong> for the most intimate experience.
+      {/* Header — dark panel like wayve.tiiny.site contrast sections */}
+      <div style={{ background: C.bgDark, borderRadius: "16px", padding: "28px", marginBottom: "24px", color: "#fff", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-20px", right: "-20px", fontSize: "120px", opacity: 0.05 }}>🌍</div>
+        <div style={{ fontSize: "10px", fontWeight: "600", letterSpacing: "4px", textTransform: "uppercase", opacity: 0.5, marginBottom: "6px" }}>Community Architecture</div>
+        <div style={{ fontSize: "24px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "8px" }}>🏙 City Groups</div>
+        <div style={{ fontSize: "13px", opacity: 0.7, lineHeight: 1.7, maxWidth: "460px" }}>
+          Cluster your practice groups into city communities for the Question of the Day. Keep cities between <strong>15–25 students</strong> for the most intimate experience.
         </div>
         <div style={{ display: "flex", gap: "24px", marginTop: "18px" }}>
           {[["🏙", cities.length, "Cities"], ["👥", groups.length, "Groups"], ["🎓", students.length, "Students"], ["📭", unassignedGroups.length, "Unassigned"]].map(([icon, val, label]) =>
             React.createElement("div", { key: label, style: { textAlign: "center" } },
-              React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: label === "Unassigned" && val > 0 ? C.retry : C.text } }, icon + " " + val),
-              React.createElement("div", { style: { fontSize: "9px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: "2px" } }, label)
+              React.createElement("div", { style: { fontSize: "18px", fontWeight: "800" } }, icon + " " + val),
+              React.createElement("div", { style: { fontSize: "9px", opacity: 0.5, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: "2px" } }, label)
             )
           )}
         </div>
@@ -2937,7 +2922,7 @@ function CityGroupsTab({ groups, students, showMsg }) {
 
       {/* Unassigned */}
       {unassignedGroups.length > 0 && (
-        <Card style={{ marginBottom: "20px", borderLeft: `3px solid ${C.retry}`, background: C.retryBg, border: `1px solid ${C.retryBorder}` }}>
+        <Card style={{ marginBottom: "20px", borderLeft: `3px solid ${C.retry}`, background: C.retryBg }}>
           <div style={{ fontSize: "11px", fontWeight: "700", color: C.retry, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
             📭 {unassignedGroups.length} Unassigned
           </div>
@@ -2945,11 +2930,11 @@ function CityGroupsTab({ groups, students, showMsg }) {
             {unassignedGroups.map(g => {
               const sc = students.filter(s => s.group_id === g.id).length;
               return (
-                <div key={g.id} className="group-chip" style={{ background: C.bgMid, border: `1px dashed ${C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s" }}>
-                  <span style={{ fontWeight: "500", color: C.text }}>{g.name}</span>
+                <div key={g.id} style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "6px 14px", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontWeight: "600" }}>{g.name}</span>
                   <span style={{ fontSize: "11px", color: C.textLight }}>({sc}명)</span>
                   <select onChange={e => e.target.value && assignGroup(g.id, e.target.value)} defaultValue=""
-                    style={{ border: "none", background: "transparent", fontSize: "11px", color: C.gold, cursor: "pointer", fontFamily: FONT, outline: "none" }}>
+                    style={{ border: "none", background: "transparent", fontSize: "11px", color: C.text, cursor: "pointer", fontFamily: FONT, outline: "none", fontWeight: "600" }}>
                     <option value="">Assign →</option>
                     {cities.map(c => React.createElement("option", { key: c.id, value: c.id }, c.emoji + " " + c.name))}
                   </select>
@@ -2961,8 +2946,8 @@ function CityGroupsTab({ groups, students, showMsg }) {
       )}
 
       {/* City cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: "14px", marginBottom: "24px" }}>
-        {cities.map((city, idx) => {
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: "12px", marginBottom: "24px" }}>
+        {cities.map((city) => {
           const cityGroups = getCityGroups(city.id);
           const studentCount = getCityStudentCount(city.id);
           const isDragOver = dragOverCity === city.id;
@@ -2971,47 +2956,42 @@ function CityGroupsTab({ groups, students, showMsg }) {
               onDragOver={e => { e.preventDefault(); setDragOverCity(city.id); }}
               onDragLeave={() => setDragOverCity(null)}
               onDrop={e => { e.preventDefault(); if (dragging) { assignGroup(dragging, city.id); setDragging(null); } setDragOverCity(null); }}
-              style={{ background: C.bgCard, border: `1px solid ${isDragOver ? C.gold : C.border}`, borderRadius: "14px", overflow: "hidden", animation: `citySlideIn 0.35s ease ${idx * 0.06}s both` }}>
-              <div style={{ padding: "18px", background: "linear-gradient(145deg, rgba(255,255,255,0.03), transparent)", borderBottom: `1px solid ${C.border}` }}>
+              style={{ background: C.bgCard, border: `1px solid ${isDragOver ? C.text : C.border}`, borderRadius: "14px", overflow: "hidden" }}>
+              <div style={{ padding: "18px", borderBottom: `1px solid ${C.border}`, background: C.bgSoft }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{ fontSize: "36px", lineHeight: 1, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}>{city.emoji}</div>
+                    <div style={{ fontSize: "32px", lineHeight: 1 }}>{city.emoji}</div>
                     <div>
-                      <div style={{ fontSize: "17px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px" }}>{city.name}</div>
+                      <div style={{ fontSize: "16px", fontWeight: "800", letterSpacing: "-0.3px" }}>{city.name}</div>
                       {city.description && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>{city.description}</div>}
                     </div>
                   </div>
-                  <button onClick={() => deleteCity(city.id)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "18px", padding: "2px", lineHeight: 1, opacity: 0.5 }}>×</button>
+                  <button onClick={() => deleteCity(city.id)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "18px", lineHeight: 1 }}>×</button>
                 </div>
-                <div style={{ marginTop: "14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-                    <span style={{ fontSize: "10px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1px" }}>Community</span>
+                <div style={{ marginTop: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "10px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1px" }}>Community size</span>
                     <span style={{ fontSize: "12px", fontWeight: "700", color: capacityColor(studentCount) }}>{studentCount} · {capacityLabel(studentCount)}</span>
                   </div>
-                  <div style={{ height: "5px", background: C.bgMid, borderRadius: "3px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, (studentCount / 25) * 100)}%`, background: `linear-gradient(to right, ${C.success}, ${capacityColor(studentCount)})`, borderRadius: "3px", transition: "width 0.5s ease" }} />
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: C.textLight, marginTop: "3px" }}>
-                    <span>0</span><span style={{ color: C.success }}>15</span><span style={{ color: C.gold }}>25</span>
+                  <div style={{ height: "4px", background: C.bgMid, borderRadius: "2px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, (studentCount / 25) * 100)}%`, background: capacityColor(studentCount) === C.success ? C.success : capacityColor(studentCount), borderRadius: "2px", transition: "width 0.4s ease" }} />
                   </div>
                 </div>
               </div>
               <div style={{ padding: "12px 16px" }}>
                 {cityGroups.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "14px", color: C.textLight, fontSize: "12px", fontStyle: "italic", border: `1px dashed ${C.border}`, borderRadius: "8px" }}>
-                    Add groups below
-                  </div>
+                  <div style={{ textAlign: "center", padding: "12px", color: C.textLight, fontSize: "12px", fontStyle: "italic", border: `1px dashed ${C.border}`, borderRadius: "8px" }}>Drop groups here</div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                     {cityGroups.map(g => {
                       const sc = students.filter(s => s.group_id === g.id).length;
                       return (
-                        <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bgMid, borderRadius: "8px", padding: "7px 12px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "13px", fontWeight: "500", color: C.text }}>{g.name}</span>
-                            <span style={{ fontSize: "10px", color: C.textLight, background: C.bgSoft, padding: "1px 7px", borderRadius: "10px" }}>{sc}명</span>
+                        <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bgSoft, borderRadius: "8px", padding: "7px 12px" }}>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                            <span style={{ fontSize: "13px", fontWeight: "600" }}>{g.name}</span>
+                            <span style={{ fontSize: "10px", color: C.textLight, background: C.bgMid, padding: "1px 7px", borderRadius: "100px" }}>{sc}명</span>
                           </div>
-                          <button onClick={() => assignGroup(g.id, null)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px", opacity: 0.5 }}>×</button>
+                          <button onClick={() => assignGroup(g.id, null)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px" }}>×</button>
                         </div>
                       );
                     })}
@@ -3020,8 +3000,8 @@ function CityGroupsTab({ groups, students, showMsg }) {
                 {unassignedGroups.length > 0 && (
                   <div style={{ marginTop: "8px" }}>
                     <select onChange={e => { if (e.target.value) { assignGroup(e.target.value, city.id); e.target.value = ""; } }} defaultValue=""
-                      style={{ width: "100%", padding: "7px 10px", border: `1px dashed ${C.border}`, borderRadius: "8px", fontSize: "12px", color: C.textMid, fontFamily: FONT, outline: "none", background: C.bgMid, cursor: "pointer" }}>
-                      <option value="">+ Add group…</option>
+                      style={{ width: "100%", padding: "7px 10px", border: `1px dashed ${C.border}`, borderRadius: "8px", fontSize: "12px", color: C.textMid, fontFamily: FONT, outline: "none", background: C.bg, cursor: "pointer" }}>
+                      <option value="">+ Add group to {city.name}…</option>
                       {unassignedGroups.map(g => React.createElement("option", { key: g.id, value: g.id }, g.name + " (" + students.filter(s => s.group_id === g.id).length + " students)"))}
                     </select>
                   </div>
@@ -3033,31 +3013,29 @@ function CityGroupsTab({ groups, students, showMsg }) {
       </div>
 
       {/* Create city */}
-      <Card style={{ borderLeft: `4px solid ${C.gold}`, background: C.bgCard }}>
-        <div style={{ fontSize: "12px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "14px" }}>+ Create New City</div>
-        <div style={{ marginBottom: "10px" }}>
-          <div style={{ fontSize: "10px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>Choose Emoji</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
-            {CITY_EMOJIS.map(e => (
-              <button key={e} onClick={() => setNewCityEmoji(e)}
-                style={{ width: "36px", height: "36px", borderRadius: "8px", border: `2px solid ${newCityEmoji === e ? C.gold : C.border}`, background: newCityEmoji === e ? C.goldBg : C.bgMid, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}>
-                {e}
-              </button>
-            ))}
-          </div>
+      <Card>
+        <div style={{ fontSize: "12px", fontWeight: "700", color: C.text, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "14px" }}>+ Create New City</div>
+        <div style={{ fontSize: "10px", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>Choose Emoji</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+          {CITY_EMOJIS.map(e => (
+            <button key={e} onClick={() => setNewCityEmoji(e)}
+              style={{ width: "36px", height: "36px", borderRadius: "8px", border: `2px solid ${newCityEmoji === e ? C.text : C.border}`, background: newCityEmoji === e ? C.bgSoft : C.bg, fontSize: "18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}>
+              {e}
+            </button>
+          ))}
         </div>
         <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
           <Input value={newCityName} onChange={e => setNewCityName(e.target.value)} placeholder="City name (e.g. Seoul, Barcelona)" />
-          <div style={{ width: "42px", height: "42px", borderRadius: "8px", background: C.bgMid, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{newCityEmoji}</div>
+          <div style={{ width: "42px", height: "42px", borderRadius: "8px", background: C.bgSoft, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0 }}>{newCityEmoji}</div>
         </div>
         <Input value={newCityDesc} onChange={e => setNewCityDesc(e.target.value)} placeholder="Optional tagline" style={{ marginBottom: "12px" }} />
-        <Btn onClick={createCity} disabled={saving || !newCityName.trim()} variant="gold" style={{ width: "100%" }}>{saving ? React.createElement(Spinner) : "🏙 Create City"}</Btn>
+        <Btn onClick={createCity} disabled={saving || !newCityName.trim()} style={{ width: "100%" }}>{saving ? React.createElement(Spinner) : "🏙 Create City"}</Btn>
       </Card>
 
-      <div style={{ marginTop: "14px", padding: "12px 14px", background: C.bgSoft, borderRadius: "8px", fontSize: "11px", color: C.textLight, lineHeight: 1.8, border: `1px solid ${C.border}` }}>
+      <div style={{ marginTop: "14px", padding: "12px 14px", background: C.bgSoft, borderRadius: "8px", fontSize: "11px", color: C.textLight, lineHeight: 1.8 }}>
         <strong style={{ color: C.textMid }}>Supabase tables needed:</strong><br />
-        <code style={{ color: C.gold }}>city_groups</code>: id, name, emoji, description, created_at<br />
-        <code style={{ color: C.gold }}>city_group_members</code>: id, city_group_id, group_id, created_at
+        <code>city_groups</code>: id, name, emoji, description, created_at<br />
+        <code>city_group_members</code>: id, city_group_id, group_id, created_at
       </div>
     </div>
   );
@@ -3065,13 +3043,13 @@ function CityGroupsTab({ groups, students, showMsg }) {
 
 // ── QoD Studio Tab ────────────────────────────────────────────────────────────
 const QOD_CATEGORIES = [
-  { id: "personal", label: "🌱 Personal Growth", desc: "Self-reflection, goals, values", color: "#2ECC7A", bg: "rgba(46,204,122,0.08)" },
-  { id: "culture", label: "🌏 Culture Bridge", desc: "Korean/western culture, customs", color: "#60A5FA", bg: "rgba(96,165,250,0.08)" },
-  { id: "daily", label: "☀️ Daily Life", desc: "Work, routines, weekends", color: "#C9A84C", bg: "rgba(201,168,76,0.08)" },
-  { id: "memory", label: "📸 Memory Lane", desc: "Stories, firsts, childhood", color: "#A78BFA", bg: "rgba(167,139,250,0.08)" },
-  { id: "opinion", label: "💬 Hot Take", desc: "Light opinions, preferences, debates", color: "#F87171", bg: "rgba(248,113,113,0.08)" },
-  { id: "imagine", label: "✨ What If?", desc: "Hypotheticals, dreams, scenarios", color: "#34D399", bg: "rgba(52,211,153,0.08)" },
-  { id: "english", label: "🎯 English Journey", desc: "Learning goals, funny moments", color: "#FBBF24", bg: "rgba(251,191,36,0.08)" },
+  { id: "personal", label: "🌱 Personal Growth", desc: "Self-reflection, goals, values", color: C ? C.success : "#1A7A45" },
+  { id: "culture", label: "🌏 Culture Bridge", desc: "Korean/western culture, customs", color: "#2563EB" },
+  { id: "daily", label: "☀️ Daily Life", desc: "Work, routines, weekends", color: "#B8973A" },
+  { id: "memory", label: "📸 Memory Lane", desc: "Stories, firsts, childhood", color: "#7C3AED" },
+  { id: "opinion", label: "💬 Hot Take", desc: "Light opinions, preferences, debates", color: "#C0392B" },
+  { id: "imagine", label: "✨ What If?", desc: "Hypotheticals, dreams, scenarios", color: "#0891B2" },
+  { id: "english", label: "🎯 English Journey", desc: "Learning goals, funny moments", color: "#C96A1A" },
 ];
 
 const QOD_DIFFICULTY = [
@@ -3101,29 +3079,23 @@ function QodStudioTab({ showMsg }) {
     const cat = QOD_CATEGORIES.find(c => c.id === selectedCategory);
     const diff = QOD_DIFFICULTY.find(d => d.id === selectedDifficulty);
     try {
-      const text = await groqCall(`You are designing Question of the Day prompts for a Korean adult English learner community called WAYVE.
-Context: Korean adults (20s-50s) learning conversational English. Voice messages 20-45 seconds. Intimate community of 15-25 students. Teacher is "Teacher Tom" — warm, encouraging.
-Category: ${cat.label} — ${cat.desc}. Difficulty: ${diff.label} — ${diff.desc}.${customContext ? ` Extra: ${customContext}` : ""}
+      const text = await groqCall(`You are designing Question of the Day prompts for a Korean adult English learner community called WAYVE. Students respond via short voice messages (20-45 seconds). Community is 15-25 students who know each other. Category: ${cat.label} — ${cat.desc}. Difficulty: ${diff.label} — ${diff.desc}.${customContext ? ` Extra context: ${customContext}` : ""}
 
-Generate exactly 5 engaging QoD prompts. Each must spark a real personal story, be answerable in 20-45 seconds, and make students curious to hear others' answers.
+Generate exactly 5 engaging QoD prompts. Each must spark a real personal story, be answerable in 20-45 seconds of spoken English, and make students curious to hear others' answers.
 
 STRICT FORMAT — no other text:
 PROMPT_1: [question]
 TAG_1: [2-3 word tag]
-SPARK_1: [one sentence: why this works]
-
+SPARK_1: [one sentence: why this works for language learning]
 PROMPT_2: [question]
-TAG_2: [2-3 word tag]
+TAG_2: [tag]
 SPARK_2: [one sentence]
-
 PROMPT_3: [question]
 TAG_3: [tag]
 SPARK_3: [one sentence]
-
 PROMPT_4: [question]
 TAG_4: [tag]
 SPARK_4: [one sentence]
-
 PROMPT_5: [question]
 TAG_5: [tag]
 SPARK_5: [one sentence]`);
@@ -3135,7 +3107,7 @@ SPARK_5: [one sentence]`);
         const sm = text.match(new RegExp(`SPARK_${i}:\\s*(.+?)(?=PROMPT_${i+1}:|$)`, "s"));
         if (pm) parsed.push({ id: Date.now() + i, prompt: pm[1].trim(), tag: tm ? tm[1].trim() : cat.label, spark: sm ? sm[1].trim() : "", category: selectedCategory, difficulty: selectedDifficulty });
       }
-      setSuggestions(parsed.length > 0 ? parsed : [{ id: Date.now(), prompt: text.trim(), tag: cat.label, spark: "", category: selectedCategory, difficulty: selectedDifficulty }]);
+      setSuggestions(parsed.length > 0 ? parsed : [{ id: Date.now(), prompt: text.trim(), tag: "", spark: "", category: selectedCategory, difficulty: selectedDifficulty }]);
     } catch(e) { showMsg("Generation error: " + e.message, "error"); }
     setGenerating(false);
   };
@@ -3162,34 +3134,33 @@ SPARK_5: [one sentence]`);
     } catch(e) { showMsg("Error", "error"); }
   };
 
-  const cat = QOD_CATEGORIES.find(c => c.id === selectedCategory);
   const today = new Date().toISOString().split("T")[0];
   const upcoming = savedPrompts.filter(p => p.scheduled_date && p.scheduled_date >= today).sort((a,b) => a.scheduled_date.localeCompare(b.scheduled_date));
   const unscheduled = savedPrompts.filter(p => !p.scheduled_date);
   const past = savedPrompts.filter(p => p.scheduled_date && p.scheduled_date < today);
+  const cat = QOD_CATEGORIES.find(c => c.id === selectedCategory);
 
   return (
     <div>
       <style>{`
-        @keyframes studioShimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-        @keyframes qodFloat { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-8px) rotate(2deg)} }
-        .qod-card { transition: box-shadow 0.2s, transform 0.15s; }
-        .qod-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); transform: translateY(-2px); }
-        .gen-skeleton { background: linear-gradient(90deg, #1E2535 0%, #2A3145 50%, #1E2535 100%); background-size: 400% 100%; animation: studioShimmer 1.5s ease infinite; }
+        @keyframes skeletonPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .gen-skeleton { animation: skeletonPulse 1.4s ease-in-out infinite; }
+        .qod-card { transition: box-shadow 0.18s, transform 0.15s; }
+        .qod-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); transform: translateY(-1px); }
       `}</style>
 
-      {/* Studio hero */}
-      <div style={{ background: "linear-gradient(135deg, #1a0f00 0%, #2D1F00 40%, #1a0f00 100%)", borderRadius: "16px", padding: "28px", marginBottom: "24px", position: "relative", overflow: "hidden", border: `1px solid ${C.goldBorder}`, boxShadow: `0 4px 32px rgba(201,168,76,0.1)` }}>
-        <div style={{ position: "absolute", top: "-40px", right: "-30px", fontSize: "160px", opacity: 0.06, animation: "qodFloat 5s ease-in-out infinite" }}>💡</div>
-        <div style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "4px", textTransform: "uppercase", color: C.gold, opacity: 0.8, marginBottom: "4px" }}>Teacher Tom's</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: "28px", fontWeight: "400", letterSpacing: "-0.3px", marginBottom: "8px", color: C.text }}>Question of the Day Studio</div>
-        <div style={{ fontSize: "13px", color: C.textMid, lineHeight: 1.7, maxWidth: "480px" }}>
-          Generate prompts that make students <em style={{ color: C.goldBright }}>want</em> to speak. Schedule them, save favourites, and build a library.
+      {/* Studio header — dark panel */}
+      <div style={{ background: C.bgDark, borderRadius: "16px", padding: "28px", marginBottom: "24px", color: "#fff", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "140px", opacity: 0.05 }}>💡</div>
+        <div style={{ fontSize: "10px", fontWeight: "600", letterSpacing: "4px", textTransform: "uppercase", opacity: 0.5, marginBottom: "4px" }}>Teacher Tom's</div>
+        <div style={{ fontSize: "26px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "8px" }}>Question of the Day Studio</div>
+        <div style={{ fontSize: "13px", opacity: 0.65, lineHeight: 1.7, maxWidth: "480px" }}>
+          Generate prompts that make students <em>want</em> to speak. Schedule them, save favourites, build a library.
         </div>
         <div style={{ display: "flex", gap: "6px", marginTop: "16px", flexWrap: "wrap" }}>
           {[["generate", "✨ Generate"], ["saved", `📚 Library (${savedPrompts.length})`], ["schedule", `📅 Upcoming (${upcoming.length})`]].map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setActiveTab(t),
-              style: { padding: "7px 16px", borderRadius: "20px", border: `1px solid ${activeTab === t ? C.gold : C.goldBorder}`, background: activeTab === t ? C.goldBg : "transparent", color: activeTab === t ? C.gold : C.textMid, fontSize: "12px", fontWeight: activeTab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" } }, label)
+              style: { padding: "7px 16px", borderRadius: "100px", border: `1px solid ${activeTab === t ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.2)"}`, background: activeTab === t ? "rgba(255,255,255,0.9)" : "transparent", color: activeTab === t ? C.text : "#fff", fontSize: "12px", fontWeight: activeTab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" } }, label)
           )}
         </div>
       </div>
@@ -3197,28 +3168,29 @@ SPARK_5: [one sentence]`);
       {/* Generate */}
       {activeTab === "generate" && (
         <div>
-          <div style={{ marginBottom: "18px" }}>
+          <div style={{ marginBottom: "16px" }}>
             <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px" }}>Question Theme</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
               {QOD_CATEGORIES.map(c => (
                 <button key={c.id} onClick={() => setSelectedCategory(c.id)}
-                  style={{ display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "10px", border: `1px solid ${selectedCategory === c.id ? c.color + "60" : C.border}`, background: selectedCategory === c.id ? c.bg : "transparent", cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.12s" }}>
-                  <div style={{ fontSize: "18px", lineHeight: 1 }}>{c.label.split(" ")[0]}</div>
+                  style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", borderRadius: "10px", border: `1px solid ${selectedCategory === c.id ? C.text : C.border}`, background: selectedCategory === c.id ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.12s" }}>
+                  <div style={{ fontSize: "16px" }}>{c.label.split(" ")[0]}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "13px", fontWeight: selectedCategory === c.id ? "700" : "500", color: selectedCategory === c.id ? c.color : C.text }}>{c.label.slice(c.label.indexOf(" ") + 1)}</div>
+                    <div style={{ fontSize: "13px", fontWeight: selectedCategory === c.id ? "700" : "500", color: C.text }}>{c.label.slice(c.label.indexOf(" ") + 1)}</div>
                     <div style={{ fontSize: "11px", color: C.textLight }}>{c.desc}</div>
                   </div>
-                  {selectedCategory === c.id && <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: c.color, flexShrink: 0, boxShadow: `0 0 8px ${c.color}` }} />}
+                  {selectedCategory === c.id && <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.text, flexShrink: 0 }} />}
                 </button>
               ))}
             </div>
           </div>
+
           <div style={{ marginBottom: "16px" }}>
             <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px" }}>Speaking Level</div>
             <div style={{ display: "flex", gap: "8px" }}>
               {QOD_DIFFICULTY.map(d => (
                 <button key={d.id} onClick={() => setSelectedDifficulty(d.id)}
-                  style={{ flex: 1, padding: "10px 6px", borderRadius: "10px", border: `1px solid ${selectedDifficulty === d.id ? C.gold : C.border}`, background: selectedDifficulty === d.id ? C.goldBg : "transparent", color: selectedDifficulty === d.id ? C.gold : C.textMid, fontSize: "11px", fontWeight: selectedDifficulty === d.id ? "700" : "400", cursor: "pointer", fontFamily: FONT, textAlign: "center", transition: "all 0.12s" }}>
+                  style={{ flex: 1, padding: "10px 6px", borderRadius: "10px", border: `1px solid ${selectedDifficulty === d.id ? C.text : C.border}`, background: selectedDifficulty === d.id ? C.text : C.bg, color: selectedDifficulty === d.id ? "#fff" : C.textMid, fontSize: "11px", fontWeight: selectedDifficulty === d.id ? "700" : "400", cursor: "pointer", fontFamily: FONT, textAlign: "center", transition: "all 0.12s" }}>
                   <div style={{ fontSize: "16px", marginBottom: "3px" }}>{d.label.split(" ")[0]}</div>
                   <div style={{ fontWeight: "600", fontSize: "12px" }}>{d.label.slice(d.label.indexOf(" ") + 1)}</div>
                   <div style={{ fontSize: "10px", opacity: 0.6, marginTop: "2px" }}>{d.desc}</div>
@@ -3226,24 +3198,27 @@ SPARK_5: [one sentence]`);
               ))}
             </div>
           </div>
+
           <div style={{ marginBottom: "16px" }}>
             <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "6px" }}>Context <span style={{ fontWeight: "400", textTransform: "none", fontSize: "11px" }}>optional</span></div>
             <Input value={customContext} onChange={e => setCustomContext(e.target.value)} placeholder="e.g. 'After a long holiday' / 'Monday motivation'" />
           </div>
-          <button onClick={generatePrompts} disabled={generating}
-            style={{ width: "100%", padding: "14px", borderRadius: "12px", border: `1px solid ${generating ? C.border : C.goldBorder}`, background: generating ? C.bgMid : C.goldBg, color: generating ? C.textLight : C.gold, fontSize: "15px", fontWeight: "700", cursor: generating ? "not-allowed" : "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "20px", transition: "all 0.2s" }}>
-            {generating ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", null, "Crafting prompts…")) : "✨  Generate 5 Questions"}
-          </button>
+
+          <Btn onClick={generatePrompts} disabled={generating} style={{ width: "100%", padding: "13px", fontSize: "14px", marginBottom: "20px", borderRadius: "100px" }}>
+            {generating ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, "Crafting prompts…")) : "✨  Generate 5 Questions"}
+          </Btn>
+
           {generating && (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {[1,2,3,4,5].map(i => <div key={i} className="gen-skeleton" style={{ height: "90px", borderRadius: "12px" }} />)}
+              {[1,2,3,4,5].map(i => <div key={i} className="gen-skeleton" style={{ height: "80px", borderRadius: "12px", background: C.bgSoft }} />)}
             </div>
           )}
+
           {!generating && suggestions.length > 0 && (
             <div>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>{suggestions.length} Generated · {cat.label}</div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>{suggestions.length} Generated</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {suggestions.map((s, i) => <QodPromptCard key={s.id} prompt={s} index={i} catColor={cat.color} catBg={cat.bg} onSave={() => savePrompt(s)} onPreview={() => setPreviewPrompt(s)} isSaved={savedPrompts.some(sp => sp.prompt === s.prompt)} />)}
+                {suggestions.map((s, i) => <QodPromptCard key={s.id} prompt={s} index={i} onSave={() => savePrompt(s)} onPreview={() => setPreviewPrompt(s)} isSaved={savedPrompts.some(sp => sp.prompt === s.prompt)} />)}
               </div>
             </div>
           )}
@@ -3252,84 +3227,79 @@ SPARK_5: [one sentence]`);
 
       {/* Saved */}
       {activeTab === "saved" && (
-        <div>
-          {loadingSaved ? React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner)) :
-           savedPrompts.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 20px" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📚</div>
-              <div style={{ fontSize: "16px", color: C.textMid, fontWeight: "600", marginBottom: "8px" }}>Library is empty</div>
-              <div style={{ fontSize: "13px", color: C.textLight }}>Generate questions and save your favourites</div>
-            </div>
-          ) : (
-            <div>
-              {unscheduled.length > 0 && (
-                <div style={{ marginBottom: "20px" }}>
-                  <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px" }}>Unscheduled ({unscheduled.length})</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {unscheduled.map((p, i) => { const c = QOD_CATEGORIES.find(c => c.id === p.category) || QOD_CATEGORIES[0]; return <QodPromptCard key={p.id} prompt={p} index={i} catColor={c.color} catBg={c.bg} isSaved={true} onDelete={() => deletePrompt(p.id)} onSchedule={() => setScheduling(p.id)} onPreview={() => setPreviewPrompt(p)} schedulingId={scheduling} onConfirmSchedule={(date) => schedulePrompt(p.id, date)} onCancelSchedule={() => setScheduling(null)} />; })}
-                  </div>
+        loadingSaved ? React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner)) :
+        savedPrompts.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: "40px", marginBottom: "16px" }}>📚</div>
+            <div style={{ fontSize: "16px", color: C.textMid, fontWeight: "700", marginBottom: "8px" }}>Library is empty</div>
+            <div style={{ fontSize: "13px", color: C.textLight }}>Generate questions and save your favourites</div>
+          </div>
+        ) : (
+          <div>
+            {unscheduled.length > 0 && (
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px" }}>Unscheduled ({unscheduled.length})</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {unscheduled.map((p, i) => <QodPromptCard key={p.id} prompt={p} index={i} isSaved={true} onDelete={() => deletePrompt(p.id)} onSchedule={() => setScheduling(p.id)} onPreview={() => setPreviewPrompt(p)} schedulingId={scheduling} onConfirmSchedule={(date) => schedulePrompt(p.id, date)} onCancelSchedule={() => setScheduling(null)} />)}
                 </div>
-              )}
-              {past.length > 0 && (
-                <div>
-                  <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px" }}>Past ({past.length})</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", opacity: 0.5 }}>
-                    {past.map((p, i) => { const c = QOD_CATEGORIES.find(c => c.id === p.category) || QOD_CATEGORIES[0]; return <QodPromptCard key={p.id} prompt={p} index={i} catColor={c.color} catBg={c.bg} isSaved={true} onDelete={() => deletePrompt(p.id)} onPreview={() => setPreviewPrompt(p)} />; })}
-                  </div>
+              </div>
+            )}
+            {past.length > 0 && (
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px" }}>Past ({past.length})</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", opacity: 0.55 }}>
+                  {past.map((p, i) => <QodPromptCard key={p.id} prompt={p} index={i} isSaved={true} onDelete={() => deletePrompt(p.id)} onPreview={() => setPreviewPrompt(p)} />)}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* Schedule */}
       {activeTab === "schedule" && (
-        <div>
-          {upcoming.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 20px" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📅</div>
-              <div style={{ fontSize: "16px", color: C.textMid, fontWeight: "600", marginBottom: "8px" }}>No upcoming questions</div>
-              <div style={{ fontSize: "13px", color: C.textLight }}>Save prompts and schedule them from the Library</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {upcoming.map((p, i) => {
-                const c = QOD_CATEGORIES.find(c => c.id === p.category) || QOD_CATEGORIES[0];
-                const isToday = p.scheduled_date === today;
-                return (
-                  <div key={p.id} style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
-                    <div style={{ width: "48px", textAlign: "center", flexShrink: 0, paddingTop: "4px" }}>
-                      <div style={{ fontSize: "10px", fontWeight: "700", color: isToday ? C.gold : C.textLight, textTransform: "uppercase", letterSpacing: "1px" }}>{isToday ? "TODAY" : new Date(p.scheduled_date + "T00:00").toLocaleDateString("en", { weekday: "short" })}</div>
-                      <div style={{ fontSize: "22px", fontWeight: "800", color: isToday ? C.gold : C.text, lineHeight: 1.2 }}>{new Date(p.scheduled_date + "T00:00").getDate()}</div>
-                      <div style={{ fontSize: "10px", color: C.textLight }}>{new Date(p.scheduled_date + "T00:00").toLocaleDateString("en", { month: "short" })}</div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <QodPromptCard prompt={p} index={i} catColor={c.color} catBg={c.bg} isSaved={true} isToday={isToday} onDelete={() => deletePrompt(p.id)} onPreview={() => setPreviewPrompt(p)} />
-                    </div>
+        upcoming.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: "40px", marginBottom: "16px" }}>📅</div>
+            <div style={{ fontSize: "16px", color: C.textMid, fontWeight: "700", marginBottom: "8px" }}>No upcoming questions</div>
+            <div style={{ fontSize: "13px", color: C.textLight }}>Save prompts and schedule them from the Library</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {upcoming.map((p, i) => {
+              const isToday = p.scheduled_date === today;
+              return (
+                <div key={p.id} style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+                  <div style={{ width: "46px", textAlign: "center", flexShrink: 0, paddingTop: "6px" }}>
+                    <div style={{ fontSize: "9px", fontWeight: "700", color: isToday ? C.text : C.textLight, textTransform: "uppercase", letterSpacing: "1px" }}>{isToday ? "TODAY" : new Date(p.scheduled_date + "T00:00").toLocaleDateString("en", { weekday: "short" })}</div>
+                    <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, lineHeight: 1.1 }}>{new Date(p.scheduled_date + "T00:00").getDate()}</div>
+                    <div style={{ fontSize: "10px", color: C.textLight }}>{new Date(p.scheduled_date + "T00:00").toLocaleDateString("en", { month: "short" })}</div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  <div style={{ flex: 1 }}>
+                    <QodPromptCard prompt={p} index={i} isSaved={true} isToday={isToday} onDelete={() => deletePrompt(p.id)} onPreview={() => setPreviewPrompt(p)} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {/* Preview modal */}
       {previewPrompt && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(8px)" }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
           onClick={e => { if (e.target === e.currentTarget) setPreviewPrompt(null); }}>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: "20px", padding: "28px", maxWidth: "480px", width: "100%", boxShadow: "0 24px 80px rgba(0,0,0,0.6)", animation: "scaleIn 0.2s ease" }}>
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "28px", maxWidth: "480px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", animation: "scaleIn 0.18s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "3px", textTransform: "uppercase" }}>Student Preview</div>
-              <button onClick={() => setPreviewPrompt(null)} style={{ background: C.bgMid, border: "none", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", color: C.textMid }}>×</button>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase" }}>Student Preview</div>
+              <button onClick={() => setPreviewPrompt(null)} style={{ background: C.bgSoft, border: "none", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", color: C.textMid }}>×</button>
             </div>
-            <div style={{ background: "linear-gradient(135deg, #0D1B2A, #1A1035)", borderRadius: "14px", padding: "28px", marginBottom: "16px", textAlign: "center", border: `1px solid ${C.goldBorder}` }}>
-              <div style={{ fontSize: "10px", color: C.gold, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "14px", opacity: 0.8 }}>오늘의 질문</div>
-              <div style={{ fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: "400", lineHeight: 1.6, color: C.text, fontStyle: "italic" }}>"{previewPrompt.prompt}"</div>
+            <div style={{ background: C.bgDark, borderRadius: "12px", padding: "24px", marginBottom: "16px", textAlign: "center", color: "#fff" }}>
+              <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>오늘의 질문</div>
+              <div style={{ fontSize: "19px", fontWeight: "700", lineHeight: 1.5, fontStyle: "italic" }}>"{previewPrompt.prompt}"</div>
             </div>
             {previewPrompt.spark && (
-              <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "10px 14px", borderRadius: "0 8px 8px 0", fontSize: "13px", color: C.textMid, fontStyle: "italic", marginBottom: "16px" }}>
+              <div style={{ background: C.bgSoft, borderLeft: `3px solid ${C.border}`, padding: "10px 14px", borderRadius: "0 8px 8px 0", fontSize: "13px", color: C.textMid, fontStyle: "italic", marginBottom: "16px" }}>
                 💡 {previewPrompt.spark}
               </div>
             )}
@@ -3341,54 +3311,58 @@ SPARK_5: [one sentence]`);
         </div>
       )}
 
-      <div style={{ marginTop: "20px", padding: "12px 14px", background: C.bgSoft, borderRadius: "8px", fontSize: "11px", color: C.textLight, lineHeight: 1.8, border: `1px solid ${C.border}` }}>
-        <strong style={{ color: C.textMid }}>Supabase table needed:</strong> <code style={{ color: C.gold }}>qod_prompts</code>: id, prompt, tag, spark, category, difficulty, scheduled_date, created_at
+      <div style={{ marginTop: "20px", padding: "12px 14px", background: C.bgSoft, borderRadius: "8px", fontSize: "11px", color: C.textLight, lineHeight: 1.8 }}>
+        <strong style={{ color: C.textMid }}>Supabase table needed:</strong> <code>qod_prompts</code>: id, prompt, tag, spark, category, difficulty, scheduled_date, created_at
       </div>
     </div>
   );
 }
 
 // ── QoD Prompt Card ───────────────────────────────────────────────────────────
-function QodPromptCard({ prompt, index, catColor, catBg, onSave, onDelete, onPreview, onSchedule, isSaved, isToday, schedulingId, onConfirmSchedule, onCancelSchedule }) {
+function QodPromptCard({ prompt, index, onSave, onDelete, onPreview, onSchedule, isSaved, isToday, schedulingId, onConfirmSchedule, onCancelSchedule }) {
   const [schedDate, setSchedDate] = useState("");
   const isScheduling = schedulingId === prompt.id;
   const diff = QOD_DIFFICULTY.find(d => d.id === prompt.difficulty);
 
   return (
-    <div className="qod-card" style={{ background: C.bgCard, border: `1px solid ${isToday ? catColor + "50" : C.border}`, borderRadius: "12px", overflow: "hidden", borderLeft: `3px solid ${catColor}`, ...(isToday ? { boxShadow: `0 0 0 1px ${catColor}20, 0 4px 20px ${catColor}15` } : {}) }}>
+    <div className="qod-card" style={{ background: C.bgCard, border: `1px solid ${isToday ? C.text : C.border}`, borderRadius: "12px", overflow: "hidden", borderLeft: `3px solid ${C.text}` }}>
       <div style={{ padding: "14px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "10px", fontWeight: "700", background: catBg, color: catColor, padding: "3px 9px", borderRadius: "10px", letterSpacing: "0.5px", border: `1px solid ${catColor}30` }}>{prompt.tag}</span>
-            {diff && <span style={{ fontSize: "10px", color: C.textLight, background: C.bgMid, padding: "3px 9px", borderRadius: "10px" }}>{diff.label.split(" ")[0]} {diff.label.slice(diff.label.indexOf(" ") + 1)}</span>}
-            {isToday && <span style={{ fontSize: "10px", fontWeight: "700", background: C.goldBg, color: C.gold, padding: "3px 9px", borderRadius: "10px", border: `1px solid ${C.goldBorder}` }}>⭐ Today</span>}
+            {prompt.tag && <span style={{ fontSize: "10px", fontWeight: "700", background: C.bgSoft, color: C.textMid, padding: "3px 9px", borderRadius: "100px", letterSpacing: "0.5px" }}>{prompt.tag}</span>}
+            {diff && <span style={{ fontSize: "10px", color: C.textLight, background: C.bgSoft, padding: "3px 9px", borderRadius: "100px" }}>{diff.label.split(" ")[0]} {diff.label.slice(diff.label.indexOf(" ") + 1)}</span>}
+            {isToday && <span style={{ fontSize: "10px", fontWeight: "700", background: C.text, color: "#fff", padding: "3px 9px", borderRadius: "100px" }}>⭐ Today</span>}
           </div>
           <div style={{ display: "flex", gap: "4px" }}>
-            {onPreview && <button onClick={onPreview} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "4px 8px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT }}>👁</button>}
-            {!isSaved && onSave && <button onClick={onSave} style={{ background: catBg, border: `1px solid ${catColor}40`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: catColor, fontFamily: FONT, fontWeight: "700" }}>Save ⭐</button>}
-            {isSaved && onSchedule && <button onClick={onSchedule} style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: C.gold, fontFamily: FONT, fontWeight: "600" }}>📅 Schedule</button>}
-            {onDelete && <button onClick={onDelete} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px", padding: "2px 4px", opacity: 0.5 }}>×</button>}
+            {onPreview && <button onClick={onPreview} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT }}>👁 Preview</button>}
+            {!isSaved && onSave && <button onClick={onSave} style={{ background: C.text, border: "none", borderRadius: "100px", padding: "4px 12px", cursor: "pointer", fontSize: "11px", color: "#fff", fontFamily: FONT, fontWeight: "600" }}>Save ⭐</button>}
+            {isSaved && onSchedule && <button onClick={onSchedule} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT }}>📅 Schedule</button>}
+            {onDelete && <button onClick={onDelete} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px", padding: "2px 4px" }}>×</button>}
           </div>
         </div>
+
         <div style={{ fontSize: "15px", fontWeight: "600", color: C.text, lineHeight: 1.6, fontStyle: "italic", marginBottom: prompt.spark ? "10px" : "0" }}>
           "{prompt.prompt}"
         </div>
+
         {prompt.spark && (
-          <div style={{ background: C.bgMid, borderRadius: "6px", padding: "8px 12px", fontSize: "12px", color: C.textMid, lineHeight: 1.5 }}>
+          <div style={{ background: C.bgSoft, borderRadius: "6px", padding: "8px 12px", fontSize: "12px", color: C.textMid, lineHeight: 1.5 }}>
             💡 {prompt.spark}
           </div>
         )}
+
         {isScheduling && (
           <div style={{ marginTop: "10px", display: "flex", gap: "8px", alignItems: "center" }}>
             <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} min={new Date().toISOString().split("T")[0]}
-              style={{ flex: 1, padding: "8px 10px", border: `1px solid ${C.gold}`, borderRadius: "8px", fontSize: "13px", fontFamily: FONT, outline: "none", color: C.text, background: C.bgMid }} />
-            <Btn onClick={() => { if (schedDate) onConfirmSchedule(schedDate); }} disabled={!schedDate} variant="gold" style={{ fontSize: "12px", padding: "7px 12px" }}>Confirm</Btn>
+              style={{ flex: 1, padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontFamily: FONT, outline: "none", color: C.text, background: C.bg }} />
+            <Btn onClick={() => { if (schedDate) onConfirmSchedule(schedDate); }} disabled={!schedDate} style={{ fontSize: "12px", padding: "7px 14px" }}>Confirm</Btn>
             <Btn onClick={onCancelSchedule} variant="ghost" style={{ fontSize: "12px", padding: "7px 10px" }}>✕</Btn>
           </div>
         )}
+
         {prompt.scheduled_date && !isScheduling && (
-          <div style={{ marginTop: "8px", fontSize: "11px", color: C.textLight, display: "flex", alignItems: "center", gap: "4px" }}>
-            📅 <strong style={{ color: prompt.scheduled_date === new Date().toISOString().split("T")[0] ? C.gold : C.textMid }}>{prompt.scheduled_date}</strong>
+          <div style={{ marginTop: "8px", fontSize: "11px", color: C.textLight }}>
+            📅 {prompt.scheduled_date === new Date().toISOString().split("T")[0] ? <strong style={{ color: C.text }}>Today</strong> : prompt.scheduled_date}
           </div>
         )}
       </div>
