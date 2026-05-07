@@ -3428,103 +3428,174 @@ Format:
 }
 
 // ── Rich Audio Player ────────────────────────────────────────────────────────
-function RichAudioPlayer({ src, label = "내 녹음 듣기" }) {
+function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [waveform, setWaveform] = useState([]);
+  const rafRef = useRef(null);
 
+  // Decode real waveform from audio data
+  useEffect(() => {
+    if (!src) return;
+    setWaveform([]);
+    setPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    const decode = async () => {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) throw new Error("no AudioContext");
+        const ctx = new AudioCtx();
+        const res = await fetch(src);
+        const buf = await res.arrayBuffer();
+        const decoded = await ctx.decodeAudioData(buf);
+        const raw = decoded.getChannelData(0);
+        const N = 50;
+        const block = Math.floor(raw.length / N);
+        const bars = Array.from({ length: N }, (_, i) => {
+          let s = 0;
+          for (let j = 0; j < block; j++) s += Math.abs(raw[i * block + j]);
+          return s / block;
+        });
+        const max = Math.max(...bars, 0.001);
+        setWaveform(bars.map(v => v / max));
+        ctx.close();
+      } catch(e) {
+        // Smooth fallback shape
+        setWaveform(Array.from({ length: 50 }, (_, i) =>
+          Math.max(0.08, 0.35 + Math.sin(i * 0.45) * 0.28 + Math.sin(i * 0.95 + 1.1) * 0.2 + Math.sin(i * 1.9) * 0.12)
+        ));
+      }
+    };
+    decode();
+  }, [src]);
+
+  // Audio metadata
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onLoaded = () => setDuration(audio.duration || 0);
-    const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
+    const onMeta = () => setDuration(audio.duration || 0);
+    const onEnded = () => {
+      setPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+      cancelAnimationFrame(rafRef.current);
     };
-    const onEnded = () => { setPlaying(false); setProgress(0); setCurrentTime(0); };
-    audio.addEventListener("loadedmetadata", onLoaded);
-    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("ended", onEnded);
     return () => {
-      audio.removeEventListener("loadedmetadata", onLoaded);
-      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("ended", onEnded);
     };
   }, [src]);
+
+  // 60fps RAF loop — only runs while playing
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const tick = () => {
+      if (!audio.paused && audio.duration) {
+        const t = audio.currentTime;
+        const p = (t / audio.duration) * 100;
+        setCurrentTime(t);
+        setProgress(p);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    if (playing) {
+      rafRef.current = requestAnimationFrame(tick);
+    } else {
+      cancelAnimationFrame(rafRef.current);
+    }
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [playing]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) { audio.pause(); setPlaying(false); }
-    else { audio.play(); setPlaying(true); }
+    else { audio.play().catch(() => {}); setPlaying(true); }
   };
 
   const seek = (e) => {
     const audio = audioRef.current;
     if (!audio || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * duration;
+    setProgress(ratio * 100);
+    setCurrentTime(ratio * duration);
   };
 
-  const fmt = (s) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+  const fmt = s => isNaN(s) ? "0:00" : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+  const bars = waveform.length > 0 ? waveform : Array.from({ length: 50 }, (_, i) =>
+    Math.max(0.08, 0.35 + Math.sin(i * 0.45) * 0.28 + Math.sin(i * 0.95 + 1.1) * 0.2)
+  );
 
   return React.createElement("div", { style: { marginBottom: "12px" } },
-    React.createElement("audio", { ref: audioRef, src, preload: "metadata" }),
+    React.createElement("audio", { ref: audioRef, src, preload: "auto" }),
     React.createElement("div", {
-      style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "10px 14px", display: "flex", flexDirection: "column", gap: "8px" }
+      style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px", display: "flex", flexDirection: "column", gap: "10px" }
     },
+      // Label + timestamp
       React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-        React.createElement("div", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid, display: "flex", alignItems: "center", gap: "6px" } },
-          React.createElement("span", null, "🎙"), React.createElement("span", null, label)
+        React.createElement("span", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid, display: "flex", alignItems: "center", gap: "5px" } },
+          React.createElement("span", null, "🎙"),
+          React.createElement("span", null, label)
         ),
-        React.createElement("span", { style: { fontSize: "11px", color: C.textLight } },
-          duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : "--:--"
+        React.createElement("span", { style: { fontSize: "11px", color: C.textLight, fontVariantNumeric: "tabular-nums", minWidth: "72px", textAlign: "right" } },
+          duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : "—"
         )
       ),
-      React.createElement("div", {
-        onClick: seek,
-        style: { position: "relative", height: "36px", cursor: "pointer", display: "flex", alignItems: "center", gap: "3px", padding: "4px 0" }
-      },
-        Array.from({ length: 40 }, (_, i) => {
-          // Smoother organic wave shape using multiple sine waves
-          const wave1 = Math.sin(i * 0.4) * 0.35;
-          const wave2 = Math.sin(i * 0.9 + 1.2) * 0.25;
-          const wave3 = Math.sin(i * 1.8 + 0.5) * 0.2;
-          const base = 0.25;
-          const h = Math.max(8, Math.min(100, (base + wave1 + wave2 + wave3 + 0.5) * 80));
-          const filled = (i / 40) * 100 < progress;
-          return React.createElement("div", {
-            key: i,
-            style: {
-              flex: 1,
-              height: `${h}%`,
-              borderRadius: "100px",
-              background: filled
-                ? C.text
-                : C.bgMid,
-              transition: "background 0.15s ease",
-              opacity: filled ? 1 : 0.5,
-            }
-          });
-        }),
-        progress > 0 && React.createElement("div", {
-          style: { position: "absolute", left: `calc(${progress}% - 5px)`, width: "10px", height: "10px", borderRadius: "50%", background: C.text, boxShadow: "0 1px 4px rgba(0,0,0,0.2)", pointerEvents: "none", zIndex: 2, top: "50%", transform: "translateY(-50%)" }
-        })
-      ),
+      // Play button + waveform
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
         React.createElement("button", {
           onClick: togglePlay,
-          style: { width: "32px", height: "32px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", flexShrink: 0 }
+          style: { width: "36px", height: "36px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", color: "#fff", fontSize: "12px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.1s", transform: playing ? "scale(0.93)" : "scale(1)" }
         }, playing ? "⏸" : "▶"),
-        React.createElement("div", { style: { flex: 1, fontSize: "11px", color: C.textLight } },
-          playing ? "재생 중…" : duration > 0 ? "탭하여 재생" : ""
+        // Waveform — clickable, progress driven by RAF state
+        React.createElement("div", {
+          onClick: seek,
+          style: { flex: 1, height: "36px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer", position: "relative", overflow: "hidden" }
+        },
+          bars.map((amp, i) => {
+            const pct = (i / bars.length) * 100;
+            const filled = pct < progress;
+            const nearHead = Math.abs(pct - progress) < 4;
+            const minPx = 3;
+            const maxPx = 28;
+            const h = Math.round(minPx + amp * (maxPx - minPx));
+            return React.createElement("div", {
+              key: i,
+              style: {
+                width: "3px",
+                height: `${h}px`,
+                borderRadius: "100px",
+                flexShrink: 0,
+                background: filled ? C.text : C.bgMid,
+                opacity: filled ? 1 : 0.35,
+                transform: nearHead && playing ? "scaleY(1.3)" : "scaleY(1)",
+                transition: "background 0.05s, transform 0.05s, opacity 0.05s",
+              }
+            });
+          })
         )
+      ),
+      // Transcript
+      (transcript && transcript.trim().length > 0) && React.createElement("div", {
+        style: { fontSize: "13px", color: C.textMid, lineHeight: 1.65, paddingTop: "8px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", gap: "6px" }
+      },
+        React.createElement("span", { style: { fontSize: "11px", flexShrink: 0, marginTop: "2px", opacity: 0.6 } }, "🎙"),
+        React.createElement("span", { style: { fontStyle: "italic" } }, `"${transcript}"`)
       )
     )
   );
 }
+
 
 // ── Community Tab ─────────────────────────────────────────────────────────────
 // Supabase tables needed:
@@ -3590,21 +3661,29 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
 
   const handleReaction = async (responseId, emoji) => {
     if (isPreview) return;
+    // Optimistic update — flip UI instantly
+    setResponses(prev => prev.map(r => {
+      if (r.id !== responseId) return r;
+      const counts = { ...(r._reactionCounts || {}) };
+      const mine = new Set(r._myReactions || []);
+      if (mine.has(emoji)) {
+        mine.delete(emoji);
+        counts[emoji] = Math.max(0, (counts[emoji] || 1) - 1);
+      } else {
+        mine.add(emoji);
+        counts[emoji] = (counts[emoji] || 0) + 1;
+      }
+      return { ...r, _reactionCounts: counts, _myReactions: [...mine] };
+    }));
     try {
-      // Toggle: remove if already reacted with same emoji
       const existing = await db.get("qod_reactions", `response_id=eq.${responseId}&student_id=eq.${user.id}&emoji=eq.${emoji}`).catch(() => []);
       if (existing.length > 0) {
         await db.delete("qod_reactions", `id=eq.${existing[0].id}`);
       } else {
         await db.insert("qod_reactions", { response_id: responseId, student_id: user.id, emoji });
       }
-      // Reload responses to update counts
-      if (qodPrompt && cityGroup) {
-        const resp = await db.get("qod_responses", `prompt_id=eq.${qodPrompt.id}&city_group_id=eq.${cityGroup.id}&order=created_at.asc`).catch(() => []);
-        setResponses(resp);
-      }
     } catch(e) {}
-  };
+  };;
 
   if (isPreview) return (
     <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -3719,21 +3798,25 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
 
 // ── Response Card ─────────────────────────────────────────────────────────────
 function ResponseCard({ response, isMe, onReact, userId, index }) {
-  const [reactions, setReactions] = useState({});
-  const [loadingReactions, setLoadingReactions] = useState(true);
+  // Use optimistic reaction data from parent (updated instantly on tap)
+  // Fall back to DB fetch only on first load when optimistic data not yet set
+  const [dbReactions, setDbReactions] = useState(null);
 
   useEffect(() => {
     db.get("qod_reactions", `response_id=eq.${response.id}`).then(r => {
       const counts = {};
-      const myReactions = new Set();
+      const mine = new Set();
       r.forEach(rx => {
         counts[rx.emoji] = (counts[rx.emoji] || 0) + 1;
-        if (rx.student_id === userId) myReactions.add(rx.emoji);
+        if (rx.student_id === userId) mine.add(rx.emoji);
       });
-      setReactions({ counts, mine: myReactions });
-      setLoadingReactions(false);
-    }).catch(() => setLoadingReactions(false));
+      setDbReactions({ counts, mine });
+    }).catch(() => setDbReactions({ counts: {}, mine: new Set() }));
   }, [response.id]);
+
+  // Prefer optimistic data from parent response object, fall back to DB fetch
+  const reactionCounts = response._reactionCounts || dbReactions?.counts || {};
+  const myReactions = new Set(response._myReactions || [...(dbReactions?.mine || new Set())]);
 
   const timeAgo = (dateStr) => {
     const mins = Math.floor((Date.now() - new Date(dateStr)) / 60000);
@@ -3764,7 +3847,7 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
 
       {/* Audio player — use RichAudioPlayer if audio exists, else show transcript */}
       {response.audio_url ? (
-        React.createElement(RichAudioPlayer, { src: response.audio_url, label: `${response.nickname || "Student"}'s answer` })
+        React.createElement(RichAudioPlayer, { src: response.audio_url, label: `${response.nickname || "Student"}'s answer`, transcript: response.transcript || "" })
       ) : (
         response.transcript && (
           <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "10px 14px", marginBottom: "10px", fontSize: "14px", color: C.text, fontStyle: "italic", lineHeight: 1.5 }}>
@@ -3776,8 +3859,8 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
       {/* Reactions — always show all 6, filled if reacted, tappable always */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
         {REACTION_EMOJIS.map(emoji => {
-          const count = reactions.counts?.[emoji] || 0;
-          const isMine = reactions.mine?.has(emoji);
+          const count = reactionCounts[emoji] || 0;
+          const isMine = myReactions.has(emoji);
           // On other people's cards, hide reactions with 0 count
           if (count === 0 && !isMe) return null;
           return (
@@ -3912,6 +3995,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
       try { await db.update("students", `id=eq.${user.id}`, { nickname: nick }); user.nickname = nick; } catch(e) {}
     }
     setPosting(true);
+    console.log("Submitting - finalBlob:", finalBlob ? `${finalBlob.size} bytes` : "NULL", "finalTranscript:", finalTranscript);
     try {
       let audioUrl = null;
       if (finalBlob) {
@@ -4167,18 +4251,13 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             {/* Feedback */}
             {currentFeedback && !loadingFeedback && (
               <div style={{ animation: "fadeIn 0.25s ease" }}>
-                {finalUrl && React.createElement(RichAudioPlayer, { src: finalUrl, label: "내 녹음 듣기" })}
-                {finalTranscript && (
-                  <div style={{ background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", marginBottom: "10px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.border}` }}>
-                    🎙 "{finalTranscript}"
-                  </div>
-                )}
+                {finalUrl && React.createElement(RichAudioPlayer, { src: finalUrl, label: "내 녹음 듣기", transcript: finalTranscript || "" })}
                 {React.createElement(FeedbackDisplay, { text: currentFeedback.text })}
                 <div style={{ marginTop: "12px", padding: "10px 14px", background: currentFeedback.score >= 7 ? C.successBg : C.bgSoft, borderRadius: "8px", fontSize: "13px", color: currentFeedback.score >= 7 ? C.success : C.textMid, fontWeight: "600", border: `1px solid ${currentFeedback.score >= 7 ? C.successBorder : C.border}`, marginBottom: "14px" }}>
                   {currentFeedback.score >= 7 ? "🎉 잘했어요! 이 답변으로 제출할 수 있어요." : "💪 다시 해보거나 그냥 제출해도 돼요!"}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <Btn onClick={() => setStep(isFirstTime ? "nickname" : "posting")} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
+                  <Btn onClick={() => { if (isFirstTime) { setStep("nickname"); } else { handleSubmit(); } }} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
                     ✅ 제출하기 · Submit
                   </Btn>
                   <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); }} variant="ghost" style={{ width: "100%", padding: "11px" }}>
@@ -4213,8 +4292,8 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "20px" }}>
               💡 나중에 언제든지 바꿀 수 있어요.
             </div>
-            <Btn onClick={() => setStep("posting")} disabled={!nickname.trim()} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
-              완료 → Confirm Nickname
+            <Btn onClick={() => handleSubmit()} disabled={!nickname.trim() || posting} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
+              {posting ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, "올리는 중…")) : "완료 → Submit Answer"}
             </Btn>
           </div>
         )}
