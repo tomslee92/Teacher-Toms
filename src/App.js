@@ -22,6 +22,7 @@ const db = {
   insert: (t, d) => sb(t, { method: "POST", body: JSON.stringify(d) }),
   update: (t, q, d) => sb(`${t}?${q}`, { method: "PATCH", body: JSON.stringify(d) }),
   delete: (t, q) => sb(`${t}?${q}`, { method: "DELETE", headers: { "Prefer": "return=representation" } }),
+  upsert: (t, d) => sb(t, { method: "POST", body: JSON.stringify(d), headers: { "Prefer": "resolution=merge-duplicates,return=representation" } }),
 };
 
 // ── Colors ────────────────────────────────────────────────────────────────────
@@ -698,7 +699,7 @@ function StudentScreen({ user, group, isPreview, onBack }) {
     return () => clearInterval(interval);
   }, [isPreview, user.id]);
 
-  const tabs = [["practice", "🎙 Practice"], ["freetalk", "💬 Free Talk"], ["myphrases", "⭐ My Phrases"], ["notes", "📝 Notes"], ["chat", "💬 Chat"]];
+  const tabs = [["practice", "🎙 Practice"], ["freetalk", "💬 Free Talk"], ["myphrases", "⭐ My Phrases"], ["notes", "📝 Notes"]];
 
   return (
     <div style={{ minHeight: "100vh", background: C.bgSoft }}>
@@ -750,8 +751,8 @@ function StudentScreen({ user, group, isPreview, onBack }) {
         {tab === "freetalk" && React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak })}
         {tab === "myphrases" && React.createElement(MyPhrasesTab, { user, isPreview })}
         {tab === "notes" && React.createElement(NotesTab, { user, group, isPreview })}
-        {tab === "chat" && React.createElement(ChatTab, { user, group, isPreview })}
       </div>
+      {!isPreview && React.createElement(FloatingChat, { user, group, isPreview, isTeacher: false, students: [] })}
     </div>
   );
 }
@@ -911,40 +912,104 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
         </div>
       )}
 
-      {/* Session tabs with progress */}
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
-        {sessionNums.map(n => {
-          const { passed, total } = getSessionProgress(n);
-          const allDone = total > 0 && passed === total;
-          return React.createElement("button", {
-            key: n, onClick: () => setActiveSession(n),
-            style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${activeSession === n ? C.text : C.border}`, background: activeSession === n ? C.text : allDone ? C.successBg : C.bg, color: activeSession === n ? "#fff" : allDone ? C.success : C.textMid, fontSize: "13px", fontWeight: activeSession === n ? "600" : "400", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "5px" }
-          },
-            `Session ${n}`,
-            total > 0 && React.createElement("span", { style: { fontSize: "10px", background: activeSession === n ? "rgba(255,255,255,0.2)" : allDone ? "rgba(26,122,69,0.15)" : C.bgMid, padding: "1px 5px", borderRadius: "10px", fontWeight: "600" } }, `${passed}/${total}`)
-          );
-        })}
-      </div>
+      {/* Scrollable session feed */}
+      <SessionFeed
+        sessionNums={sessionNums}
+        sessions={sessions}
+        progress={progress}
+        sessionResets={sessionResets}
+        user={user}
+        isPreview={isPreview}
+        onUpdate={handleProgressUpdate}
+        onPracticed={onPracticed}
+        getSessionProgress={getSessionProgress}
+        resetSession={resetSession}
+      />
+    </div>
+  );
+}
 
-      {/* Practice Again button */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "10px" }}>
-        <button onClick={() => resetSession(activeSession)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px" }}>
-          ↺ 다시 연습하기
-        </button>
-      </div>
+// ── Session Feed ──────────────────────────────────────────────────────────────
+function SessionFeed({ sessionNums, sessions, progress, sessionResets, user, isPreview, onUpdate, onPracticed, getSessionProgress, resetSession }) {
+  const [collapsed, setCollapsed] = useState({});
+  const latestSession = sessionNums[0];
+  const currentRef = useRef(null);
 
-      {/* Phrase list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {ordered.map(phrase => React.createElement(ExpandableRow, {
-          key: `${phrase.id}-${sessionKey}`,
-          phrase,
-          progress,
-          sessionReset: !!sessionResets[activeSession],
-          user, isPreview,
-          onUpdate: handleProgressUpdate,
-          onPracticed,
-        }))}
-      </div>
+  const toggleCollapse = (n) => setCollapsed(prev => ({ ...prev, [n]: !prev[n] }));
+
+  // Jump to current session button visibility
+  const [showJump, setShowJump] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => setShowJump(window.scrollY > 300);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <div>
+      {/* Jump to current session button */}
+      {showJump && (
+        <button
+          onClick={() => currentRef.current?.scrollIntoView({ behavior: "smooth" })}
+          style={{ position: "fixed", bottom: "86px", left: "20px", background: C.text, color: "#fff", border: "none", borderRadius: "20px", padding: "8px 16px", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, zIndex: 90, boxShadow: "0 2px 12px rgba(0,0,0,0.15)", display: "flex", alignItems: "center", gap: "5px" }}
+        >↑ 최신 세션으로</button>
+      )}
+
+      {sessionNums.map((n, idx) => {
+        const isLatest = n === latestSession;
+        const { passed, total } = getSessionProgress(n);
+        const allDone = total > 0 && passed === total;
+        const isCollapsed = isLatest ? false : (collapsed[n] !== false); // previous sessions start collapsed
+        const sessionKey = sessionResets[n] || 0;
+
+        const phrases = sessions[n] || [];
+        const retry = phrases.filter(p => progress[p.id]?.needs_retry && !progress[p.id]?.passed);
+        const others = phrases.filter(p => !progress[p.id]?.needs_retry || progress[p.id]?.passed);
+        const ordered = [...retry, ...others];
+
+        return (
+          <div key={n} ref={isLatest ? currentRef : null} style={{ marginBottom: "20px" }}>
+            {/* Session header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {isLatest && (
+                  <span style={{ background: C.gold, color: "#fff", fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px", letterSpacing: "0.5px" }}>✨ 최신</span>
+                )}
+                <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>Session {n}</div>
+                <span style={{ fontSize: "12px", color: allDone ? C.success : C.textLight, background: allDone ? C.successBg : C.bgSoft, padding: "2px 8px", borderRadius: "10px", fontWeight: "600" }}>
+                  {passed}/{total} {allDone ? "✅" : ""}
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button onClick={() => resetSession(n)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT }}>↺ 다시</button>
+                {!isLatest && (
+                  <button onClick={() => toggleCollapse(n)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: "3px 10px", borderRadius: "12px" }}>
+                    {isCollapsed ? `펼치기 ▼` : `접기 ▲`}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Phrase list */}
+            {!isCollapsed && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }} className="fade-in">
+                {ordered.map(phrase => React.createElement(ExpandableRow, {
+                  key: `${phrase.id}-${sessionKey}`,
+                  phrase, progress,
+                  sessionReset: !!sessionResets[n],
+                  user, isPreview,
+                  onUpdate, onPracticed,
+                }))}
+              </div>
+            )}
+
+            {/* Divider between sessions */}
+            {idx < sessionNums.length - 1 && (
+              <div style={{ height: "1px", background: C.border, marginTop: "16px" }} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1552,17 +1617,21 @@ function MyPhraseRow({ phrase, user, isPreview, onToggleHide, onDelete }) {
 }
 
 // ── Notes Tab (Student) ───────────────────────────────────────────────────────
+
+// ── Notes Tab (Student) ───────────────────────────────────────────────────────
 function NotesTab({ user, group, isPreview }) {
   const [sessionNotes, setSessionNotes] = useState([]);
   const [studentNote, setStudentNote] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [unreadReplies, setUnreadReplies] = useState(0);
 
   useEffect(() => {
     if (!group?.id || isPreview) { setLoading(false); return; }
     Promise.all([
       db.get("session_notes", `group_id=eq.${group.id}&order=session_number.desc`),
       db.get("student_notes", `student_id=eq.${user.id}&order=created_at.desc&limit=1`),
-    ]).then(([sn, pn]) => { setSessionNotes(sn); setStudentNote(pn[0] || null); setLoading(false); }).catch(() => setLoading(false));
+    ]).then(([sn, pn]) => { setSessionNotes(sn); setStudentNote(pn[0] || null); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [group, user, isPreview]);
 
   if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner));
@@ -1570,15 +1639,10 @@ function NotesTab({ user, group, isPreview }) {
 
   return (
     <div>
-      {/* Personal note from teacher */}
+      {/* Personal note */}
       {studentNote && (
-        <Card style={{ marginBottom: "16px", borderLeft: `3px solid ${C.gold}` }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>📝 선생님의 개인 피드백</div>
-          <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.8, whiteSpace: "pre-line" }}>{studentNote.content}</div>
-          <div style={{ fontSize: "11px", color: C.textLight, marginTop: "8px" }}>{new Date(studentNote.updated_at).toLocaleDateString("ko-KR")}</div>
-        </Card>
+        <NoteCard note={studentNote} noteType="student" user={user} isTeacher={false} />
       )}
-
       {/* Session notes */}
       {sessionNotes.length === 0 && !studentNote ? (
         <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -1586,19 +1650,11 @@ function NotesTab({ user, group, isPreview }) {
           <div style={{ fontSize: "15px", color: C.textMid, marginBottom: "8px" }}>아직 노트가 없어요.</div>
           <div style={{ fontSize: "13px", color: C.textLight }}>선생님이 수업 후 노트를 추가해 드릴게요!</div>
         </div>
-      ) : (
+      ) : sessionNotes.length > 0 && (
         <div>
-          {sessionNotes.length > 0 && (
-            <div>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>수업 노트</div>
-              {sessionNotes.map(note => (
-                React.createElement(Card, { key: note.id, style: { marginBottom: "10px" } },
-                  React.createElement("div", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid, marginBottom: "6px" } }, "Session " + note.session_number),
-                  React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.8, whiteSpace: "pre-line" } }, note.content),
-                  React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "6px" } }, new Date(note.updated_at).toLocaleDateString("ko-KR"))
-                )
-              ))}
-            </div>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>수업 노트</div>
+          {sessionNotes.map(note =>
+            React.createElement(NoteCard, { key: note.id, note, noteType: "session", user, isTeacher: false })
           )}
         </div>
       )}
@@ -1606,98 +1662,327 @@ function NotesTab({ user, group, isPreview }) {
   );
 }
 
-// ── Chat Tab (Student) ────────────────────────────────────────────────────────
-function ChatTab({ user, group, isPreview }) {
-  const [mode, setMode] = useState("group"); // group | private
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+// ── Note Card with Replies ────────────────────────────────────────────────────
+function NoteCard({ note, noteType, user, isTeacher }) {
+  const [replies, setReplies] = useState([]);
+  const [replyInput, setReplyInput] = useState("");
+  const [showReply, setShowReply] = useState(false);
   const [sending, setSending] = useState(false);
-  const [students, setStudents] = useState([]);
-  const bottomRef = useRef(null);
-
-  const isOnline = (lastSeen) => lastSeen && new Date() - new Date(lastSeen) < 60000;
 
   useEffect(() => {
-    if (!group?.id || isPreview) return;
-    // Load classmates for online status
-    db.get("students", `group_id=eq.${group.id}&select=id,name,last_seen`).then(setStudents).catch(() => {});
-  }, [group, isPreview]);
+    db.get("note_replies", `note_id=eq.${note.id}&order=created_at.asc`)
+      .then(setReplies).catch(() => {});
+  }, [note.id]);
 
-  const loadMessages = useCallback(async () => {
-    if (!group?.id || isPreview) return;
-    try {
-      const query = mode === "group"
-        ? `group_id=eq.${group.id}&is_private=eq.false&order=created_at.asc&limit=100`
-        : `group_id=eq.${group.id}&is_private=eq.true&student_id=eq.${user.id}&order=created_at.asc&limit=100`;
-      const msgs = await db.get("messages", query);
-      setMessages(msgs);
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch(e) {}
-  }, [group, user, mode, isPreview]);
-
-  useEffect(() => { loadMessages(); const interval = setInterval(loadMessages, 10000); return () => clearInterval(interval); }, [loadMessages]);
-
-  const send = async () => {
-    if (!input.trim() || sending) return;
+  const sendReply = async () => {
+    if (!replyInput.trim()) return;
     setSending(true);
     try {
-      await db.insert("messages", { group_id: group.id, student_id: user.id, sender: user.name, content: input.trim(), is_teacher: false, is_private: mode === "private", read: false });
-      setInput("");
-      await loadMessages();
+      const r = await db.insert("note_replies", {
+        note_id: note.id, note_type: noteType,
+        student_id: isTeacher ? null : user.id,
+        sender: isTeacher ? "Teacher Tom" : user.name,
+        is_teacher: isTeacher, content: replyInput.trim()
+      });
+      const newReply = Array.isArray(r) ? r[0] : r;
+      setReplies(prev => [...prev, newReply]);
+      setReplyInput(""); setShowReply(false);
     } catch(e) {}
     setSending(false);
   };
 
-  if (isPreview) return React.createElement("div", { style: { textAlign: "center", padding: "40px", color: C.textLight, fontStyle: "italic" } }, "Chat not available in preview mode.");
-
-  const onlineStudents = students.filter(s => s.id !== user.id && isOnline(s.last_seen));
+  const isPersonal = noteType === "student";
 
   return (
-    <div>
-      {/* Online students */}
-      {onlineStudents.length > 0 && (
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px", padding: "8px 12px", background: C.successBg, borderRadius: "8px" }}>
-          <span style={{ fontSize: "11px", color: C.success, fontWeight: "600" }}>🟢 지금 온라인:</span>
-          {onlineStudents.map(s => React.createElement("span", { key: s.id, style: { fontSize: "11px", color: C.success } }, s.name))}
+    <Card style={{ marginBottom: "12px", borderLeft: `3px solid ${isPersonal ? C.success : C.gold}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+        <div style={{ fontSize: "11px", fontWeight: "700", color: isPersonal ? C.success : C.gold, letterSpacing: "1px", textTransform: "uppercase" }}>
+          {isPersonal ? "📝 개인 피드백" : "📋 Session " + note.session_number + " 노트"}
+        </div>
+        <div style={{ fontSize: "11px", color: C.textLight }}>{new Date(note.updated_at || note.created_at).toLocaleDateString("ko-KR")}</div>
+      </div>
+      <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.8, whiteSpace: "pre-line", marginBottom: "10px" }}>{note.content}</div>
+
+      {/* Replies */}
+      {replies.length > 0 && (
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "8px", display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
+          {replies.map(r => (
+            React.createElement("div", { key: r.id, style: { display: "flex", gap: "8px", alignItems: "flex-start" } },
+              React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: r.is_teacher ? C.gold : C.text, minWidth: "80px", paddingTop: "2px" } }, r.is_teacher ? "👨🏫 Teacher" : r.sender),
+              React.createElement("div", { style: { flex: 1, fontSize: "13px", color: C.text, background: C.bgSoft, padding: "6px 10px", borderRadius: "0 8px 8px 8px", lineHeight: 1.5 } }, r.content)
+            )
+          ))}
         </div>
       )}
 
-      {/* Mode tabs */}
-      <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "14px" }}>
-        {[["group", "👥 Class Chat"], ["private", "🔒 Teacher Chat"]].map(([m, label]) =>
-          React.createElement("button", { key: m, onClick: () => setMode(m), style: { padding: "9px 14px", background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.text}` : "2px solid transparent", color: mode === m ? C.text : C.textLight, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px" } }, label)
-        )}
-      </div>
-
-      {/* Messages */}
-      <div style={{ height: "400px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px", padding: "4px" }}>
-        {messages.length === 0 && (
-          <div style={{ textAlign: "center", padding: "40px", color: C.textLight, fontSize: "13px", fontStyle: "italic" }}>
-            {mode === "group" ? "아직 메시지가 없어요. 먼저 인사해 보세요! 👋" : "선생님과 개인 대화를 시작해 보세요!"}
-          </div>
-        )}
-        {messages.map(msg => {
-          const isMe = msg.sender === user.name && !msg.is_teacher;
-          const isTeacher = msg.is_teacher;
-          return React.createElement("div", { key: msg.id, style: { display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" } },
-            React.createElement("div", { style: { fontSize: "10px", color: C.textLight, marginBottom: "2px", paddingLeft: "4px", paddingRight: "4px" } },
-              isTeacher ? "👨🏫 Teacher Tom" : msg.sender,
-              " · ", new Date(msg.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-            ),
-            React.createElement("div", { style: { maxWidth: "75%", padding: "9px 13px", borderRadius: isMe ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMe ? C.text : isTeacher ? C.goldBg : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacher ? `1px solid ${C.gold}` : "none" } }, msg.content)
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      <div style={{ display: "flex", gap: "8px" }}>
-        <Input value={input} onChange={e => setInput(e.target.value)} placeholder={mode === "group" ? "반 친구들에게 메시지 보내기…" : "선생님에게 메시지 보내기…"} style={{ fontSize: "14px" }} />
-        <Btn onClick={send} disabled={sending || !input.trim()} style={{ flexShrink: 0, padding: "10px 16px" }}>전송</Btn>
-      </div>
-    </div>
+      {/* Reply input */}
+      {showReply ? (
+        <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+          <input value={replyInput} onChange={e => setReplyInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendReply()} placeholder="댓글 달기…" style={{ flex: 1, padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "13px", fontFamily: FONT, outline: "none" }} />
+          <Btn onClick={sendReply} disabled={sending || !replyInput.trim()} style={{ padding: "7px 12px", fontSize: "12px" }}>{sending ? React.createElement(Spinner) : "전송"}</Btn>
+          <Btn onClick={() => setShowReply(false)} variant="ghost" style={{ padding: "7px 10px", fontSize: "12px" }}>✕</Btn>
+        </div>
+      ) : (
+        <button onClick={() => setShowReply(true)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: "2px 0" }}>
+          💬 {replies.length > 0 ? `${replies.length}개 댓글` : "댓글 달기"}
+        </button>
+      )}
+    </Card>
   );
 }
+
+
+// ── Floating Chat Bubble System ───────────────────────────────────────────────
+function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], students = [] }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("group"); // group | private
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [typing, setTyping] = useState([]); // who is typing
+  const [isTyping, setIsTyping] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(group || groups[0]);
+  const bottomRef = useRef(null);
+  const inputRef = useRef(null);
+  const typingTimer = useRef(null);
+  const lastReadRef = useRef(new Date().toISOString());
+
+  const currentGroup = isTeacher ? selectedGroup : group;
+  const isOnline = (lastSeen) => lastSeen && new Date() - new Date(lastSeen) < 90000;
+
+  const groupStudents = isTeacher
+    ? students.filter(s => s.group_id === currentGroup?.id)
+    : students.filter(s => s.group_id === group?.id);
+
+  const loadMessages = useCallback(async () => {
+    if (!currentGroup?.id || isPreview) return;
+    try {
+      const query = mode === "group"
+        ? `group_id=eq.${currentGroup.id}&is_private=eq.false&order=created_at.asc&limit=100`
+        : isTeacher
+          ? selectedStudent ? `group_id=eq.${currentGroup.id}&is_private=eq.true&student_id=eq.${selectedStudent.id}&order=created_at.asc&limit=100` : null
+          : `group_id=eq.${currentGroup.id}&is_private=eq.true&student_id=eq.${user.id}&order=created_at.asc&limit=100`;
+      if (!query) return;
+      const msgs = await db.get("messages", query);
+      setMessages(msgs);
+      // Count unread
+      if (!open) {
+        const newUnread = msgs.filter(m => {
+          const isFromOther = isTeacher ? !m.is_teacher : (m.is_teacher || m.sender !== user.name);
+          return isFromOther && m.created_at > lastReadRef.current;
+        }).length;
+        setUnread(prev => Math.max(prev, newUnread));
+      }
+      if (open) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    } catch(e) {}
+  }, [currentGroup, mode, selectedStudent, open, isTeacher, user, isPreview]);
+
+  // Load typing indicators
+  const loadTyping = useCallback(async () => {
+    if (!currentGroup?.id || isPreview) return;
+    try {
+      const cutoff = new Date(Date.now() - 5000).toISOString();
+      const rows = await db.get("typing_indicators",
+        `group_id=eq.${currentGroup.id}&updated_at=gt.${cutoff}&${isTeacher ? "" : `is_private=eq.${mode === "private"}&`}order=updated_at.desc`
+      );
+      const others = rows.filter(r => isTeacher ? !r.is_teacher : r.sender !== user.name);
+      setTyping(others.map(r => r.sender));
+    } catch(e) {}
+  }, [currentGroup, mode, isTeacher, user, isPreview]);
+
+  useEffect(() => {
+    loadMessages();
+    const msgInterval = setInterval(loadMessages, 5000);
+    const typingInterval = setInterval(loadTyping, 2000);
+    return () => { clearInterval(msgInterval); clearInterval(typingInterval); };
+  }, [loadMessages, loadTyping]);
+
+  useEffect(() => {
+    if (open) { setUnread(0); lastReadRef.current = new Date().toISOString(); setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100); inputRef.current?.focus(); }
+  }, [open]);
+
+  const updateTyping = async (isTypingNow) => {
+    if (!currentGroup?.id || isPreview) return;
+    try {
+      const senderName = isTeacher ? "Teacher Tom" : user.name;
+      if (isTypingNow) {
+        await db.upsert("typing_indicators", { group_id: currentGroup.id, student_id: isTeacher ? null : user.id, sender: senderName, is_teacher: isTeacher, is_private: mode === "private", updated_at: new Date().toISOString() });
+      } else {
+        await db.delete("typing_indicators", `group_id=eq.${currentGroup.id}&sender=eq.${encodeURIComponent(senderName)}`);
+      }
+    } catch(e) {}
+  };
+
+  const handleInputChange = (val) => {
+    setInput(val);
+    if (!isTyping && val.length > 0) { setIsTyping(true); updateTyping(true); }
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => { setIsTyping(false); updateTyping(false); }, 3000);
+    if (val.length === 0) { setIsTyping(false); updateTyping(false); }
+  };
+
+  const send = async () => {
+    if (!input.trim() || sending || !currentGroup) return;
+    setSending(true);
+    setIsTyping(false); updateTyping(false);
+    try {
+      const senderName = isTeacher ? "Teacher Tom" : user.name;
+      await db.insert("messages", {
+        group_id: currentGroup.id,
+        student_id: isTeacher ? (selectedStudent?.id || null) : user.id,
+        sender: senderName,
+        content: input.trim(),
+        is_teacher: isTeacher,
+        is_private: mode === "private",
+        read: false
+      });
+      setInput("");
+      await loadMessages();
+    } catch(e) { console.error("Send failed:", e); }
+    setSending(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  };
+
+  // Group messages by day
+  const groupedMessages = [];
+  let lastDay = null;
+  messages.forEach(msg => {
+    const day = new Date(msg.created_at).toDateString();
+    if (day !== lastDay) { groupedMessages.push({ type: "day", label: formatDay(msg.created_at) }); lastDay = day; }
+    groupedMessages.push({ type: "msg", msg });
+  });
+
+  const onlineStudents = groupStudents.filter(s => s.id !== user.id && isOnline(s.last_seen));
+
+  return (
+    <React.Fragment>
+      {/* Floating bubble button */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ position: "fixed", bottom: "20px", right: "20px", width: "56px", height: "56px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", boxShadow: "0 4px 20px rgba(0,0,0,0.25)", zIndex: 100, transition: "transform 0.2s", transform: open ? "scale(0.9)" : "scale(1)" }}
+      >
+        {open ? "✕" : "💬"}
+        {unread > 0 && !open && (
+          <span style={{ position: "absolute", top: "-4px", right: "-4px", background: C.error, color: "#fff", borderRadius: "50%", width: "20px", height: "20px", fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT }}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {/* Chat drawer */}
+      {open && (
+        <div style={{ position: "fixed", bottom: "86px", right: "16px", width: "min(380px, calc(100vw - 32px))", height: "min(520px, calc(100vh - 120px))", background: C.bg, borderRadius: "16px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", zIndex: 99, display: "flex", flexDirection: "column", overflow: "hidden", border: `1px solid ${C.border}` }}>
+
+          {/* Header */}
+          <div style={{ background: C.text, padding: "14px 16px", borderRadius: "16px 16px 0 0" }}>
+            {isTeacher && groups.length > 1 && (
+              <select value={selectedGroup?.id || ""} onChange={e => { const g = groups.find(x => x.id === e.target.value); setSelectedGroup(g); setMessages([]); }} style={{ width: "100%", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: "12px", fontFamily: FONT, outline: "none", marginBottom: "8px", borderRadius: "4px", padding: "4px 6px" }}>
+                {groups.map(g => React.createElement("option", { key: g.id, value: g.id, style: { color: C.text, background: C.bg } }, g.name))}
+              </select>
+            )}
+            <div style={{ display: "flex", gap: "8px" }}>
+              {[["group", "👥 Class"], ["private", "🔒 Private"]].map(([m, label]) =>
+                React.createElement("button", { key: m, onClick: () => { setMode(m); setSelectedStudent(null); setMessages([]); }, style: { padding: "5px 12px", borderRadius: "20px", border: "none", background: mode === m ? "rgba(255,255,255,0.25)" : "transparent", color: "#fff", fontSize: "12px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
+              )}
+            </div>
+            {/* Online indicators */}
+            {mode === "group" && onlineStudents.length > 0 && (
+              <div style={{ marginTop: "6px", fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>
+                🟢 {onlineStudents.map(s => s.name).join(", ")}
+              </div>
+            )}
+          </div>
+
+          {/* Student selector for private */}
+          {mode === "private" && isTeacher && (
+            <div style={{ padding: "8px 12px", borderBottom: `1px solid ${C.border}` }}>
+              <select value={selectedStudent?.id || ""} onChange={e => { setSelectedStudent(groupStudents.find(s => s.id === e.target.value) || null); setMessages([]); }} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "13px", fontFamily: FONT, outline: "none", background: C.bg }}>
+                <option value="">Select student…</option>
+                {groupStudents.map(s => React.createElement("option", { key: s.id, value: s.id }, s.name + (isOnline(s.last_seen) ? " 🟢" : "")))}
+              </select>
+            </div>
+          )}
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px", display: "flex", flexDirection: "column", gap: "2px" }}>
+            {groupedMessages.length === 0 && (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textLight, fontSize: "13px" }}>
+                {mode === "group" ? "아직 메시지가 없어요. 먼저 인사해 보세요! 👋" : mode === "private" && isTeacher && !selectedStudent ? "학생을 선택하세요" : "선생님과 대화를 시작해 보세요!"}
+              </div>
+            )}
+            {groupedMessages.map((item, idx) => {
+              if (item.type === "day") return (
+                React.createElement("div", { key: "day-" + idx, style: { textAlign: "center", margin: "10px 0 6px", fontSize: "11px", color: C.textLight } }, item.label)
+              );
+              const { msg } = item;
+              const isMe = isTeacher ? msg.is_teacher : (msg.sender === user.name && !msg.is_teacher);
+              const isTeacherMsg = msg.is_teacher;
+              return (
+                React.createElement("div", { key: msg.id, style: { display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", marginBottom: "6px" } },
+                  React.createElement("div", { style: { fontSize: "10px", color: C.textLight, marginBottom: "3px", padding: "0 4px" } },
+                    isTeacherMsg ? "👨🏫 Teacher Tom" : msg.sender, " · ",
+                    new Date(msg.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                  ),
+                  React.createElement("div", { style: { maxWidth: "80%", padding: "9px 13px", borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: isMe ? C.text : isTeacherMsg ? C.goldBg : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacherMsg && !isMe ? `1px solid ${C.gold}` : "none", wordBreak: "break-word" } }, msg.content)
+                )
+              );
+            })}
+            {/* Typing indicator */}
+            {typing.length > 0 && (
+              React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "6px", padding: "4px" } },
+                React.createElement("div", { style: { background: C.bgSoft, borderRadius: "16px 16px 16px 4px", padding: "8px 12px", display: "flex", gap: "3px", alignItems: "center" } },
+                  [0,1,2].map(i => React.createElement("div", { key: i, style: { width: "6px", height: "6px", borderRadius: "50%", background: C.textLight, animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite` } }))
+                ),
+                React.createElement("span", { style: { fontSize: "11px", color: C.textLight } }, typing.join(", ") + " 입력 중…")
+              )
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: "10px 12px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "8px", alignItems: "flex-end" }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => handleInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="메시지 입력… (Enter로 전송)"
+              rows={1}
+              style={{ flex: 1, padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "20px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "none", maxHeight: "80px", overflowY: "auto", lineHeight: 1.4, background: C.bgSoft }}
+            />
+            <button onClick={send} disabled={sending || !input.trim()} style={{ width: "36px", height: "36px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", cursor: input.trim() ? "pointer" : "default", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+              {sending ? "⋯" : "➤"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bounce animation for typing dots */}
+      <style>{`
+        @keyframes bounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-6px); }
+        }
+      `}</style>
+    </React.Fragment>
+  );
+}
+
+function formatDay(dateStr) {
+  const d = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today - 86400000);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+}
+
+
 
 // ── Teacher Screen ────────────────────────────────────────────────────────────
 function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
@@ -1733,7 +2018,7 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
           <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontFamily: FONT }}>Log out</button>
         </div>
         <div style={{ display: "flex", overflowX: "auto" }}>
-          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["messages", "Messages"], ["myphrases", "Student Phrases"]].map(([t, label]) =>
+          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"]].map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "600" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px" } }, label)
           )}
         </div>
@@ -1744,9 +2029,9 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
         {tab === "add" && React.createElement(AddPhrasesTab, { groups, phraseBank, setPhraseBank, showMsg })}
         {tab === "students" && React.createElement(StudentsTab, { students, setStudents, groups, showMsg })}
         {tab === "notes" && React.createElement(TeacherNotesTab, { groups, students, showMsg })}
-        {tab === "messages" && React.createElement(TeacherMessagesTab, { groups, students })}
         {tab === "myphrases" && React.createElement(TeacherMyPhrasesTab, { students, groups })}
       </div>
+      {React.createElement(FloatingChat, { user: { id: "teacher", name: "Teacher Tom" }, group: groups[0], isPreview: false, isTeacher: true, groups, students })}
     </div>
   );
 }
@@ -1809,23 +2094,20 @@ function TeacherNotesTab({ groups, students, showMsg }) {
 
   return (
     <div>
-      {/* Group selector */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
         {groups.map(g => React.createElement("button", { key: g.id, onClick: () => { setSelectedGroup(g); setSelectedStudent(null); setSessionContent(""); setStudentContent(""); }, style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? "#fff" : C.textMid, fontSize: "13px", cursor: "pointer", fontFamily: FONT } }, g.name))}
       </div>
 
-      {/* Session note */}
       <Card style={{ marginBottom: "16px", borderLeft: `3px solid ${C.gold}` }}>
-        <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>📝 Session Note — visible to all students in {selectedGroup?.name}</div>
+        <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>📋 Session Note — visible to all students in {selectedGroup?.name}</div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
           <span style={{ fontSize: "13px", color: C.textMid }}>Session:</span>
-          <input type="number" min="1" value={sessionNum} onChange={e => { const n = parseInt(e.target.value) || 1; setSessionNum(n); const existing = sessionNotes.find(x => x.session_number === n); setSessionContent(existing?.content || ""); }} style={{ width: "64px", padding: "6px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontWeight: "700", textAlign: "center", fontFamily: FONT, outline: "none" }} />
+          <input type="number" min="1" value={sessionNum} onChange={e => { const n = parseInt(e.target.value) || 1; setSessionNum(n); const ex = sessionNotes.find(x => x.session_number === n); setSessionContent(ex?.content || ""); }} style={{ width: "64px", padding: "6px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontWeight: "700", textAlign: "center", fontFamily: FONT, outline: "none" }} />
         </div>
-        <textarea value={sessionContent} onChange={e => setSessionContent(e.target.value)} placeholder="수업 노트를 입력하세요. 예: 오늘 과거형 연습을 잘 했어요! 다음 주에는 질문 형태를 연습할 거예요." style={{ width: "100%", minHeight: "100px", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.6 }} />
+        <textarea value={sessionContent} onChange={e => setSessionContent(e.target.value)} placeholder="Write session notes visible to the whole class…" style={{ width: "100%", minHeight: "100px", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.6 }} />
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
-          <Btn onClick={saveSessionNote} disabled={saving || !sessionContent.trim()} variant="gold" style={{ padding: "8px 18px" }}>{saving ? React.createElement(Spinner) : "Save Note"}</Btn>
+          <Btn onClick={saveSessionNote} disabled={saving || !sessionContent.trim()} variant="gold">{saving ? React.createElement(Spinner) : "Save Note"}</Btn>
         </div>
-        {/* Existing session notes */}
         {sessionNotes.length > 0 && (
           <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
             <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>Saved Notes</div>
@@ -1837,10 +2119,9 @@ function TeacherNotesTab({ groups, students, showMsg }) {
         )}
       </Card>
 
-      {/* Student personal note */}
       <Card style={{ borderLeft: `3px solid ${C.success}` }}>
         <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>🔒 Personal Note — visible only to student</div>
-        <select value={selectedStudent?.id || ""} onChange={e => { const s = students.find(x => x.id === e.target.value); setSelectedStudent(s || null); }} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", marginBottom: "10px" }}>
+        <select value={selectedStudent?.id || ""} onChange={e => setSelectedStudent(students.find(x => x.id === e.target.value) || null)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", marginBottom: "10px" }}>
           <option value="">Select a student…</option>
           {groupStudents.map(s => React.createElement("option", { key: s.id, value: s.id }, s.name))}
         </select>
@@ -1848,114 +2129,27 @@ function TeacherNotesTab({ groups, students, showMsg }) {
           <div>
             <textarea value={studentContent} onChange={e => setStudentContent(e.target.value)} placeholder={`Personal feedback for ${selectedStudent.name}…`} style={{ width: "100%", minHeight: "100px", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.6 }} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
-              <Btn onClick={saveStudentNote} disabled={saving || !studentContent.trim()} variant="success" style={{ padding: "8px 18px" }}>{saving ? React.createElement(Spinner) : "Save Note"}</Btn>
+              <Btn onClick={saveStudentNote} disabled={saving || !studentContent.trim()} variant="success">{saving ? React.createElement(Spinner) : "Save Note"}</Btn>
             </div>
           </div>
+        )}
+        {/* Show existing notes with NoteCard for teacher to see replies */}
+        {selectedStudent && (
+          <TeacherStudentNoteView studentId={selectedStudent.id} />
         )}
       </Card>
     </div>
   );
 }
 
-// ── Teacher Messages Tab ──────────────────────────────────────────────────────
-function TeacherMessagesTab({ groups, students }) {
-  const [selectedGroup, setSelectedGroup] = useState(groups[0]);
-  const [mode, setMode] = useState("group"); // group | private
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const bottomRef = useRef(null);
-
-  const isOnline = (lastSeen) => lastSeen && new Date() - new Date(lastSeen) < 60000;
-
-  const loadMessages = useCallback(async () => {
-    if (!selectedGroup) return;
-    try {
-      const query = mode === "group"
-        ? `group_id=eq.${selectedGroup.id}&is_private=eq.false&order=created_at.asc&limit=100`
-        : selectedStudent
-          ? `group_id=eq.${selectedGroup.id}&is_private=eq.true&student_id=eq.${selectedStudent.id}&order=created_at.asc&limit=100`
-          : null;
-      if (!query) return;
-      const msgs = await db.get("messages", query);
-      setMessages(msgs);
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch(e) {}
-  }, [selectedGroup, mode, selectedStudent]);
-
-  useEffect(() => { loadMessages(); const interval = setInterval(loadMessages, 8000); return () => clearInterval(interval); }, [loadMessages]);
-
-  const send = async () => {
-    if (!input.trim() || sending || !selectedGroup) return;
-    setSending(true);
-    try {
-      await db.insert("messages", { group_id: selectedGroup.id, student_id: selectedStudent?.id || null, sender: "Teacher Tom", content: input.trim(), is_teacher: true, is_private: mode === "private", read: false });
-      setInput("");
-      await loadMessages();
-    } catch(e) {}
-    setSending(false);
-  };
-
-  const groupStudents = students.filter(s => s.group_id === selectedGroup?.id);
-
-  return (
-    <div>
-      {/* Group selector */}
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }}>
-        {groups.map(g => React.createElement("button", { key: g.id, onClick: () => { setSelectedGroup(g); setSelectedStudent(null); setMessages([]); }, style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? "#fff" : C.textMid, fontSize: "13px", cursor: "pointer", fontFamily: FONT } }, g.name))}
-      </div>
-
-      {/* Online indicators */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
-        {groupStudents.map(s => React.createElement("span", { key: s.id, style: { fontSize: "12px", color: isOnline(s.last_seen) ? C.success : C.textLight, display: "flex", alignItems: "center", gap: "4px" } },
-          React.createElement("span", null, isOnline(s.last_seen) ? "🟢" : "⚪"), s.name
-        ))}
-      </div>
-
-      {/* Mode tabs */}
-      <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "12px" }}>
-        {[["group", "👥 Class Chat"], ["private", "🔒 Private Chat"]].map(([m, label]) =>
-          React.createElement("button", { key: m, onClick: () => { setMode(m); setSelectedStudent(null); setMessages([]); }, style: { padding: "9px 14px", background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.text}` : "2px solid transparent", color: mode === m ? C.text : C.textLight, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px" } }, label)
-        )}
-      </div>
-
-      {/* Student selector for private */}
-      {mode === "private" && (
-        <select value={selectedStudent?.id || ""} onChange={e => setSelectedStudent(groupStudents.find(s => s.id === e.target.value) || null)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", marginBottom: "12px" }}>
-          <option value="">Select a student…</option>
-          {groupStudents.map(s => React.createElement("option", { key: s.id, value: s.id }, s.name + (isOnline(s.last_seen) ? " 🟢" : "")))}
-        </select>
-      )}
-
-      {/* Messages */}
-      <div style={{ height: "360px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px", padding: "4px", background: C.bgSoft, borderRadius: "8px" }}>
-        {messages.length === 0 && (
-          <div style={{ textAlign: "center", padding: "40px", color: C.textLight, fontSize: "13px", fontStyle: "italic" }}>
-            {mode === "private" && !selectedStudent ? "Select a student to view private chat" : "No messages yet"}
-          </div>
-        )}
-        {messages.map(msg => {
-          const isMe = msg.is_teacher;
-          return React.createElement("div", { key: msg.id, style: { display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", padding: "0 8px" } },
-            React.createElement("div", { style: { fontSize: "10px", color: C.textLight, marginBottom: "2px" } },
-              isMe ? "👨🏫 Teacher Tom" : msg.sender,
-              " · ", new Date(msg.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-            ),
-            React.createElement("div", { style: { maxWidth: "75%", padding: "9px 13px", borderRadius: isMe ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMe ? C.text : C.bg, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5 } }, msg.content)
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      {(mode === "group" || selectedStudent) && (
-        <div style={{ display: "flex", gap: "8px" }}>
-          <Input value={input} onChange={e => setInput(e.target.value)} placeholder={mode === "group" ? "Message the whole class…" : `Message ${selectedStudent?.name}…`} style={{ fontSize: "14px" }} />
-          <Btn onClick={send} disabled={sending || !input.trim()} style={{ flexShrink: 0, padding: "10px 16px" }}>{sending ? React.createElement(Spinner) : "Send"}</Btn>
-        </div>
-      )}
-    </div>
+function TeacherStudentNoteView({ studentId }) {
+  const [note, setNote] = useState(null);
+  useEffect(() => {
+    db.get("student_notes", `student_id=eq.${studentId}&order=created_at.desc&limit=1`).then(rows => setNote(rows[0] || null)).catch(() => {});
+  }, [studentId]);
+  if (!note) return null;
+  return React.createElement("div", { style: { marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` } },
+    React.createElement(NoteCard, { note, noteType: "student", user: { id: "teacher", name: "Teacher Tom" }, isTeacher: true })
   );
 }
 
