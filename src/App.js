@@ -3485,18 +3485,32 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기" }) {
       ),
       React.createElement("div", {
         onClick: seek,
-        style: { position: "relative", height: "28px", cursor: "pointer", display: "flex", alignItems: "center", gap: "2px" }
+        style: { position: "relative", height: "36px", cursor: "pointer", display: "flex", alignItems: "center", gap: "3px", padding: "4px 0" }
       },
-        Array.from({ length: 36 }, (_, i) => {
-          const h = 30 + Math.sin(i * 0.9) * 20 + Math.sin(i * 2.1) * 15;
-          const filled = (i / 36) * 100 < progress;
+        Array.from({ length: 40 }, (_, i) => {
+          // Smoother organic wave shape using multiple sine waves
+          const wave1 = Math.sin(i * 0.4) * 0.35;
+          const wave2 = Math.sin(i * 0.9 + 1.2) * 0.25;
+          const wave3 = Math.sin(i * 1.8 + 0.5) * 0.2;
+          const base = 0.25;
+          const h = Math.max(8, Math.min(100, (base + wave1 + wave2 + wave3 + 0.5) * 80));
+          const filled = (i / 40) * 100 < progress;
           return React.createElement("div", {
             key: i,
-            style: { flex: 1, height: `${h}%`, borderRadius: "2px", background: filled ? C.text : C.bgMid, transition: "background 0.1s" }
+            style: {
+              flex: 1,
+              height: `${h}%`,
+              borderRadius: "100px",
+              background: filled
+                ? C.text
+                : C.bgMid,
+              transition: "background 0.15s ease",
+              opacity: filled ? 1 : 0.5,
+            }
           });
         }),
         progress > 0 && React.createElement("div", {
-          style: { position: "absolute", left: `calc(${progress}% - 5px)`, width: "10px", height: "10px", borderRadius: "50%", background: C.text, pointerEvents: "none", zIndex: 2 }
+          style: { position: "absolute", left: `calc(${progress}% - 5px)`, width: "10px", height: "10px", borderRadius: "50%", background: C.text, boxShadow: "0 1px 4px rgba(0,0,0,0.2)", pointerEvents: "none", zIndex: 2, top: "50%", transform: "translateY(-50%)" }
         })
       ),
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
@@ -4163,7 +4177,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               {!rec.isRec && !loadingFeedback && (
                 <div>
-                  <button onClick={rec.start}
+                  <button onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.start(); }}
                     style={{ width: "76px", height: "76px", borderRadius: "50%", background: C.text, border: "none", color: "#fff", fontSize: "28px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)", transition: "transform 0.15s" }}>
                     🎙
                   </button>
@@ -4189,12 +4203,12 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             {/* Feedback */}
             {currentFeedback && !loadingFeedback && (
               <div style={{ animation: "fadeIn 0.25s ease" }}>
+                {finalUrl && React.createElement(RichAudioPlayer, { src: finalUrl, label: "내 녹음 듣기" })}
                 {finalTranscript && (
                   <div style={{ background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", marginBottom: "10px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.border}` }}>
                     🎙 "{finalTranscript}"
                   </div>
                 )}
-                {finalUrl && React.createElement(RichAudioPlayer, { src: finalUrl, label: "내 녹음 듣기" })}
                 {React.createElement(FeedbackDisplay, { text: currentFeedback.text })}
                 <div style={{ marginTop: "12px", padding: "10px 14px", background: currentFeedback.score >= 7 ? C.successBg : C.bgSoft, borderRadius: "8px", fontSize: "13px", color: currentFeedback.score >= 7 ? C.success : C.textMid, fontWeight: "600", border: `1px solid ${currentFeedback.score >= 7 ? C.successBorder : C.border}`, marginBottom: "14px" }}>
                   {currentFeedback.score >= 7 ? "🎉 잘했어요! 이 답변으로 제출할 수 있어요." : "💪 다시 해보거나 그냥 제출해도 돼요!"}
@@ -4203,14 +4217,14 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                   <Btn onClick={() => setStep(isFirstTime ? "nickname" : "posting")} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
                     ✅ 제출하기 · Submit
                   </Btn>
-                  <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); rec.reset(); }} variant="ghost" style={{ width: "100%", padding: "11px" }}>
+                  <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); }} variant="ghost" style={{ width: "100%", padding: "11px" }}>
                     🔄 다시 녹음하기
                   </Btn>
                 </div>
               </div>
             )}
 
-            <button onClick={() => setStep("main")} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "12px", marginTop: "4px" }}>
+            <button onClick={() => { setStep("main"); setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); setAttempts([]); }} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "12px", marginTop: "4px" }}>
               ← 처음으로
             </button>
           </div>
