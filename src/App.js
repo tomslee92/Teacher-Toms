@@ -22,7 +22,7 @@ const db = {
   get: (t, q = "") => sb(`${t}?${q}`),
   insert: (t, d) => sb(t, { method: "POST", body: JSON.stringify(d) }),
   update: (t, q, d) => sb(`${t}?${q}`, { method: "PATCH", body: JSON.stringify(d) }),
-  delete: (t, q) => sb(`${t}?${q}`, { method: "DELETE", headers: { "Prefer": "return=representation" } }),
+  delete: (t, q) => sb(`${t}?${q}`, { method: "DELETE", prefer: "return=minimal" }),
   upsert: (t, d) => sb(t, { method: "POST", body: JSON.stringify(d), headers: { "Prefer": "resolution=merge-duplicates,return=representation" } }),
 };
 
@@ -615,7 +615,7 @@ export default function App() {
     if (savedName) {
       db.get("students", `name=eq.${encodeURIComponent(savedName)}&select=*,groups(name,id)`)
         .then(rows => {
-          if (rows.length > 0) { setUser(rows[0]); setScreen("student"); }
+          if (rows.length > 0) { setUser(rows[0]); setScreen("qod_entry"); }
           else { localStorage.removeItem("wayve_student_name"); setScreen("login"); }
         })
         .catch(() => setScreen("login"));
@@ -629,7 +629,7 @@ export default function App() {
       const rows = await db.get("students", `name=eq.${encodeURIComponent(name)}&select=*,groups(name,id)`);
       if (!rows.length) return "이름을 찾을 수 없어요. Teacher Toms에게 등록을 요청해 주세요.";
       localStorage.setItem("wayve_student_name", rows[0].name);
-      setUser(rows[0]); setScreen("student"); return null;
+      setUser(rows[0]); setScreen("qod_entry"); return null;
     } catch(e) { return "오류: " + e.message; }
   };
 
@@ -962,60 +962,103 @@ function StudentScreen({ user, group, isPreview, onBack }) {
     return () => clearInterval(interval);
   }, [isPreview, user.id]);
 
-  const tabs = [["community", "🌍 Community"], ["practice", "🎙 Practice"], ["freetalk", "💬 Free Talk"], ["myphrases", "⭐ My Phrases"], ["notes", "📝 Notes"]];
+  // active tab state: null = home grid
+  const activeFeature = tab === "community" || tab === "practice" || tab === "freetalk" || tab === "myphrases" ? tab : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bgSoft }}>
-      <div style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10 }}>
-        {isPreview && (
-          <div style={{ background: C.bgDark, color: "#fff", padding: "7px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "500", letterSpacing: "0.2px" }}>
-            <span>👁 Preview — {group?.name}</span>
-            <button onClick={onBack} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.5)", color: "#fff", padding: "3px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT }}>← Dashboard</button>
-          </div>
-        )}
-        <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "20px", fontWeight: "800", color: streak > 0 ? C.retry : C.textLight, lineHeight: 1, display: "inline-block", animation: streak > 0 ? "streakFire 2.5s ease-in-out infinite" : "none" }}>🔥 {streak}</div>
-                <div style={{ fontSize: "8px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: "2px" }}>연속 일</div>
-              </div>
-              {longest > 0 && (
-                <div style={{ textAlign: "center", paddingLeft: "10px", borderLeft: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: "15px", fontWeight: "700", color: C.gold, lineHeight: 1 }}>🏅 {longest}</div>
-                  <div style={{ fontSize: "8px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: "2px" }}>최고 기록</div>
-                </div>
-              )}
-            </div>
-            <div>
-              <div style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.2px" }}>안녕하세요, {user.name}! 👋</div>
-              <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{group?.name || ""}</div>
-            </div>
-          </div>
-          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, transition: "all 0.15s", fontWeight: "500" }}>Log out</button>
+    <div style={{ minHeight: "100vh", background: C.bg, paddingBottom: "72px" }}>
+      <style>{`
+        @keyframes featureSlideIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        .feature-screen { animation: featureSlideIn 0.22s ease both; }
+        .nav-btn { transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+        .home-card { transition: transform 0.15s, box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
+        .home-card:active { transform: scale(0.97); }
+      `}</style>
+
+      {/* Preview banner */}
+      {isPreview && (
+        <div style={{ background: C.bgDark, color: "#fff", padding: "7px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", fontWeight: "500" }}>
+          <span>👁 Preview — {group?.name}</span>
+          <button onClick={onBack} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.5)", color: "#fff", padding: "3px 10px", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: FONT }}>← Dashboard</button>
         </div>
-        <div className="tab-nav" style={{ display: "flex", padding: "0 20px", overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-          {tabs.map(([t, label]) =>
-            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", whiteSpace: "nowrap", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
+      )}
+
+      {/* Top header — always visible */}
+      <div style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {tab !== "community" && activeFeature && (
+            <button onClick={() => setTab("community")} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "20px", padding: "0", lineHeight: 1, color: C.text }}>←</button>
           )}
+          {WayveLogo()}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: streak > 0 ? C.retry : C.textLight, display: "inline-block", animation: streak > 0 ? "streakFire 2.5s ease-in-out infinite" : "none" }}>🔥{streak}</div>
+            {longest > 0 && <div style={{ fontSize: "15px", fontWeight: "700", color: C.gold }}>🏅{longest}</div>}
+          </div>
+          <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500" }}>Log out</button>
         </div>
       </div>
-      <div style={{ maxWidth: "700px", margin: "0 auto", padding: "20px 16px" }}>
-        {showStreakBanner && !isPreview && (
-          <div style={{ background: C.bgDark, borderRadius: "12px", padding: "14px 18px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" }}>
-            <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "2px" }}>오늘 아직 연습 안 했어요! 🔥</div>
-              <div style={{ fontSize: "12px", opacity: 0.9 }}>연속 {streak}일 streak을 지키세요!</div>
+
+      {/* Content area */}
+      <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px 16px" }}>
+
+        {/* HOME SCREEN — 2×2 card grid */}
+        {!activeFeature && (
+          <div className="feature-screen">
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>안녕하세요, {user.name}! 👋</div>
+              <div style={{ fontSize: "12px", color: C.textLight, marginTop: "2px" }}>{group?.name || ""}</div>
             </div>
-            <button onClick={() => setShowStreakBanner(false)} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontSize: "12px", fontFamily: FONT }}>닫기</button>
+            {React.createElement(HomeGrid, { user, group, isPreview, onNavigate: setTab, streak })}
           </div>
         )}
-        {tab === "community" && React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak })}
-        {tab === "practice" && React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak })}
-        {tab === "freetalk" && React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak })}
-        {tab === "myphrases" && React.createElement(MyPhrasesTab, { user, isPreview })}
-        {tab === "notes" && React.createElement(NotesTab, { user, group, isPreview })}
+
+        {/* FEATURE SCREENS */}
+        {tab === "community" && (
+          <div className="feature-screen">
+            {React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak })}
+          </div>
+        )}
+        {tab === "practice" && (
+          <div className="feature-screen">
+            {React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak })}
+          </div>
+        )}
+        {tab === "freetalk" && (
+          <div className="feature-screen">
+            {React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak })}
+          </div>
+        )}
+        {tab === "myphrases" && (
+          <div className="feature-screen">
+            {React.createElement(MyPhrasesTab, { user, isPreview })}
+          </div>
+        )}
       </div>
+
+      {/* Bottom nav bar — always visible */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 20, paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {[
+          ["community", "🌍", "Community"],
+          ["practice", "🎙", "Practice"],
+          ["freetalk", "💬", "Free Talk"],
+          ["myphrases", "⭐", "My Phrases"],
+        ].map(([id, icon, label]) => {
+          const active = tab === id;
+          return React.createElement("button", {
+            key: id,
+            className: "nav-btn",
+            onClick: () => setTab(id),
+            style: { flex: 1, padding: "10px 4px 8px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }
+          },
+            React.createElement("div", { style: { fontSize: "20px", lineHeight: 1 } }, icon),
+            React.createElement("div", { style: { fontSize: "10px", fontWeight: active ? "700" : "400", color: active ? C.text : C.textLight, letterSpacing: "0.2px" } }, label),
+            active && React.createElement("div", { style: { width: "4px", height: "4px", borderRadius: "50%", background: C.text, marginTop: "1px" } })
+          );
+        })}
+      </div>
+
       {!isPreview && React.createElement(FloatingChat, { user, group, isPreview, isTeacher: false, students: [] })}
     </div>
   );
@@ -2354,7 +2397,7 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
           <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", transition: "all 0.15s" }}>Log out</button>
         </div>
         <div style={{ display: "flex", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"], ["responses", "🎙 QoD Responses"]].map(([t, label]) =>
+          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"], ["responses", "🎙 QoD Responses"]].map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
         </div>
@@ -2364,7 +2407,6 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
         {tab === "groups" && React.createElement(GroupsTab, { groups, setGroups, students, setStudents, onPreview, showMsg })}
         {tab === "add" && React.createElement(AddPhrasesTab, { groups, phraseBank, setPhraseBank, showMsg })}
         {tab === "students" && React.createElement(StudentsTab, { students, setStudents, groups, showMsg })}
-        {tab === "notes" && React.createElement(TeacherNotesTab, { groups, students, showMsg })}
         {tab === "myphrases" && React.createElement(TeacherMyPhrasesTab, { students, groups })}
         {tab === "cities" && React.createElement(CityGroupsTab, { groups, students, showMsg })}
         {tab === "qod" && React.createElement(QodStudioTab, { showMsg })}
@@ -4074,6 +4116,9 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index }) {
         )
       )}
 
+      {/* Teacher comment — shown only if exists */}
+      {React.createElement(TeacherCommentDisplay, { responseId: response.id })}
+
       {/* Reactions + delete */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
@@ -4699,6 +4744,7 @@ function QodResponsesTab({ students, showMsg }) {
                         style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px", padding: "2px 4px", opacity: 0.5 }}>×</button>
                     </div>
                     {React.createElement(RichAudioPlayer, { src: r.audio_url || "", label: r.nickname + "'s answer", transcript: r.transcript || "" })}
+                    {React.createElement(TeacherCommentBox, { responseId: r.id, existingComment: r._comment || null, onSaved: (c) => { /* update local */ } })}
                   </Card>
                 );
               })}
@@ -4706,6 +4752,413 @@ function QodResponsesTab({ students, showMsg }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── WAYVE Logo SVG ────────────────────────────────────────────────────────────
+function WayveLogo({ size = 72, color = "#1A1A1A" }) {
+  // Faithful SVG recreation of the WAYVE rounded geometric wordmark
+  return React.createElement("svg", {
+    viewBox: "0 0 280 52", width: size * (280/52), height: size,
+    xmlns: "http://www.w3.org/2000/svg", style: { display: "block" }
+  },
+    React.createElement("path", {
+      fill: color,
+      d: "M4 8 L16 40 L28 16 L40 40 L52 8" + // W
+         " M68 8 L86 40 L104 8" + // A
+         " M116 8 L134 28 L152 8" + // Y
+         " M168 8 L186 40 L204 8" + // V
+         " M216 8 L252 8 M216 26 L248 26 M216 44 L252 44", // E
+      strokeWidth: "6", stroke: color, fill: "none",
+      strokeLinecap: "round", strokeLinejoin: "round"
+    })
+  );
+}
+
+// ── Loading Screen ────────────────────────────────────────────────────────────
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "20px" }}>
+      {WayveLogo({ size: 28, color: C.text })}
+      <Spinner />
+    </div>
+  );
+}
+
+// ── Auto-generate QoD when none scheduled ─────────────────────────────────────
+async function autoGenerateQod() {
+  const today = new Date().toISOString().split("T")[0];
+  const text = await groqCall(`Generate ONE engaging Question of the Day for Korean adult English learners.
+The question should be conversational, warm, answerable in 20-40 seconds of spoken English.
+Return ONLY the question itself, nothing else.`);
+  const prompt = cleanText(text.trim().replace(/^["']|["']$/g, ""));
+  // Save it so all students get the same question today
+  try {
+    const r = await db.insert("qod_prompts", {
+      prompt, tag: "Auto", spark: "AI-generated for today",
+      category: "daily", difficulty: "medium",
+      scheduled_date: today,
+    });
+    return Array.isArray(r) ? r[0] : r;
+  } catch(e) { return { prompt, id: "temp_" + Date.now(), scheduled_date: today }; }
+}
+
+// ── QoD Entry Screen ──────────────────────────────────────────────────────────
+function QodEntryScreen({ user, group, onEnter }) {
+  const [qodPrompt, setQodPrompt] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showFlow, setShowFlow] = useState(false);
+  const [cityGroup, setCityGroup] = useState(null);
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // Get today's prompt
+        let prompts = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
+        let prompt = prompts[0] || null;
+        // Auto-generate if none exists
+        if (!prompt) {
+          prompt = await autoGenerateQod();
+        }
+        setQodPrompt(prompt);
+        // Get city group
+        if (group?.id) {
+          const cm = await db.get("city_group_members", `group_id=eq.${group.id}&select=*,city_groups(*)`).catch(() => []);
+          setCityGroup(cm[0]?.city_groups || null);
+        }
+      } catch(e) {}
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  // Check if already answered today
+  const checkAnswered = async () => {
+    if (!qodPrompt?.id || qodPrompt.id.startsWith("temp_")) return false;
+    try {
+      const r = await db.get("qod_responses", `student_id=eq.${user.id}&prompt_id=eq.${qodPrompt.id}&limit=1`);
+      return r.length > 0;
+    } catch(e) { return false; }
+  };
+
+  const handleAnswer = () => setShowFlow(true);
+  const handleSkip = () => onEnter();
+  const handlePosted = () => onEnter();
+
+  if (loading) return React.createElement(LoadingScreen);
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes subtlePulse { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+      `}</style>
+
+      {/* QoD Flow Modal */}
+      {showFlow && qodPrompt && cityGroup && (
+        React.createElement(QodAnswerFlow, {
+          prompt: qodPrompt, user, cityGroup,
+          onPost: handlePosted,
+          onClose: () => setShowFlow(false)
+        })
+      )}
+
+      {/* Full screen entry */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 28px", textAlign: "center" }}>
+
+        {/* Logo */}
+        <div style={{ marginBottom: "48px", animation: "qodEntryFade 0.5s ease both" }}>
+          {WayveLogo({ size: 22, color: C.text })}
+        </div>
+
+        {/* Date pill */}
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "24px", animation: "qodEntryFade 0.5s ease 0.1s both" }}>
+          {new Date().toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })}
+        </div>
+
+        {/* The question — hero moment */}
+        <div style={{ animation: "qodEntryFade 0.6s ease 0.2s both", maxWidth: "420px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "20px" }}>
+            오늘의 질문
+          </div>
+          <div style={{ fontSize: "clamp(22px, 5vw, 28px)", fontWeight: "700", lineHeight: 1.45, color: C.text, letterSpacing: "-0.5px", marginBottom: "36px", fontStyle: "italic" }}>
+            "{qodPrompt?.prompt || "Loading…"}"
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ animation: "qodEntryFade 0.6s ease 0.35s both", width: "100%", maxWidth: "360px" }}>
+          {(!cityGroup) ? (
+            <div>
+              <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "20px", lineHeight: 1.6 }}>
+                You're not in a city group yet.<br />Ask Teacher Toms to add you.
+              </div>
+              <Btn onClick={handleSkip} style={{ width: "100%", padding: "16px", fontSize: "16px", borderRadius: "100px" }}>
+                Enter WAYVE →
+              </Btn>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button onClick={handleAnswer}
+                style={{ width: "100%", padding: "16px", background: C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "16px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, letterSpacing: "-0.2px" }}>
+                🎙 Answer Now
+              </button>
+              <button onClick={handleSkip}
+                style={{ width: "100%", padding: "14px", background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: FONT }}>
+                Skip for today →
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* City + streak context */}
+        {cityGroup && (
+          <div style={{ marginTop: "32px", animation: "qodEntryFade 0.6s ease 0.5s both" }}>
+            <div style={{ fontSize: "12px", color: C.textLight }}>
+              {cityGroup.emoji} {cityGroup.name} · 🔥 {user.streak || 0} day streak
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Home Grid ─────────────────────────────────────────────────────────────────
+function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
+  const [stats, setStats] = useState({ communityVoices: 0, practiceRetry: 0, myPhrases: 0, cityName: "", cityEmoji: "" });
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    if (isPreview) return;
+    const load = async () => {
+      try {
+        // Community — today's response count
+        const todayPrompt = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
+        let voices = 0;
+        let cityName = ""; let cityEmoji = "🌍";
+        if (todayPrompt[0] && group?.id) {
+          const cm = await db.get("city_group_members", `group_id=eq.${group.id}&select=*,city_groups(*)`).catch(() => []);
+          const city = cm[0]?.city_groups;
+          if (city) {
+            cityName = city.name; cityEmoji = city.emoji || "🌍";
+            const resp = await db.get("qod_responses", `prompt_id=eq.${todayPrompt[0].id}&city_group_id=eq.${city.id}`).catch(() => []);
+            voices = resp.length;
+          }
+        }
+        // Practice — phrases needing retry
+        const prog = await db.get("student_progress", `student_id=eq.${user.id}&needs_retry=eq.true&passed=eq.false`).catch(() => []);
+        // My phrases count
+        const phrases = await db.get("student_phrases", `student_id=eq.${user.id}&hidden=eq.false&select=id`).catch(() => []);
+        setStats({ communityVoices: voices, practiceRetry: prog.length, myPhrases: phrases.length, cityName, cityEmoji });
+      } catch(e) {}
+    };
+    load();
+  }, []);
+
+  const cards = [
+    {
+      id: "community",
+      icon: stats.cityEmoji || "🌍",
+      title: "Community",
+      subtitle: stats.communityVoices > 0
+        ? `${stats.communityVoices} ${stats.communityVoices === 1 ? "voice" : "voices"} today`
+        : "Be the first to answer",
+      stat: stats.communityVoices > 0 ? `${stats.communityVoices}` : null,
+      statLabel: "voices",
+      accent: C.text,
+      bg: C.bgSoft,
+    },
+    {
+      id: "practice",
+      icon: "🎙",
+      title: "Practice",
+      subtitle: stats.practiceRetry > 0
+        ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry`
+        : "All caught up ✓",
+      stat: stats.practiceRetry > 0 ? `${stats.practiceRetry}` : "✓",
+      statLabel: stats.practiceRetry > 0 ? "to retry" : "done",
+      accent: stats.practiceRetry > 0 ? C.retry : C.success,
+      bg: stats.practiceRetry > 0 ? C.retryBg : C.successBg,
+    },
+    {
+      id: "freetalk",
+      icon: "💬",
+      title: "Free Talk",
+      subtitle: "Speak freely in English",
+      stat: null,
+      statLabel: null,
+      accent: C.text,
+      bg: C.bgSoft,
+    },
+    {
+      id: "myphrases",
+      icon: "⭐",
+      title: "My Phrases",
+      subtitle: stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here",
+      stat: stats.myPhrases > 0 ? `${stats.myPhrases}` : null,
+      statLabel: "saved",
+      accent: C.gold,
+      bg: C.goldBg,
+    },
+  ];
+
+  return (
+    <div>
+      <style>{`
+        @keyframes cardReveal { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+      `}</style>
+      {/* Streak banner */}
+      {streak > 0 && (
+        <div style={{ background: C.bgDark, borderRadius: "14px", padding: "14px 18px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "#fff", animation: "cardReveal 0.3s ease both" }}>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "2px" }}>🔥 {streak}일 연속 중이에요!</div>
+            <div style={{ fontSize: "11px", opacity: 0.6 }}>Keep the streak going</div>
+          </div>
+          <div style={{ fontSize: "28px", animation: "streakFire 2.5s ease-in-out infinite" }}>🔥</div>
+        </div>
+      )}
+      {/* 2×2 grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        {cards.map((card, i) => (
+          <button key={card.id} onClick={() => onNavigate(card.id)}
+            className="home-card"
+            style={{ background: card.bg, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 18px", textAlign: "left", cursor: "pointer", fontFamily: FONT, animation: `cardReveal 0.3s ease ${i * 0.06}s both`, display: "flex", flexDirection: "column", gap: "8px", minHeight: "130px" }}>
+            <div style={{ fontSize: "28px", lineHeight: 1 }}>{card.icon}</div>
+            <div>
+              <div style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px", marginBottom: "3px" }}>{card.title}</div>
+              <div style={{ fontSize: "12px", color: C.textMid, lineHeight: 1.4 }}>{card.subtitle}</div>
+            </div>
+            {card.stat && (
+              <div style={{ marginTop: "auto", display: "flex", alignItems: "baseline", gap: "3px" }}>
+                <span style={{ fontSize: "22px", fontWeight: "900", color: card.accent, letterSpacing: "-1px" }}>{card.stat}</span>
+                <span style={{ fontSize: "10px", color: card.accent, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>{card.statLabel}</span>
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Teacher Voice/Text Comments on QoD Responses ──────────────────────────────
+// Supabase table: qod_comments (id, response_id, teacher_text, audio_url, created_at)
+// Add to QodResponsesTab — teacher can leave comment on each student response
+
+function TeacherCommentBox({ responseId, existingComment, onSaved }) {
+  const [text, setText] = useState(existingComment?.teacher_text || "");
+  const [saving, setSaving] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(existingComment?.audio_url || null);
+  const [showBox, setShowBox] = useState(false);
+
+  const handleSaveText = async () => {
+    if (!text.trim() && !audioUrl) return;
+    setSaving(true);
+    try {
+      let finalAudioUrl = audioUrl;
+      if (audioBlob && !audioUrl?.startsWith("http")) {
+        // Upload audio
+        try {
+          const fileName = `comment_${responseId}_${Date.now()}.webm`;
+          const up = await fetch(`${SUPABASE_URL}/storage/v1/object/qod-audio/${fileName}`, {
+            method: "POST",
+            headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "audio/webm" },
+            body: audioBlob
+          });
+          if (up.ok) finalAudioUrl = `${SUPABASE_URL}/storage/v1/object/public/qod-audio/${fileName}`;
+          else {
+            // base64 fallback
+            finalAudioUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(audioBlob); });
+          }
+        } catch(e) {}
+      }
+      if (existingComment?.id) {
+        await db.update("qod_comments", `id=eq.${existingComment.id}`, { teacher_text: text.trim(), audio_url: finalAudioUrl });
+      } else {
+        await db.insert("qod_comments", { response_id: responseId, teacher_text: text.trim(), audio_url: finalAudioUrl });
+      }
+      onSaved && onSaved({ teacher_text: text.trim(), audio_url: finalAudioUrl });
+      setShowBox(false);
+    } catch(e) {}
+    setSaving(false);
+  };
+
+  const handleRecordDone = (blob) => {
+    setAudioBlob(blob);
+    setAudioUrl(URL.createObjectURL(blob));
+  };
+  const voiceRec = useRecorder(handleRecordDone);
+
+  if (!showBox) {
+    return (
+      <button onClick={() => setShowBox(true)}
+        style={{ background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "8px", padding: "7px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, width: "100%", textAlign: "left" }}>
+        {existingComment ? "✏️ Edit comment" : "💬 Add private comment for student"}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "10px", padding: "12px", marginTop: "8px" }}>
+      <div style={{ fontSize: "11px", fontWeight: "700", color: C.gold, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>Private comment — only this student sees it</div>
+      <textarea value={text} onChange={e => setText(e.target.value)}
+        placeholder="Leave feedback, encouragement, or a tip…"
+        style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontFamily: FONT, outline: "none", resize: "none", minHeight: "64px", lineHeight: 1.6, background: C.bg, marginBottom: "8px" }} />
+      {/* Voice comment */}
+      <div style={{ marginBottom: "10px" }}>
+        {!voiceRec.isRec && !audioUrl && (
+          <Btn onClick={voiceRec.start} variant="secondary" style={{ fontSize: "12px", padding: "6px 14px" }}>🎙 Record voice comment</Btn>
+        )}
+        {voiceRec.isRec && (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.error, animation: "recPulse 1.5s ease-in-out infinite" }} />
+            <span style={{ fontSize: "12px", color: C.error }}>Recording… {voiceRec.time}s</span>
+            <Btn onClick={voiceRec.stop} variant="ghost" style={{ fontSize: "12px", padding: "5px 12px", borderColor: C.error, color: C.error }}>Stop</Btn>
+          </div>
+        )}
+        {audioUrl && !voiceRec.isRec && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {React.createElement(RichAudioPlayer, { src: audioUrl, label: "Voice comment preview" })}
+            <button onClick={() => { setAudioUrl(null); setAudioBlob(null); }} style={{ background: "transparent", border: "none", color: C.error, cursor: "pointer", fontSize: "16px" }}>×</button>
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <Btn onClick={handleSaveText} disabled={saving || (!text.trim() && !audioUrl)} style={{ flex: 1, fontSize: "13px" }}>
+          {saving ? React.createElement(Spinner) : "Save Comment"}
+        </Btn>
+        <Btn onClick={() => setShowBox(false)} variant="ghost" style={{ fontSize: "13px" }}>Cancel</Btn>
+      </div>
+    </div>
+  );
+}
+
+// Student-facing: show teacher comment on their response
+function TeacherCommentDisplay({ responseId }) {
+  const [comment, setComment] = useState(null);
+
+  useEffect(() => {
+    db.get("qod_comments", `response_id=eq.${responseId}&limit=1`).then(r => {
+      if (r.length > 0) setComment(r[0]);
+    }).catch(() => {});
+  }, [responseId]);
+
+  if (!comment) return null;
+  return (
+    <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "10px", padding: "12px", marginTop: "8px" }}>
+      <div style={{ fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>
+        👨‍🏫 Teacher Toms' Feedback
+      </div>
+      {comment.teacher_text && (
+        <div style={{ fontSize: "13px", color: C.text, lineHeight: 1.65, marginBottom: comment.audio_url ? "8px" : "0" }}>
+          {comment.teacher_text}
+        </div>
+      )}
+      {comment.audio_url && React.createElement(RichAudioPlayer, { src: comment.audio_url, label: "Voice feedback" })}
     </div>
   );
 }
