@@ -1056,9 +1056,6 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
   const [randomPhrase, setRandomPhrase] = useState(null);
-  const [phraseOfDay, setPhraseOfDay] = useState(null);
-  const [showPOD, setShowPOD] = useState(true);
-  const [podOpen, setPodOpen] = useState(false);
   const [myPhrases, setMyPhrases] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [celebrationType, setCelebrationType] = useState(null);
@@ -1173,41 +1170,18 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
     <div>
       {showConfetti && React.createElement(CelebrationEffect, { type: celebrationType })}
 
-      {/* Phrase of the Day */}
-      {phraseOfDay && showPOD && !isPreview && (
-        <div style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", marginBottom: "16px", position: "relative" }}>
-          <button onClick={() => setShowPOD(false)} style={{ position: "absolute", top: "10px", right: "12px", background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px" }}>×</button>
-          <div style={{ fontSize: "10px", fontWeight: "700", color: C.text, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "8px" }}>⭐ 오늘의 표현</div>
-          <div style={{ fontSize: "18px", fontStyle: "italic", color: C.text, marginBottom: "4px" }}>"{phraseOfDay.english}"</div>
-          {phraseOfDay.korean && <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "10px" }}>{phraseOfDay.korean}</div>}
-          <Btn onClick={() => { setPodOpen(true); setShowPOD(false); }} variant="gold" style={{ fontSize: "12px", padding: "6px 14px" }}>🎙 지금 연습하기</Btn>
-        </div>
-      )}
-
-      {/* Phrase of Day practice modal */}
-      {podOpen && phraseOfDay && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={e => { if (e.target === e.currentTarget) setPodOpen(false); }}>
-          <div style={{ background: C.bg, borderRadius: "12px", padding: "24px", maxWidth: "520px", width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold }}>⭐ 오늘의 표현</div>
-              <button onClick={() => setPodOpen(false)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>×</button>
-            </div>
-            <div style={{ fontSize: "20px", fontStyle: "italic", marginBottom: "6px" }}>"{phraseOfDay.english}"</div>
-            {phraseOfDay.korean && <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "6px" }}>{phraseOfDay.korean}</div>}
-            {phraseOfDay.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", marginBottom: "12px", fontSize: "13px", color: C.textMid }}>{phraseOfDay.context}</div>}
-            <PhraseCard phrase={phraseOfDay} user={user} prog={progress[phraseOfDay.id]} isPreview={isPreview} onUpdate={handleProgressUpdate} onPracticed={onPracticed} hideContext={true} />
+      {/* Practice header + random */}
+      <div style={{ background: "#1E1E1E", borderRadius: "20px", padding: "22px 24px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
+          <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
+          <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>
+            {sessionNums.reduce((acc, n) => acc + (sessions[n] || []).filter(p => progress[p.id]?.passed).length, 0)} of{" "}
+            {sessionNums.reduce((acc, n) => acc + (sessions[n] || []).length, 0)} phrases complete
           </div>
         </div>
-      )}
-
-      {/* Random practice */}
-      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", marginBottom: "16px", background: C.bgSoft }}>
-        <div>
-          <div style={{ fontSize: "14px", fontWeight: "600" }}>🎲 랜덤 연습</div>
-          <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>연습 문장 + 나의 표현 모두에서 랜덤 선택</div>
-        </div>
-        <Btn onClick={pickRandom} variant="secondary" style={{ flexShrink: 0, fontSize: "13px" }}>시작하기</Btn>
-      </Card>
+        <button onClick={pickRandom} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "8px 16px", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }}>🎲 Random</button>
+      </div>
 
       {/* Random phrase modal */}
       {randomPhrase && (
@@ -1286,11 +1260,11 @@ function SessionFeed({ sessionNums, sessions, progress, sessionResets, user, isP
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 {isLatest && (
-                  <span style={{ background: C.text, color: "#fff", fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", letterSpacing: "0.5px" }}>✨ 최신</span>
+                  <span style={{ background: C.text, color: "#fff", fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "100px", letterSpacing: "0.5px" }}>NEW</span>
                 )}
-                <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>Session {n}</div>
-                <span style={{ fontSize: "12px", color: allDone ? C.success : C.textLight, background: allDone ? C.successBg : C.bgSoft, padding: "2px 8px", borderRadius: "10px", fontWeight: "600" }}>
-                  {passed}/{total} {allDone ? "✅" : ""}
+                <div style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" }}>Session {n}</div>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: allDone ? C.success : C.textMid, background: allDone ? C.successBg : C.bgSoft, borderRadius: "100px", padding: "3px 10px", border: `1px solid ${allDone ? C.successBorder : C.border}` }}>
+                  {passed}/{total}{allDone ? " ✓" : ""}
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1967,7 +1941,7 @@ function ChatTab({ user, group, isPreview }) {
           <div style={{ textAlign: "center", padding: "40px 20px" }}>
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>💬</div>
             <div style={{ fontSize: "14px", fontWeight: "600", color: C.text, marginBottom: "4px" }}>Start the conversation</div>
-            <div style={{ fontSize: "12px", color: C.textLight }}>Message Teacher Toms or your group</div>
+            <div style={{ fontSize: "12px", color: C.textLight }}>Message your group or your group</div>
           </div>
         ) : messages.map((msg, i) => {
           const isMe = msg.sender_id === user.id;
@@ -1979,7 +1953,7 @@ function ChatTab({ user, group, isPreview }) {
                   {isTeacher ? "👨‍🏫 Teacher Toms" : msg.sender_name}
                 </div>
               )}
-              <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: isMe ? C.bgDark : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5 }}>
+              <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: isMe ? C.bgDark : isTeacher ? C.goldBg : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacher ? `1px solid ${C.goldBorder}` : "none" }}>
                 {msg.text}
               </div>
               <div style={{ fontSize: "10px", color: C.textLight, marginTop: "2px", marginLeft: "4px", marginRight: "4px" }}>
@@ -5023,7 +4997,7 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
-            <div style={{ fontSize: "12px", color: "#777" }}>Message Teacher Toms</div>
+            <div style={{ fontSize: "12px", color: "#777" }}>Message your group</div>
           </div>
           <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
         </button>
