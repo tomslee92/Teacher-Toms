@@ -3373,9 +3373,23 @@ function QodPromptCard({ prompt, index, onSave, onDelete, onPreview, onSchedule,
 
 // ── Korean Translation Helper for QoD ─────────────────────────────────────────
 async function translateQodToKorean(prompt) {
-  const text = await groqCall(`Translate this English question into natural Korean. Return ONLY the Korean translation, nothing else.
+  const text = await groqCall(`Translate this English question into natural Korean hangul ONLY.
+CRITICAL RULES:
+- Use ONLY Korean hangul characters (가-힣)
+- NO English words, NO romanization, NO other scripts
+- Natural, conversational Korean that adult learners would understand
+- Return ONLY the Korean translation, absolutely nothing else
+
 English: "${prompt}"`);
-  return cleanText(text.trim());
+  // Strip anything that isn't Korean hangul, spaces, or basic punctuation
+  const korean = text.trim().split("").filter(c => {
+    const code = c.charCodeAt(0);
+    const isKorean = (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F);
+    const isAllowed = [" ", "?", "!", ".", ",", "·", "…", "
+"].includes(c);
+    return isKorean || isAllowed;
+  }).join("").trim();
+  return korean || text.trim(); // fallback to raw if filter removes everything
 }
 
 async function scaffoldKoreanAnswer(koreanAnswer, englishQuestion) {
@@ -3503,7 +3517,7 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
     <div style={{ textAlign: "center", padding: "60px 20px" }}>
       <div style={{ fontSize: "48px", marginBottom: "16px" }}>☀️</div>
       <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", letterSpacing: "-0.3px" }}>No question today</div>
-      <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6 }}>Teacher Tom hasn't posted today's question yet.<br />Check back soon!</div>
+      <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6 }}>Teacher Toms hasn't posted today's question yet...<br />Check back soon!</div>
     </div>
   );
 
@@ -3731,257 +3745,349 @@ function ResponseCard({ response, isMe, onReact, userId, index }) {
   );
 }
 
-// ── QoD Answer Flow ───────────────────────────────────────────────────────────
+// ── QoD Answer Flow ─────────────────────────────────────────────────────────
 function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
-  const [step, setStep] = useState("listen");     // listen | prepare | practice | nickname | posting
+  // path: null | "direct" | "korean_type" | "korean_voice"
+  const [path, setPath] = useState(null);
+  const [step, setStep] = useState("main"); // main | practice | nickname | posting
+
+  // Translation
   const [koreanTranslation, setKoreanTranslation] = useState(null);
   const [showKorean, setShowKorean] = useState(false);
   const [loadingKorean, setLoadingKorean] = useState(false);
+  const [translationError, setTranslationError] = useState(false);
+
+  // Playback speed
   const [playbackSpeed, setPlaybackSpeed] = useState(0.75);
+
   // Korean scaffold
-  const [scaffoldMode, setScaffoldMode] = useState("direct"); // direct | korean_type | korean_voice
   const [koreanInput, setKoreanInput] = useState("");
   const [scaffoldedEnglish, setScaffoldedEnglish] = useState("");
   const [loadingScaffold, setLoadingScaffold] = useState(false);
-  // Practice
-  const [attempts, setAttempts] = useState([]);
+  const [scaffoldError, setScaffoldError] = useState("");
+
+  // Korean voice recording (for scaffold)
+  const [koreanVoiceStep, setKoreanVoiceStep] = useState("idle"); // idle | recording | processing | done
+  const koreanVoiceChunks = useRef([]);
+  const koreanMediaRef = useRef(null);
+
+  // Practice recording
   const [currentFeedback, setCurrentFeedback] = useState(null);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [finalBlob, setFinalBlob] = useState(null);
   const [finalUrl, setFinalUrl] = useState(null);
   const [finalTranscript, setFinalTranscript] = useState("");
+  const [attempts, setAttempts] = useState([]);
+
   // Nickname
   const [nickname, setNickname] = useState(user.nickname || "");
-  const [savingNickname, setSavingNickname] = useState(false);
   const [posting, setPosting] = useState(false);
-
   const isFirstTime = !user.nickname;
 
   const handleRevealKorean = async () => {
-    if (koreanTranslation) { setShowKorean(true); return; }
-    setLoadingKorean(true);
+    if (koreanTranslation) { setShowKorean(s => !s); return; }
+    setLoadingKorean(true); setTranslationError(false);
     try {
       const t = await translateQodToKorean(prompt.prompt);
-      setKoreanTranslation(t);
-      setShowKorean(true);
-    } catch(e) {}
+      if (!t || t.length < 3) throw new Error("empty");
+      setKoreanTranslation(t); setShowKorean(true);
+    } catch(e) { setTranslationError(true); }
     setLoadingKorean(false);
   };
 
-  const handleScaffold = async () => {
+  const handleRetranslate = async () => {
+    setKoreanTranslation(null); setLoadingKorean(true); setTranslationError(false);
+    try {
+      const t = await translateQodToKorean(prompt.prompt);
+      if (!t || t.length < 3) throw new Error("empty");
+      setKoreanTranslation(t);
+    } catch(e) { setTranslationError(true); }
+    setLoadingKorean(false);
+  };
+
+  const handleScaffoldText = async () => {
     if (!koreanInput.trim()) return;
-    setLoadingScaffold(true);
+    setLoadingScaffold(true); setScaffoldError("");
     try {
       const eng = await scaffoldKoreanAnswer(koreanInput, prompt.prompt);
       setScaffoldedEnglish(eng);
-    } catch(e) {}
+    } catch(e) { setScaffoldError("변환 오류가 발생했어요. 다시 시도해 주세요."); }
     setLoadingScaffold(false);
   };
 
+  // Korean voice recording for scaffold
+  const startKoreanVoice = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      koreanVoiceChunks.current = [];
+      const mr = new MediaRecorder(stream);
+      koreanMediaRef.current = mr;
+      mr.ondataavailable = e => { if (e.data.size > 0) koreanVoiceChunks.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setKoreanVoiceStep("processing");
+        try {
+          const blob = new Blob(koreanVoiceChunks.current, { type: "audio/webm" });
+          const said = await transcribe(blob);
+          setKoreanInput(said);
+          const eng = await scaffoldKoreanAnswer(said, prompt.prompt);
+          setScaffoldedEnglish(eng);
+          setKoreanVoiceStep("done");
+        } catch(e) { setScaffoldError("음성 인식 오류. 다시 시도해 주세요."); setKoreanVoiceStep("idle"); }
+      };
+      mr.start(100);
+      setKoreanVoiceStep("recording");
+    } catch(e) { alert("마이크 접근이 필요합니다."); }
+  };
+
+  const stopKoreanVoice = () => { koreanMediaRef.current?.stop(); };
+
+  // English practice recording
   const handleRecordingDone = async (blob) => {
     const url = URL.createObjectURL(blob);
-    setFinalBlob(blob);
-    setFinalUrl(url);
+    setFinalBlob(blob); setFinalUrl(url);
     setLoadingFeedback(true);
     try {
       const said = await transcribe(blob);
       setFinalTranscript(said);
       const { text, score } = await getQodFeedback(said, prompt.prompt);
       setCurrentFeedback({ text, score, said });
-      setAttempts(prev => [...prev, { blob, url, said, score }]);
-    } catch(e) { setCurrentFeedback({ text: "피드백 오류가 발생했어요.", score: 0, said: "" }); }
+      setAttempts(prev => [...prev, { url, said, score }]);
+    } catch(e) { setCurrentFeedback({ text: "피드백 오류. 다시 시도해 주세요.", score: 0, said: "" }); }
     setLoadingFeedback(false);
   };
 
   const rec = useRecorder(handleRecordingDone);
 
   const handleSubmit = async () => {
-    if (!finalBlob && !finalTranscript) return;
     const nick = nickname.trim() || user.name;
-    
-    // Save nickname if first time or changed
     if (nick !== user.nickname) {
-      try {
-        await db.update("students", `id=eq.${user.id}`, { nickname: nick });
-        user.nickname = nick;
-      } catch(e) {}
+      try { await db.update("students", `id=eq.${user.id}`, { nickname: nick }); user.nickname = nick; } catch(e) {}
     }
-
     setPosting(true);
     try {
-      // Upload audio to Supabase storage if possible, else store transcript only
       let audioUrl = null;
       if (finalBlob) {
         try {
           const fileName = `qod_${user.id}_${Date.now()}.webm`;
-          const uploadRes = await fetch(
-            `${SUPABASE_URL}/storage/v1/object/qod-audio/${fileName}`,
-            { method: "POST", headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "audio/webm" }, body: finalBlob }
-          );
-          if (uploadRes.ok) {
-            audioUrl = `${SUPABASE_URL}/storage/v1/object/public/qod-audio/${fileName}`;
-          }
+          const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/qod-audio/${fileName}`, {
+            method: "POST",
+            headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "audio/webm" },
+            body: finalBlob
+          });
+          if (uploadRes.ok) audioUrl = `${SUPABASE_URL}/storage/v1/object/public/qod-audio/${fileName}`;
         } catch(e) {}
       }
-
       const r = await db.insert("qod_responses", {
-        prompt_id: prompt.id,
-        student_id: user.id,
-        nickname: nick,
-        audio_url: audioUrl,
-        transcript: finalTranscript,
-        city_group_id: cityGroup.id,
+        prompt_id: prompt.id, student_id: user.id, nickname: nick,
+        audio_url: audioUrl, transcript: finalTranscript, city_group_id: cityGroup.id,
       });
-      const response = Array.isArray(r) ? r[0] : r;
-      onPost(response);
+      onPost(Array.isArray(r) ? r[0] : r);
     } catch(e) { setPosting(false); }
   };
 
+  // ── Shared header shown on all steps
+  const QuestionHeader = () => React.createElement("div", { style: { marginBottom: "20px" } },
+    React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "8px" } }, "오늘의 질문"),
+    React.createElement("div", { style: { fontSize: "19px", fontWeight: "700", lineHeight: 1.5, fontStyle: "italic", letterSpacing: "-0.3px", marginBottom: "12px" } },
+      `"${prompt.prompt}"`
+    ),
+    // Korean translation toggle
+    !showKorean
+      ? React.createElement("button", {
+          onClick: handleRevealKorean, disabled: loadingKorean,
+          style: { background: C.bgSoft, border: `1px dashed ${C.border}`, borderRadius: "8px", padding: "9px 14px", width: "100%", textAlign: "left", cursor: "pointer", fontFamily: FONT, color: C.textMid, fontSize: "13px", display: "flex", alignItems: "center", gap: "8px" }
+        },
+        loadingKorean ? React.createElement(Spinner) : React.createElement("span", null, "🇰🇷"),
+        React.createElement("span", null, loadingKorean ? "번역 중…" : "한국어로 보기 (탭하여 확인)")
+      )
+      : React.createElement("div", { style: { background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", fontSize: "14px", color: C.textMid, lineHeight: 1.7, borderLeft: `3px solid ${C.border}` } },
+          translationError
+            ? React.createElement("div", { style: { color: C.error, fontSize: "13px" } }, "번역 오류. ",
+                React.createElement("button", { onClick: handleRetranslate, style: { background: "none", border: "none", color: C.text, fontWeight: "700", cursor: "pointer", fontFamily: FONT, textDecoration: "underline", fontSize: "13px" } }, "다시 시도 🔄")
+              )
+            : React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" } },
+                React.createElement("span", null, "🇰🇷 ", koreanTranslation),
+                React.createElement("button", { onClick: handleRetranslate, title: "Retranslate", style: { background: "none", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "0 2px" } }, "🔄")
+              )
+        ),
+    // Listen controls
+    React.createElement("div", { style: { display: "flex", gap: "7px", flexWrap: "wrap", marginTop: "12px" } },
+      React.createElement(Btn, { onClick: () => speak(prompt.prompt, playbackSpeed), variant: "secondary", style: { fontSize: "12px", padding: "7px 14px" } }, "🔊 듣기"),
+      ...[1.0, 0.75, 0.5].map(s =>
+        React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(prompt.prompt, s); },
+          style: { padding: "7px 12px", borderRadius: "100px", border: `1px solid ${playbackSpeed === s ? C.text : C.border}`, background: playbackSpeed === s ? C.text : C.bg, color: playbackSpeed === s ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, transition: "all 0.12s" } }, s + "x")
+      )
+    )
+  );
+
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: C.bg, borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "600px", maxHeight: "90vh", overflowY: "auto", padding: "28px 24px 40px", animation: "slideUp 0.3s ease" }}>
-        <style>{`@keyframes slideUp { from{transform:translateY(100px);opacity:0} to{transform:translateY(0);opacity:1} }`}</style>
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ background: C.bg, borderRadius: "20px", width: "100%", maxWidth: "540px", maxHeight: "88vh", overflowY: "auto", padding: "24px 22px 36px", boxShadow: "0 24px 60px rgba(0,0,0,0.25)", animation: "scaleIn 0.2s ease" }}>
 
-        {/* Handle bar */}
-        <div style={{ width: "36px", height: "4px", background: C.bgMid, borderRadius: "2px", margin: "0 auto 24px" }} />
+        {/* Handle + close */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <div style={{ width: "32px", height: "4px", background: C.bgMid, borderRadius: "2px" }} />
+          <button onClick={onClose} style={{ background: C.bgSoft, border: "none", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontSize: "14px", color: C.textMid, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
 
-        {/* ── STEP: LISTEN ── */}
-        {step === "listen" && (
+        {/* ── MAIN: question + all paths visible upfront ── */}
+        {step === "main" && (
           <div>
-            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "6px" }}>오늘의 질문</div>
-            <div style={{ fontSize: "21px", fontWeight: "700", lineHeight: 1.5, fontStyle: "italic", marginBottom: "20px", letterSpacing: "-0.3px" }}>
-              "{prompt.prompt}"
-            </div>
+            {React.createElement(QuestionHeader)}
 
-            {/* Korean translation — tap to reveal */}
-            {!showKorean ? (
-              <button onClick={handleRevealKorean} disabled={loadingKorean}
-                style={{ background: C.bgSoft, border: `1px dashed ${C.border}`, borderRadius: "10px", padding: "11px 16px", width: "100%", textAlign: "left", cursor: "pointer", fontFamily: FONT, color: C.textMid, fontSize: "13px", display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px" }}>
-                {loadingKorean ? React.createElement(Spinner) : <span>🇰🇷</span>}
-                <span>{loadingKorean ? "번역 중…" : "한국어로 보기 (탭하여 확인)"}</span>
-              </button>
-            ) : (
-              <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "12px 16px", marginBottom: "20px", fontSize: "14px", color: C.textMid, lineHeight: 1.7, borderLeft: `3px solid ${C.border}` }}>
-                🇰🇷 {koreanTranslation}
-              </div>
-            )}
+            <div style={{ height: "1px", background: C.border, margin: "20px 0" }} />
 
-            {/* Listen controls */}
-            <div style={{ marginBottom: "24px" }}>
-              <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>Tom의 목소리로 듣기</div>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <Btn onClick={() => speak(prompt.prompt, playbackSpeed)} variant="secondary" style={{ fontSize: "13px" }}>🔊 듣기</Btn>
-                {[1.0, 0.75, 0.5].map(s => (
-                  <button key={s} onClick={() => { setPlaybackSpeed(s); speak(prompt.prompt, s); }}
-                    style={{ padding: "7px 14px", borderRadius: "100px", border: `1px solid ${playbackSpeed === s ? C.text : C.border}`, background: playbackSpeed === s ? C.text : C.bg, color: playbackSpeed === s ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, transition: "all 0.12s" }}>
-                    {s}x
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px" }}>어떻게 답할까요?</div>
 
-            <Btn onClick={() => setStep("prepare")} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
-              준비됐어요 → Ready to Answer
-            </Btn>
-          </div>
-        )}
-
-        {/* ── STEP: PREPARE ── */}
-        {step === "prepare" && (
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "6px" }}>답변 준비</div>
-            <div style={{ fontSize: "16px", fontWeight: "600", fontStyle: "italic", marginBottom: "20px", color: C.textMid }}>"{prompt.prompt}"</div>
-
-            <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>어떻게 시작할까요?</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px" }}>
-              {[
-                ["direct", "🗣 영어로 바로 말할게요", "I'll answer directly in English"],
-                ["korean_type", "⌨️ 한국어로 먼저 써볼게요", "Let me type my answer in Korean first"],
-                ["korean_voice", "🎙 한국어로 먼저 말할게요", "Let me speak in Korean first"],
-              ].map(([mode, kor, eng]) => (
-                <button key={mode} onClick={() => setScaffoldMode(mode)}
-                  style={{ padding: "12px 16px", borderRadius: "12px", border: `1px solid ${scaffoldMode === mode ? C.text : C.border}`, background: scaffoldMode === mode ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.12s" }}>
-                  <div style={{ fontSize: "14px", fontWeight: scaffoldMode === mode ? "700" : "500", color: C.text }}>{kor}</div>
-                  <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>{eng}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Korean type scaffold */}
-            {scaffoldMode === "korean_type" && (
-              <div style={{ marginBottom: "16px" }}>
-                <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>한국어로 답변 입력</div>
-                <textarea value={koreanInput} onChange={e => setKoreanInput(e.target.value)}
-                  placeholder="예: 저는 지난 주에 새로운 카페를 발견했어요…"
-                  style={{ width: "100%", padding: "12px 14px", border: `1px solid ${C.border}`, borderRadius: "10px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "none", minHeight: "80px", lineHeight: 1.6, background: C.bgSoft }} />
-                <Btn onClick={handleScaffold} disabled={loadingScaffold || !koreanInput.trim()} variant="secondary" style={{ width: "100%", marginTop: "8px" }}>
-                  {loadingScaffold ? React.createElement(React.Fragment, null, React.createElement(Spinner), " 번역 중…") : "→ 영어로 변환하기"}
-                </Btn>
-              </div>
-            )}
-
-            {/* Korean voice scaffold */}
-            {scaffoldMode === "korean_voice" && (
-              <div style={{ marginBottom: "16px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "12px" }}>한국어로 말하기</div>
-                {!rec.isRec && !loadingScaffold && (
-                  <Btn onClick={() => { rec.start(); setScaffoldMode("korean_voice_recording"); }} variant="secondary">🎙 한국어로 말하기 시작</Btn>
-                )}
-              </div>
-            )}
-
-            {/* Scaffolded English output */}
-            {scaffoldedEnglish && (
-              <div style={{ background: C.bgDark, color: "#fff", borderRadius: "12px", padding: "16px", marginBottom: "16px" }}>
-                <div style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", opacity: 0.5, marginBottom: "8px" }}>English Translation</div>
-                <div style={{ fontSize: "16px", fontWeight: "600", lineHeight: 1.6, fontStyle: "italic" }}>"{scaffoldedEnglish}"</div>
-                <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-                  {[1.0, 0.75, 0.5].map(s => (
-                    <button key={s} onClick={() => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); }}
-                      style={{ padding: "5px 12px", borderRadius: "100px", border: `1px solid ${playbackSpeed === s ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.2)"}`, background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
-                      {s}x
-                    </button>
-                  ))}
-                  <Btn onClick={() => speak(scaffoldedEnglish, playbackSpeed)} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "5px 14px", fontSize: "12px" }}>🔊</Btn>
+            {/* Path A — Direct English */}
+            <div style={{ marginBottom: "8px" }}>
+              <button onClick={() => { setPath("direct"); setStep("practice"); }}
+                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: C.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>🗣</div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>영어로 바로 말할게요</div>
+                  <div style={{ fontSize: "12px", color: C.textLight }}>I'll answer directly in English</div>
                 </div>
-              </div>
-            )}
+              </button>
+            </div>
 
-            <Btn onClick={() => setStep("practice")} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
-              🎙 녹음 시작하기
-            </Btn>
-            <button onClick={() => setStep("listen")} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "10px", marginTop: "4px" }}>← 질문 다시 듣기</button>
+            {/* Path B — Type in Korean */}
+            <div style={{ marginBottom: "8px" }}>
+              <button onClick={() => setPath(path === "korean_type" ? null : "korean_type")}
+                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${path === "korean_type" ? C.text : C.border}`, background: path === "korean_type" ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: path === "korean_type" ? C.text : C.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>⌨️</div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>한국어로 먼저 써볼게요</div>
+                  <div style={{ fontSize: "12px", color: C.textLight }}>Type my answer in Korean → get English</div>
+                </div>
+              </button>
+              {path === "korean_type" && (
+                <div style={{ padding: "14px", background: C.bgSoft, borderRadius: "0 0 12px 12px", border: `1px solid ${C.text}`, borderTop: "none", marginTop: "-1px", animation: "fadeIn 0.2s ease" }}>
+                  <textarea value={koreanInput} onChange={e => setKoreanInput(e.target.value)}
+                    placeholder="한국어로 답변을 써보세요…"
+                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "none", minHeight: "72px", lineHeight: 1.6, background: C.bg, marginBottom: "10px" }} />
+                  {scaffoldError && <div style={{ color: C.error, fontSize: "12px", marginBottom: "8px" }}>{scaffoldError}</div>}
+                  {scaffoldedEnglish ? (
+                    <div>
+                      <div style={{ background: C.bgDark, color: "#fff", borderRadius: "10px", padding: "14px", marginBottom: "10px" }}>
+                        <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>English Version</div>
+                        <div style={{ fontSize: "15px", fontWeight: "600", fontStyle: "italic", lineHeight: 1.5 }}>"{scaffoldedEnglish}"</div>
+                        <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
+                          {[1.0, 0.75, 0.5].map(s =>
+                            React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); },
+                              style: { padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s + "x")
+                          )}
+                          <button onClick={() => speak(scaffoldedEnglish, playbackSpeed)} style={{ padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px", cursor: "pointer", fontFamily: FONT }}>🔊</button>
+                        </div>
+                      </div>
+                      <Btn onClick={() => setStep("practice")} style={{ width: "100%" }}>🎙 이걸로 녹음하기</Btn>
+                    </div>
+                  ) : (
+                    <Btn onClick={handleScaffoldText} disabled={loadingScaffold || !koreanInput.trim()} style={{ width: "100%" }}>
+                      {loadingScaffold ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, "변환 중…")) : "→ 영어로 변환하기"}
+                    </Btn>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Path C — Speak in Korean */}
+            <div style={{ marginBottom: "20px" }}>
+              <button onClick={() => setPath(path === "korean_voice" ? null : "korean_voice")}
+                style={{ width: "100%", padding: "14px 16px", borderRadius: "12px", border: `1px solid ${path === "korean_voice" ? C.text : C.border}`, background: path === "korean_voice" ? C.bgSoft : C.bg, cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: path === "korean_voice" ? C.text : C.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>🎙</div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>한국어로 먼저 말할게요</div>
+                  <div style={{ fontSize: "12px", color: C.textLight }}>Speak in Korean → get English translation</div>
+                </div>
+              </button>
+              {path === "korean_voice" && (
+                <div style={{ padding: "16px", background: C.bgSoft, borderRadius: "0 0 12px 12px", border: `1px solid ${C.text}`, borderTop: "none", marginTop: "-1px", textAlign: "center", animation: "fadeIn 0.2s ease" }}>
+                  {koreanVoiceStep === "idle" && (
+                    <div>
+                      <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "12px" }}>한국어로 답변을 말해보세요</div>
+                      <Btn onClick={startKoreanVoice} style={{ padding: "10px 24px" }}>🎙 말하기 시작</Btn>
+                    </div>
+                  )}
+                  {koreanVoiceStep === "recording" && (
+                    <div>
+                      <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: C.error, border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", margin: "0 auto 12px", animation: "recPulse 1.5s ease-in-out infinite" }}>⏺</div>
+                      <div style={{ color: C.error, fontSize: "14px", fontWeight: "600", marginBottom: "12px" }}>녹음 중…</div>
+                      <Btn onClick={stopKoreanVoice} variant="ghost" style={{ borderColor: C.error, color: C.error }}>⏹ 멈추기</Btn>
+                    </div>
+                  )}
+                  {koreanVoiceStep === "processing" && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", padding: "12px", color: C.textMid }}>
+                      {React.createElement(Spinner)} 번역 중…
+                    </div>
+                  )}
+                  {koreanVoiceStep === "done" && scaffoldedEnglish && (
+                    <div>
+                      {koreanInput && <div style={{ fontSize: "12px", color: C.textMid, marginBottom: "8px", fontStyle: "italic" }}>🎙 "{koreanInput}"</div>}
+                      <div style={{ background: C.bgDark, color: "#fff", borderRadius: "10px", padding: "14px", marginBottom: "10px", textAlign: "left" }}>
+                        <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>English Version</div>
+                        <div style={{ fontSize: "15px", fontWeight: "600", fontStyle: "italic", lineHeight: 1.5 }}>"{scaffoldedEnglish}"</div>
+                        <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
+                          {[1.0, 0.75, 0.5].map(s =>
+                            React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); },
+                              style: { padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s + "x")
+                          )}
+                          <button onClick={() => speak(scaffoldedEnglish, playbackSpeed)} style={{ padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px", cursor: "pointer", fontFamily: FONT }}>🔊</button>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <Btn onClick={() => setStep("practice")} style={{ flex: 1 }}>🎙 이걸로 녹음하기</Btn>
+                        <Btn onClick={() => { setKoreanVoiceStep("idle"); setScaffoldedEnglish(""); setKoreanInput(""); }} variant="ghost">🔄 다시</Btn>
+                      </div>
+                    </div>
+                  )}
+                  {scaffoldError && <div style={{ color: C.error, fontSize: "12px", marginTop: "8px" }}>{scaffoldError}</div>}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* ── STEP: PRACTICE ── */}
+        {/* ── PRACTICE: record + feedback ── */}
         {step === "practice" && (
           <div>
-            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "6px" }}>녹음하기 · Record</div>
-            <div style={{ fontSize: "15px", fontWeight: "600", fontStyle: "italic", marginBottom: "20px", color: C.textMid, lineHeight: 1.5 }}>"{prompt.prompt}"</div>
+            {React.createElement(QuestionHeader)}
+            <div style={{ height: "1px", background: C.border, margin: "16px 0" }} />
 
-            {attempts.length > 0 && (
-              <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "12px", textAlign: "center" }}>
-                시도 횟수: {attempts.length}번 · 최고 점수: {Math.max(...attempts.map(a => a.score))}/10
+            {/* Show scaffolded answer as reference if they used Korean path */}
+            {scaffoldedEnglish && (
+              <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "12px 14px", marginBottom: "16px", fontSize: "13px", color: C.textMid, fontStyle: "italic", borderLeft: `3px solid ${C.border}`, lineHeight: 1.6 }}>
+                💡 참고: "{scaffoldedEnglish}"
               </div>
             )}
 
-            {/* Record button */}
-            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+            {attempts.length > 0 && (
+              <div style={{ textAlign: "center", fontSize: "11px", color: C.textLight, marginBottom: "12px" }}>
+                시도 {attempts.length}번 · 최고 점수 {Math.max(...attempts.map(a => a.score))}/10
+              </div>
+            )}
+
+            {/* Big record button */}
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
               {!rec.isRec && !loadingFeedback && (
-                <button onClick={rec.start}
-                  style={{ width: "72px", height: "72px", borderRadius: "50%", background: C.text, border: "none", color: "#fff", fontSize: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", boxShadow: "0 4px 20px rgba(0,0,0,0.2)", transition: "all 0.15s" }}>
-                  🎙
-                </button>
+                <div>
+                  <button onClick={rec.start}
+                    style={{ width: "76px", height: "76px", borderRadius: "50%", background: C.text, border: "none", color: "#fff", fontSize: "28px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)", transition: "transform 0.15s" }}>
+                    🎙
+                  </button>
+                  <div style={{ fontSize: "13px", color: C.textLight }}>탭하여 녹음 시작</div>
+                </div>
               )}
               {rec.isRec && (
                 <div>
                   <button onClick={rec.stop}
-                    style={{ width: "72px", height: "72px", borderRadius: "50%", background: C.error, border: "none", color: "#fff", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", animation: "recPulse 1.5s ease-in-out infinite" }}>
+                    style={{ width: "76px", height: "76px", borderRadius: "50%", background: C.error, border: "none", color: "#fff", fontSize: "22px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", animation: "recPulse 1.5s ease-in-out infinite" }}>
                     ⏹
                   </button>
-                  <div style={{ marginTop: "10px", color: C.error, fontSize: "14px", fontWeight: "600" }}>녹음 중… {rec.time}초</div>
+                  <div style={{ color: C.error, fontSize: "14px", fontWeight: "600" }}>녹음 중… {rec.time}초</div>
                 </div>
               )}
               {loadingFeedback && (
@@ -3993,60 +4099,55 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
 
             {/* Feedback */}
             {currentFeedback && !loadingFeedback && (
-              <div style={{ marginBottom: "16px", animation: "fadeIn 0.25s ease" }}>
+              <div style={{ animation: "fadeIn 0.25s ease" }}>
                 {finalTranscript && (
                   <div style={{ background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", marginBottom: "10px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.border}` }}>
                     🎙 "{finalTranscript}"
                   </div>
                 )}
-                {/* Rich audio player for playback */}
                 {finalUrl && React.createElement(RichAudioPlayer, { src: finalUrl, label: "내 녹음 듣기" })}
-                <FeedbackDisplay text={currentFeedback.text} />
-                <div style={{ marginTop: "12px", padding: "10px 14px", background: currentFeedback.score >= 7 ? C.successBg : C.bgSoft, borderRadius: "8px", fontSize: "13px", color: currentFeedback.score >= 7 ? C.success : C.textMid, fontWeight: "600", border: `1px solid ${currentFeedback.score >= 7 ? C.successBorder : C.border}` }}>
-                  {currentFeedback.score >= 7 ? "🎉 잘했어요! 제출할 준비가 됐어요." : "💪 다시 한 번 해보거나 제출하세요!"}
+                {React.createElement(FeedbackDisplay, { text: currentFeedback.text })}
+                <div style={{ marginTop: "12px", padding: "10px 14px", background: currentFeedback.score >= 7 ? C.successBg : C.bgSoft, borderRadius: "8px", fontSize: "13px", color: currentFeedback.score >= 7 ? C.success : C.textMid, fontWeight: "600", border: `1px solid ${currentFeedback.score >= 7 ? C.successBorder : C.border}`, marginBottom: "14px" }}>
+                  {currentFeedback.score >= 7 ? "🎉 잘했어요! 이 답변으로 제출할 수 있어요." : "💪 다시 해보거나 그냥 제출해도 돼요!"}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <Btn onClick={() => setStep(isFirstTime ? "nickname" : "posting")} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
+                    ✅ 제출하기 · Submit
+                  </Btn>
+                  <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); rec.reset(); }} variant="ghost" style={{ width: "100%", padding: "11px" }}>
+                    🔄 다시 녹음하기
+                  </Btn>
                 </div>
               </div>
             )}
 
-            {/* Actions */}
-            {currentFeedback && !loadingFeedback && !rec.isRec && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <Btn onClick={() => setStep(isFirstTime ? "nickname" : "posting")} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
-                  ✅ 제출하기 · Submit This Answer
-                </Btn>
-                <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); rec.reset(); }} variant="ghost" style={{ width: "100%", padding: "11px" }}>
-                  🔄 다시 녹음하기
-                </Btn>
-              </div>
-            )}
-
-            {!currentFeedback && !rec.isRec && !loadingFeedback && (
-              <button onClick={() => setStep("prepare")} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "10px" }}>← 준비 단계로</button>
-            )}
+            <button onClick={() => setStep("main")} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "12px", marginTop: "4px" }}>
+              ← 처음으로
+            </button>
           </div>
         )}
 
-        {/* ── STEP: NICKNAME (first time only) ── */}
+        {/* ── NICKNAME (first time) ── */}
         {step === "nickname" && (
           <div>
             <div style={{ textAlign: "center", marginBottom: "24px" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>👋</div>
               <div style={{ fontSize: "22px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "8px" }}>커뮤니티 닉네임</div>
-              <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6 }}>
+              <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.7 }}>
                 처음으로 커뮤니티에 올리는 거예요!<br />
-                다른 학생들이 볼 닉네임을 정해주세요.<br />
-                <span style={{ fontSize: "12px", color: C.textLight }}>This is your community nickname. You can change it later.</span>
+                다른 학생들이 볼 닉네임을 정해주세요.
+                <br /><span style={{ fontSize: "12px", color: C.textLight }}>You can change it anytime in your profile.</span>
               </div>
             </div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>닉네임 / Nickname</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>닉네임</div>
             <Input value={nickname} onChange={e => setNickname(e.target.value)}
               placeholder="e.g. SunnySeoul, WaveRider, MorningMike"
               style={{ marginBottom: "8px", fontSize: "16px", padding: "13px 16px" }} />
             <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "20px" }}>
-              💡 닉네임을 설정하면 나중에 프로필에서 변경할 수 있어요.
+              💡 나중에 언제든지 바꿀 수 있어요.
             </div>
             <Btn onClick={() => setStep("posting")} disabled={!nickname.trim()} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
-              완료 → Submit Answer
+              완료 → Confirm Nickname
             </Btn>
             <button onClick={() => { setNickname(user.name); setStep("posting"); }}
               style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "10px" }}>
@@ -4055,7 +4156,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
           </div>
         )}
 
-        {/* ── STEP: POSTING ── */}
+        {/* ── POSTING ── */}
         {step === "posting" && (
           <div style={{ textAlign: "center", padding: "40px 20px" }}>
             {posting ? (
@@ -4066,20 +4167,23 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             ) : (
               <div>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🌊</div>
-                <div style={{ fontSize: "20px", fontWeight: "800", marginBottom: "8px" }}>준비 완료!</div>
+                <div style={{ fontSize: "20px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "8px" }}>준비 완료!</div>
                 <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "24px", lineHeight: 1.6 }}>
-                  {nickname || user.name}으로 {cityGroup.emoji} {cityGroup.name}에 올릴게요.
+                  <strong>{nickname || user.name}</strong>으로<br />{cityGroup.emoji} {cityGroup.name}에 올릴게요.
                 </div>
-                <Btn onClick={handleSubmit} style={{ padding: "14px 32px", fontSize: "15px" }}>
-                  🌍 커뮤니티에 공유하기
+                <Btn onClick={handleSubmit} style={{ padding: "14px 32px", fontSize: "15px", marginBottom: "10px" }}>
+                  🌍 공유하기
                 </Btn>
-                <div style={{ marginTop: "12px" }}>
-                  <button onClick={() => setStep("practice")} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT }}>← 다시 녹음하기</button>
+                <div>
+                  <button onClick={() => setStep("practice")} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT }}>
+                    ← 다시 녹음하기
+                  </button>
                 </div>
               </div>
             )}
           </div>
         )}
+
       </div>
     </div>
   );
