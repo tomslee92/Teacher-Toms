@@ -4600,67 +4600,67 @@ function WayveLogo({ size = 22, color = "#1A1A1A" }) {
 
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
-  const [phase, setPhase] = useState("hidden"); // hidden | logo | line | sub | done
+  const [phase, setPhase] = useState("hidden");
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase("logo"), 100);
-    const t2 = setTimeout(() => setPhase("line"), 600);
-    const t3 = setTimeout(() => setPhase("sub"), 1000);
-    const t4 = setTimeout(() => setPhase("done"), 1800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+    const t1 = setTimeout(() => setPhase("logo"), 200);
+    const t2 = setTimeout(() => setPhase("line"), 1000);
+    const t3 = setTimeout(() => setPhase("sub"), 1600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, position: "relative", overflow: "hidden" }}>
       <style>{`
-        @keyframes rippleOut {
-          0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0.12; }
-          100% { transform: translate(-50%,-50%) scale(4); opacity: 0; }
+        @keyframes introLogoRise {
+          0%   { opacity: 0; transform: translateY(20px); }
+          100% { opacity: 1; transform: translateY(0px); }
         }
-        @keyframes lineGrow { from{width:0} to{width:44px} }
-        @keyframes subFade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes logoRise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes introLineGrow {
+          0%   { width: 0px; }
+          100% { width: 48px; }
+        }
+        @keyframes introSubFade {
+          0%   { opacity: 0; transform: translateY(6px); }
+          100% { opacity: 1; transform: translateY(0px); }
+        }
       `}</style>
 
-      {/* Ripple rings */}
-      {phase !== "hidden" && [0,1,2].map(i => (
-        <div key={i} style={{
-          position: "absolute", top: "50%", left: "50%",
-          width: "80px", height: "80px", borderRadius: "50%",
-          border: "1.5px solid rgba(26,26,26,0.06)",
-          animation: `rippleOut ${1.4 + i * 0.3}s ease-out ${i * 0.18}s forwards`,
-          pointerEvents: "none",
-        }} />
-      ))}
-
-      {/* Logo */}
+      {/* Logo wordmark */}
       <div style={{
-        opacity: phase === "hidden" ? 0 : 1,
-        transform: phase === "hidden" ? "translateY(14px)" : "translateY(0)",
-        transition: "opacity 0.7s cubic-bezier(0.34,1.2,0.64,1), transform 0.7s cubic-bezier(0.34,1.2,0.64,1)",
-        display: "flex", flexDirection: "column", alignItems: "center", gap: "0",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        animation: phase !== "hidden" ? "introLogoRise 1.0s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+        opacity: phase === "hidden" ? 0 : undefined,
       }}>
-        <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", fontSize: "32px", fontWeight: "800", letterSpacing: "10px", color: C.text, lineHeight: 1, WebkitFontSmoothing: "antialiased" }}>
+        <div style={{
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontSize: "34px", fontWeight: "800", letterSpacing: "10px",
+          color: "#1A1A1A", lineHeight: 1,
+          WebkitFontSmoothing: "antialiased",
+        }}>
           WAYVE
         </div>
 
-        {/* Animated underline */}
-        <div style={{
-          height: "1.5px", background: C.text, marginTop: "12px", borderRadius: "1px",
-          width: phase === "hidden" || phase === "logo" ? "0" : "44px",
-          transition: "width 0.5s ease",
-        }} />
+        {/* Underline — draws in after logo */}
+        {(phase === "line" || phase === "sub") && (
+          <div style={{
+            height: "1.5px", background: "#1A1A1A",
+            marginTop: "14px", borderRadius: "1px",
+            animation: "introLineGrow 0.7s cubic-bezier(0.22,1,0.36,1) forwards",
+          }} />
+        )}
 
-        {/* Tagline */}
-        <div style={{
-          fontSize: "10px", color: C.textLight, letterSpacing: "3px",
-          textTransform: "uppercase", marginTop: "10px", fontFamily: FONT,
-          opacity: phase === "sub" || phase === "done" ? 1 : 0,
-          transform: phase === "sub" || phase === "done" ? "translateY(0)" : "translateY(4px)",
-          transition: "opacity 0.5s ease, transform 0.5s ease",
-        }}>
-          English · Made for Korea
-        </div>
+        {/* Tagline — last to appear */}
+        {phase === "sub" && (
+          <div style={{
+            fontSize: "10px", color: "#999999",
+            letterSpacing: "3.5px", textTransform: "uppercase",
+            marginTop: "12px", fontFamily: FONT,
+            animation: "introSubFade 0.8s ease forwards",
+          }}>
+            English · Made for Korea
+          </div>
+        )}
       </div>
     </div>
   );
