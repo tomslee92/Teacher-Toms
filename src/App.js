@@ -638,7 +638,8 @@ export default function App() {
     setUser(null); setScreen("login");
   };
 
-  if (screen === "loading") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" } }, React.createElement(Spinner)));
+  if (screen === "loading") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(LoadingScreen));
+  if (screen === "qod_entry") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(QodEntryScreen, { user, group: groups.find(g => g.id === user?.group_id) || user?.groups, onEnter: () => setScreen("student") }));
   if (screen === "login") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(LoginScreen, { onLogin: handleLogin, onTeacher: p => { if (p === TEACHER_PASS) { setScreen("teacher"); return null; } return "Wrong password"; } }));
   if (screen === "teacher") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(TeacherScreen, { groups, setGroups, setScreen, onPreview: g => { setPreview(g); setScreen("preview"); } }));
   if (screen === "preview") return React.createElement(React.Fragment, null, React.createElement(GlobalStyle), React.createElement(StudentScreen, { user: { id: "preview", name: "Preview Mode", group_id: preview?.id, streak: 3, longest_streak: 7 }, group: preview, isPreview: true, onBack: () => setScreen("teacher") }));
@@ -4765,12 +4766,7 @@ function WayveLogo({ size = 72, color = "#1A1A1A" }) {
   },
     React.createElement("path", {
       fill: color,
-      d: "M4 8 L16 40 L28 16 L40 40 L52 8" + // W
-         " M68 8 L86 40 L104 8" + // A
-         " M116 8 L134 28 L152 8" + // Y
-         " M168 8 L186 40 L204 8" + // V
-         " M216 8 L252 8 M216 26 L248 26 M216 44 L252 44", // E
-      strokeWidth: "6", stroke: color, fill: "none",
+      d: "M4 8 L16 40 L28 16 L40 40 L52 8 M68 8 L86 40 L104 8 M116 8 L134 28 L152 8 M168 8 L186 40 L204 8 M216 8 L252 8 M216 26 L248 26 M216 44 L252 44",
       strokeLinecap: "round", strokeLinejoin: "round"
     })
   );
