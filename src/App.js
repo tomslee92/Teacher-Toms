@@ -464,6 +464,7 @@ function MiniPractice({ phrase, user, isPreview, showListen = true }) {
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const [started, setStarted] = useState(false);
 
   const handleStop = async (blob) => {
     if (isPreview) return;
@@ -473,30 +474,47 @@ function MiniPractice({ phrase, user, isPreview, showListen = true }) {
       setTranscription(said);
       const { text, score } = await getPhraseFeedback(said, phrase);
       setFeedback({ text, score });
-    } catch(e) { setErrMsg("Feedback error: " + e.message); }
+    } catch(e) { setErrMsg("피드백 오류: " + e.message); }
     setLoading(false);
   };
 
   const rec = useRecorder(handleStop);
 
+  if (!started) {
+    return (
+      <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}`, textAlign: "center" }}>
+        <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+          {showListen && <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 듣기</Btn>}
+          <Btn onClick={() => { setStarted(true); setTimeout(() => rec.start(), 200); }} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 연습</Btn>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "12px" }}>
         {showListen && <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 듣기</Btn>}
-        {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 연습</Btn>}
+        {!rec.isRec && !loading && !feedback && <Btn onClick={rec.start} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 다시 시도</Btn>}
         {rec.isRec && <Btn onClick={rec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error, fontSize: "12px", padding: "6px 14px" }}>⏹ 멈추기 ({rec.time}초)</Btn>}
         {loading && React.createElement(Spinner)}
       </div>
+      {!rec.isRec && !loading && !feedback && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", color: C.textLight, fontSize: "13px" }}>
+          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.error, animation: "spin 1s linear infinite" }} />
+          <span>마이크 연결 중…</span>
+        </div>
+      )}
       {errMsg && <div style={{ color: C.error, fontSize: "12px", textAlign: "center" }}>{errMsg}</div>}
       {feedback && (
         <div className="fade-in">
           {transcription && <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "10px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>🎙 {highlightMissed(phrase.english, transcription)}</div>}
           <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8
-            ? <div style={{ marginTop: "8px", padding: "8px 10px", background: C.successBg, borderRadius: "6px", fontSize: "12px", color: C.success, fontWeight: "500" }}>🎉 Great job!</div>
+            ? <div style={{ marginTop: "8px", padding: "8px 10px", background: C.successBg, borderRadius: "6px", fontSize: "12px", color: C.success, fontWeight: "500" }}>🎉 잘했어요!</div>
             : <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
-                <div style={{ fontSize: "12px", color: C.retry }}>Keep practicing! 💪</div>
-                <Btn onClick={() => { rec.reset(); setFeedback(null); setTranscription(null); }} variant="secondary" style={{ fontSize: "11px", padding: "4px 10px" }}>Try Again</Btn>
+                <div style={{ fontSize: "12px", color: C.retry }}>계속 연습해요! 💪</div>
+                <Btn onClick={() => { rec.reset(); setFeedback(null); setTranscription(null); rec.start(); }} variant="secondary" style={{ fontSize: "11px", padding: "4px 10px" }}>🔄 다시</Btn>
               </div>
           }
         </div>
@@ -578,11 +596,45 @@ function LoginScreen({ onLogin, onTeacher }) {
   );
 }
 
+// ── Confetti ──────────────────────────────────────────────────────────────────
+function Confetti() {
+  const colors = ["#B8973A", "#1A7A45", "#C0392B", "#3498DB", "#9B59B6"];
+  const pieces = Array.from({ length: 32 }, (_, i) => ({
+    id: i, color: colors[i % colors.length],
+    left: Math.random() * 100, delay: Math.random() * 0.6,
+    size: 6 + Math.random() * 6,
+  }));
+  return React.createElement(React.Fragment, null,
+    React.createElement("style", null, `
+      @keyframes confettiFall {
+        0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+      }
+    `),
+    ...pieces.map(p => React.createElement("div", {
+      key: p.id,
+      style: {
+        position: "fixed", top: 0, left: `${p.left}%`, width: `${p.size}px`, height: `${p.size}px`,
+        background: p.color, borderRadius: p.id % 3 === 0 ? "50%" : "2px",
+        animation: `confettiFall 1.8s ease-in ${p.delay}s forwards`,
+        zIndex: 999, pointerEvents: "none",
+      }
+    }))
+  );
+}
+
 // ── Student Screen ────────────────────────────────────────────────────────────
 function StudentScreen({ user, group, isPreview, onBack }) {
   const [tab, setTab] = useState("practice");
   const [streak, setStreak] = useState(user.streak || 0);
   const [longest, setLongest] = useState(user.longest_streak || 0);
+  const [showStreakBanner, setShowStreakBanner] = useState(false);
+
+  useEffect(() => {
+    if (isPreview) return;
+    const today = new Date().toISOString().split("T")[0];
+    if (user.last_practice !== today) setShowStreakBanner(true);
+  }, [isPreview, user]);
 
   const updateStreak = useCallback(async () => {
     if (isPreview) return;
@@ -592,6 +644,7 @@ function StudentScreen({ user, group, isPreview, onBack }) {
     const ns = user.last_practice === yesterday ? streak + 1 : 1;
     const nl = Math.max(ns, longest);
     setStreak(ns); setLongest(nl); user.last_practice = today;
+    setShowStreakBanner(false);
     await db.update("students", `id=eq.${user.id}`, { streak: ns, longest_streak: nl, last_practice: today });
   }, [isPreview, streak, longest, user]);
 
@@ -634,6 +687,15 @@ function StudentScreen({ user, group, isPreview, onBack }) {
         </div>
       </div>
       <div style={{ maxWidth: "700px", margin: "0 auto", padding: "20px 16px" }}>
+        {showStreakBanner && !isPreview && (
+          <div style={{ background: "linear-gradient(135deg, #E07B39, #B8973A)", borderRadius: "10px", padding: "14px 18px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" }}>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "2px" }}>오늘 아직 연습 안 했어요! 🔥</div>
+              <div style={{ fontSize: "12px", opacity: 0.9 }}>연속 {streak}일 streak을 지키세요!</div>
+            </div>
+            <button onClick={() => setShowStreakBanner(false)} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontSize: "12px", fontFamily: FONT }}>닫기</button>
+          </div>
+        )}
         {tab === "practice" && React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak })}
         {tab === "freetalk" && React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak })}
         {tab === "myphrases" && React.createElement(MyPhrasesTab, { user, isPreview })}
@@ -649,6 +711,11 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
   const [randomPhrase, setRandomPhrase] = useState(null);
+  const [phraseOfDay, setPhraseOfDay] = useState(null);
+  const [showPOD, setShowPOD] = useState(true);
+  const [myPhrases, setMyPhrases] = useState([]);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [sessionResets, setSessionResets] = useState({}); // tracks local resets per session
 
   const loadData = useCallback(async () => {
     if (!group?.id) { setLoading(false); return; }
@@ -661,10 +728,23 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
       const nums = Object.keys(bySession).map(Number).sort((a, b) => b - a);
       if (nums.length > 0) setActiveSession(nums[0]);
       if (!isPreview) {
-        const prog = await db.get("student_progress", `student_id=eq.${user.id}`);
+        const [prog, myP] = await Promise.all([
+          db.get("student_progress", `student_id=eq.${user.id}`),
+          db.get("student_phrases", `student_id=eq.${user.id}&hidden=eq.false&select=id,english,korean,context`),
+        ]);
         const map = {};
         prog.forEach(p => { map[p.phrase_id] = p; });
         setProgress(map);
+        setMyPhrases(myP);
+        // Phrase of day: prefer unpassed from current session
+        const allPractice = Object.values(bySession).flat();
+        const unpassed = allPractice.filter(p => !map[p.id]?.passed);
+        const pool = unpassed.length > 0 ? unpassed : allPractice;
+        if (pool.length > 0) {
+          // Use date as seed so phrase is consistent all day
+          const dayIndex = Math.floor(Date.now() / 86400000) % pool.length;
+          setPhraseOfDay(pool[dayIndex]);
+        }
       }
     } catch(e) {}
     setLoading(false);
@@ -672,13 +752,25 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const allPhrases = Object.values(sessions).flat();
+  // Combined pool for random: practice phrases + student's own phrases
+  const allPracticePhrases = Object.values(sessions).flat();
+  const allPhrasesForRandom = [...allPracticePhrases, ...myPhrases.filter(mp => !allPracticePhrases.find(p => p.id === mp.id))];
 
   const pickRandom = () => {
-    if (!allPhrases.length) return;
-    const unpassed = allPhrases.filter(p => !progress[p.id]?.passed);
-    const pool = unpassed.length > 0 ? unpassed : allPhrases;
+    if (!allPhrasesForRandom.length) return;
+    const unpassed = allPhrasesForRandom.filter(p => !progress[p.id]?.passed);
+    const pool = unpassed.length > 0 ? unpassed : allPhrasesForRandom;
     setRandomPhrase(pool[Math.floor(Math.random() * pool.length)]);
+  };
+
+  const handleProgressUpdate = (phraseId, prog) => {
+    const wasFirstPass = !progress[phraseId]?.passed && prog.passed;
+    setProgress(prev => ({ ...prev, [phraseId]: prog }));
+    if (wasFirstPass) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2000); }
+  };
+
+  const resetSession = (sessionNum) => {
+    setSessionResets(prev => ({ ...prev, [sessionNum]: Date.now() }));
   };
 
   if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "60px" } }, React.createElement(Spinner));
@@ -692,43 +784,89 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   );
 
   const currentPhrases = sessions[activeSession] || [];
+  const sessionKey = sessionResets[activeSession] || 0;
   const retry = currentPhrases.filter(p => progress[p.id]?.needs_retry && !progress[p.id]?.passed);
   const others = currentPhrases.filter(p => !progress[p.id]?.needs_retry || progress[p.id]?.passed);
   const ordered = [...retry, ...others];
 
+  // Session progress counts
+  const getSessionProgress = (n) => {
+    const phrases = sessions[n] || [];
+    const passed = phrases.filter(p => progress[p.id]?.passed).length;
+    return { passed, total: phrases.length };
+  };
+
   return (
     <div>
-      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", marginBottom: "16px" }}>
+      {showConfetti && React.createElement(Confetti)}
+
+      {/* Phrase of the Day */}
+      {phraseOfDay && showPOD && !isPreview && (
+        <div style={{ background: `linear-gradient(135deg, ${C.goldBg}, #FFF8E7)`, border: `1px solid ${C.gold}`, borderRadius: "10px", padding: "16px 18px", marginBottom: "16px", position: "relative" }}>
+          <button onClick={() => setShowPOD(false)} style={{ position: "absolute", top: "10px", right: "12px", background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px" }}>×</button>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>⭐ 오늘의 표현</div>
+          <div style={{ fontSize: "18px", fontStyle: "italic", color: C.text, marginBottom: "4px" }}>"{phraseOfDay.english}"</div>
+          {phraseOfDay.korean && <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "10px" }}>{phraseOfDay.korean}</div>}
+          <Btn onClick={() => { setRandomPhrase(phraseOfDay); setShowPOD(false); }} variant="gold" style={{ fontSize: "12px", padding: "6px 14px" }}>🎙 지금 연습하기</Btn>
+        </div>
+      )}
+
+      {/* Random practice */}
+      <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", marginBottom: "16px" }}>
         <div>
           <div style={{ fontSize: "14px", fontWeight: "600" }}>🎲 랜덤 연습</div>
-          <div style={{ fontSize: "12px", color: C.textLight, marginTop: "2px" }}>모든 세션에서 랜덤 문장 연습하기</div>
+          <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>연습 문장 + 나의 표현 모두에서 랜덤 선택</div>
         </div>
-        <Btn onClick={pickRandom} variant="secondary" style={{ flexShrink: 0 }}>시작하기</Btn>
+        <Btn onClick={pickRandom} variant="secondary" style={{ flexShrink: 0, fontSize: "13px" }}>시작하기</Btn>
       </Card>
 
+      {/* Random phrase modal */}
       {randomPhrase && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={e => { if (e.target === e.currentTarget) setRandomPhrase(null); }}>
           <div style={{ background: C.bg, borderRadius: "12px", padding: "24px", maxWidth: "520px", width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div style={{ fontSize: "13px", fontWeight: "600", color: C.textMid }}>🎲 Random Phrase</div>
+              <div style={{ fontSize: "13px", fontWeight: "600", color: C.textMid }}>🎲 랜덤 문장</div>
               <button onClick={() => setRandomPhrase(null)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>×</button>
             </div>
             <div style={{ fontSize: "20px", fontStyle: "italic", marginBottom: "6px" }}>"{randomPhrase.english}"</div>
-            {randomPhrase.korean && <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "12px" }}>{randomPhrase.korean}</div>}
+            {randomPhrase.korean && <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "6px" }}>{randomPhrase.korean}</div>}
             {randomPhrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", marginBottom: "12px", fontSize: "13px", color: C.textMid }}>{randomPhrase.context}</div>}
-            <PhraseCard phrase={randomPhrase} user={user} prog={progress[randomPhrase.id]} isPreview={isPreview} onUpdate={p => setProgress(prev => ({ ...prev, [randomPhrase.id]: p }))} onPracticed={onPracticed} />
+            <PhraseCard phrase={randomPhrase} user={user} prog={progress[randomPhrase.id]} isPreview={isPreview} onUpdate={handleProgressUpdate} onPracticed={onPracticed} />
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }}>
-        {sessionNums.map(n =>
-          React.createElement("button", { key: n, onClick: () => setActiveSession(n), style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${activeSession === n ? C.text : C.border}`, background: activeSession === n ? C.text : C.bg, color: activeSession === n ? "#fff" : C.textMid, fontSize: "13px", fontWeight: activeSession === n ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, `Session ${n}`)
-        )}
+      {/* Session tabs with progress */}
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+        {sessionNums.map(n => {
+          const { passed, total } = getSessionProgress(n);
+          const allDone = total > 0 && passed === total;
+          return React.createElement("button", {
+            key: n, onClick: () => setActiveSession(n),
+            style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${activeSession === n ? C.text : C.border}`, background: activeSession === n ? C.text : allDone ? C.successBg : C.bg, color: activeSession === n ? "#fff" : allDone ? C.success : C.textMid, fontSize: "13px", fontWeight: activeSession === n ? "600" : "400", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "5px" }
+          },
+            `Session ${n}`,
+            total > 0 && React.createElement("span", { style: { fontSize: "10px", background: activeSession === n ? "rgba(255,255,255,0.2)" : allDone ? "rgba(26,122,69,0.15)" : C.bgMid, padding: "1px 5px", borderRadius: "10px", fontWeight: "600" } }, `${passed}/${total}`)
+          );
+        })}
       </div>
 
+      {/* Practice Again button */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "10px" }}>
+        <button onClick={() => resetSession(activeSession)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px" }}>
+          ↺ 다시 연습하기
+        </button>
+      </div>
+
+      {/* Phrase list */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {ordered.map(phrase => React.createElement(ExpandableRow, { key: phrase.id, phrase, prog: progress[phrase.id], user, isPreview, onUpdate: p => setProgress(prev => ({ ...prev, [phrase.id]: p })), onPracticed }))}
+        {ordered.map(phrase => React.createElement(ExpandableRow, {
+          key: `${phrase.id}-${sessionKey}`,
+          phrase, prog: sessionResets[activeSession] ? null : progress[phrase.id],
+          user, isPreview,
+          onUpdate: handleProgressUpdate,
+          onPracticed,
+        }))}
       </div>
     </div>
   );
@@ -745,7 +883,7 @@ function ExpandableRow({ phrase, prog, user, isPreview, onUpdate, onPracticed })
   else if (prog?.attempts > 0) { bg = C.errorBg; border = "#F0A8A5"; }
 
   return (
-    <div style={{ borderRadius: "8px", border: `1px solid ${border}`, background: bg, overflow: "hidden" }}>
+    <div style={{ borderRadius: "8px", border: `1px solid ${border}`, background: bg, overflow: "hidden", transition: "box-shadow 0.15s" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "15px", fontStyle: "italic", marginBottom: "2px" }}>"{phrase.english}"</div>
@@ -754,13 +892,13 @@ function ExpandableRow({ phrase, prog, user, isPreview, onUpdate, onPracticed })
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
           {passed && <span>✅</span>}
           {needsRetry && <span>🔄</span>}
-          {prog?.best_score > 0 && <span style={{ fontSize: "11px", color: C.textLight, background: C.bgMid, padding: "2px 7px", borderRadius: "10px" }}>{prog.best_score}/10</span>}
+          {prog?.best_score > 0 && <span style={{ fontSize: "11px", color: C.textLight, background: C.bgMid, padding: "2px 7px", borderRadius: "10px", fontWeight: "600" }}>{prog.best_score}/10</span>}
           <span style={{ color: C.textLight, fontSize: "16px", display: "inline-block", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>⌄</span>
         </div>
       </div>
       {open && (
         <div style={{ borderTop: `1px solid ${border}`, padding: "16px" }} className="fade-in">
-          <PhraseCard phrase={phrase} user={user} prog={prog} isPreview={isPreview} onUpdate={onUpdate} onPracticed={onPracticed} onClose={() => setOpen(false)} />
+          <PhraseCard phrase={phrase} user={user} prog={prog} isPreview={isPreview} onUpdate={onUpdate} onPracticed={onPracticed} onClose={() => setOpen(false)} autoStart={true} />
         </div>
       )}
     </div>
@@ -768,11 +906,12 @@ function ExpandableRow({ phrase, prog, user, isPreview, onUpdate, onPracticed })
 }
 
 // ── Phrase Card ───────────────────────────────────────────────────────────────
-function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onClose }) {
+function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onClose, autoStart = false }) {
   const [feedback, setFeedback] = useState(null);
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const autoStarted = useRef(false);
 
   const handleStop = async (blob) => {
     if (isPreview) return;
@@ -797,12 +936,14 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
 
   const rec = useRecorder(handleStop);
 
+  useEffect(() => {
+    if (autoStart && !isPreview && !autoStarted.current && !feedback) {
+      autoStarted.current = true;
+      setTimeout(() => rec.start(), 350);
+    }
+  }, []);
+
   return (
-    <div>
-      {phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
-      <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "14px" }}>
-        <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "13px", padding: "7px 14px" }}>🔊 듣기</Btn>
-      </div>
       <div style={{ textAlign: "center" }}>
         {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ padding: "12px 32px", fontSize: "15px" }}>🎙 녹음 시작</Btn>}
         {rec.isRec && (
@@ -1244,20 +1385,35 @@ function MyPhrasesTab({ user, isPreview }) {
         </div>
       ) : (
         <div>
-          <div style={{ fontSize: "12px", color: C.textLight, marginBottom: "10px" }}>{visible.length} phrase{visible.length !== 1 ? "s" : ""}{hidden.length > 0 ? ` · ${hidden.length} hidden` : ""}</div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
-            {visible.map(p => React.createElement(MyPhraseRow, { key: p.id, phrase: p, user, isPreview, onToggleHide: () => toggleHide(p.id, p.hidden), onDelete: () => deletePhrase(p.id) }))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <div style={{ fontSize: "12px", color: C.textLight }}>{visible.length}개 표현{hidden.length > 0 ? ` · 숨김 ${hidden.length}개` : ""}</div>
+            {hidden.length > 0 && (
+              <button onClick={() => setShowHidden(s => !s)} style={{ background: showHidden ? C.bgMid : C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "20px", padding: "4px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "5px" }}>
+                {showHidden ? "🙈 숨긴 표현 숨기기" : `👁 숨긴 표현 보기 (${hidden.length}개)`}
+              </button>
+            )}
           </div>
 
-          {hidden.length > 0 && (
-            <div>
-              <button onClick={() => setShowHidden(s => !s)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, marginBottom: "8px" }}>
-                {showHidden ? "▼" : "▶"} {hidden.length} hidden phrase{hidden.length !== 1 ? "s" : ""}
-              </button>
-              {showHidden && hidden.map(p => React.createElement(MyPhraseRow, { key: p.id, phrase: p, user, isPreview, onToggleHide: () => toggleHide(p.id, p.hidden), onDelete: () => deletePhrase(p.id) }))}
+          {/* Hidden phrases section - shown at TOP when toggled */}
+          {showHidden && hidden.length > 0 && (
+            <div style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>숨긴 표현</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
+                {hidden.map(p => React.createElement(MyPhraseRow, { key: p.id, phrase: p, user, isPreview, onToggleHide: () => toggleHide(p.id, p.hidden), onDelete: () => deletePhrase(p.id) }))}
+              </div>
+              <div style={{ height: "1px", background: C.border, marginBottom: "12px" }} />
             </div>
           )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {visible.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px", color: C.textLight, fontStyle: "italic", fontSize: "13px" }}>
+                표시할 표현이 없어요. 위에서 숨긴 표현을 확인해 보세요.
+              </div>
+            ) : (
+              visible.map(p => React.createElement(MyPhraseRow, { key: p.id, phrase: p, user, isPreview, onToggleHide: () => toggleHide(p.id, p.hidden), onDelete: () => deletePhrase(p.id) }))
+            )}
+          </div>
         </div>
       )}
     </div>
