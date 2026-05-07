@@ -930,7 +930,7 @@ function Confetti() { return React.createElement(ConfettiEffect); }
 
 // ── Student Screen ────────────────────────────────────────────────────────────
 function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', setFontSize = () => {} }) {
-  const [tab, setTab] = useState("community");
+  const [tab, setTab] = useState(null); // null = home grid
   const [streak, setStreak] = useState(user.streak || 0);
   const [longest, setLongest] = useState(user.longest_streak || 0);
   const [showStreakBanner, setShowStreakBanner] = useState(false);
@@ -967,7 +967,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
   }, [isPreview, user.id]);
 
   // active tab state: null = home grid
-  const activeFeature = tab === "community" || tab === "practice" || tab === "freetalk" || tab === "myphrases" ? tab : null;
+  const activeFeature = ["community", "practice", "freetalk", "myphrases"].includes(tab) ? tab : null;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, paddingBottom: "72px" }}>
@@ -987,19 +987,22 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
         </div>
       )}
 
-      {/* Top header — always visible */}
-      <div style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
+      {/* Top header — clean and minimal */}
+      <div style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {tab !== "community" && activeFeature && (
-            <button onClick={() => setTab("community")} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "20px", padding: "0", lineHeight: 1, color: C.text }}>←</button>
+          {activeFeature && (
+            <button onClick={() => setTab(null)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "20px", padding: "0 4px 0 0", lineHeight: 1, color: C.text }}>←</button>
           )}
           {WayveLogo({ size: 10, color: C.text })}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ fontSize: "18px", fontWeight: "800", color: streak > 0 ? C.retry : C.textLight, display: "inline-block", animation: streak > 0 ? "streakFire 2.5s ease-in-out infinite" : "none" }}>🔥{streak}</div>
-            {longest > 0 && <div style={{ fontSize: "15px", fontWeight: "700", color: C.gold }}>🏅{longest}</div>}
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* Compact streak pill in header */}
+          {streak > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", background: C.bgSoft, borderRadius: "100px", padding: "4px 10px", border: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "14px", animation: "streakFire 2.5s ease-in-out infinite", display: "inline-block" }}>🔥</span>
+              <span style={{ fontSize: "12px", fontWeight: "800", color: C.text }}>{streak}</span>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {/* Font size toggle */}
             <div style={{ display: "flex", background: C.bgSoft, borderRadius: "100px", padding: "3px", border: `1px solid ${C.border}` }}>
@@ -1027,12 +1030,12 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
       {/* Content area */}
       <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px 16px" }}>
 
-        {/* HOME SCREEN — 2×2 card grid */}
+        {/* HOME SCREEN */}
         {!activeFeature && (
           <div className="feature-screen">
             <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>안녕하세요, {user.name}! 👋</div>
-              <div style={{ fontSize: "12px", color: C.textLight, marginTop: "2px" }}>{group?.name || ""}</div>
+              <div style={{ fontSize: "20px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px" }}>안녕하세요, {user.name}! 👋</div>
+              <div style={{ fontSize: "12px", color: C.textLight, marginTop: "3px" }}>What would you like to do today?</div>
             </div>
             {React.createElement(HomeGrid, { user, group, isPreview, onNavigate: setTab, streak })}
           </div>
@@ -5006,121 +5009,98 @@ function QodEntryScreen({ user, group, onEnter }) {
 
 // ── Home Grid ─────────────────────────────────────────────────────────────────
 function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
-  const [stats, setStats] = useState({ communityVoices: 0, practiceRetry: 0, myPhrases: 0, cityName: "", cityEmoji: "" });
+  const [stats, setStats] = useState({ communityVoices: 0, practiceRetry: 0, myPhrases: 0 });
   const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     if (isPreview) return;
     const load = async () => {
       try {
-        // Community — today's response count
         const todayPrompt = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
         let voices = 0;
-        let cityName = ""; let cityEmoji = "🌍";
         if (todayPrompt[0] && group?.id) {
           const cm = await db.get("city_group_members", `group_id=eq.${group.id}&select=*,city_groups(*)`).catch(() => []);
           const city = cm[0]?.city_groups;
           if (city) {
-            cityName = city.name; cityEmoji = city.emoji || "🌍";
             const resp = await db.get("qod_responses", `prompt_id=eq.${todayPrompt[0].id}&city_group_id=eq.${city.id}`).catch(() => []);
             voices = resp.length;
           }
         }
-        // Practice — phrases needing retry
         const prog = await db.get("student_progress", `student_id=eq.${user.id}&needs_retry=eq.true&passed=eq.false`).catch(() => []);
-        // My phrases count
         const phrases = await db.get("student_phrases", `student_id=eq.${user.id}&hidden=eq.false&select=id`).catch(() => []);
-        setStats({ communityVoices: voices, practiceRetry: prog.length, myPhrases: phrases.length, cityName, cityEmoji });
+        setStats({ communityVoices: voices, practiceRetry: prog.length, myPhrases: phrases.length });
       } catch(e) {}
     };
     load();
   }, []);
 
-  const cards = [
-    {
-      id: "community",
-      icon: stats.cityEmoji || "🌍",
-      title: "Community",
-      subtitle: stats.communityVoices > 0
-        ? `${stats.communityVoices} ${stats.communityVoices === 1 ? "voice" : "voices"} today`
-        : "Be the first to answer",
-      stat: stats.communityVoices > 0 ? `${stats.communityVoices}` : null,
-      statLabel: "voices",
-      accent: C.text,
-      bg: C.bgSoft,
-    },
-    {
-      id: "practice",
-      icon: "🎙",
-      title: "Practice",
-      subtitle: stats.practiceRetry > 0
-        ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry`
-        : "All caught up ✓",
-      stat: stats.practiceRetry > 0 ? `${stats.practiceRetry}` : "✓",
-      statLabel: stats.practiceRetry > 0 ? "to retry" : "done",
-      accent: stats.practiceRetry > 0 ? C.retry : C.success,
-      bg: stats.practiceRetry > 0 ? C.retryBg : C.successBg,
-    },
-    {
-      id: "freetalk",
-      icon: "💬",
-      title: "Free Talk",
-      subtitle: "Speak freely in English",
-      stat: null,
-      statLabel: null,
-      accent: C.text,
-      bg: C.bgSoft,
-    },
-    {
-      id: "myphrases",
-      icon: "⭐",
-      title: "My Phrases",
-      subtitle: stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here",
-      stat: stats.myPhrases > 0 ? `${stats.myPhrases}` : null,
-      statLabel: "saved",
-      accent: C.gold,
-      bg: C.goldBg,
-    },
-  ];
-
   return (
     <div>
       <style>{`
         @keyframes cardReveal { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        .primary-card:active { transform: scale(0.97); }
+        .secondary-card:active { transform: scale(0.97); }
       `}</style>
-      {/* Streak banner */}
-      {streak > 0 && (
-        <div style={{ background: C.bgDark, borderRadius: "14px", padding: "14px 18px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "#fff", animation: "cardReveal 0.3s ease both" }}>
+
+      {/* Primary cards — Practice + Free Talk */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "14px" }}>
+
+        {/* Practice — big primary card */}
+        <button onClick={() => onNavigate("practice")}
+          className="primary-card"
+          style={{ width: "100%", background: C.bgDark, borderRadius: "20px", padding: "28px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
-            <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "2px" }}>🔥 {streak}일 연속 중이에요!</div>
-            <div style={{ fontSize: "11px", opacity: 0.6 }}>Keep the streak going</div>
-          </div>
-          <div style={{ fontSize: "28px", animation: "streakFire 2.5s ease-in-out infinite" }}>🔥</div>
-        </div>
-      )}
-      {/* 2×2 grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        {cards.map((card, i) => (
-          <button key={card.id} onClick={() => onNavigate(card.id)}
-            className="home-card"
-            style={{ background: card.bg, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 18px", textAlign: "left", cursor: "pointer", fontFamily: FONT, animation: `cardReveal 0.3s ease ${i * 0.06}s both`, display: "flex", flexDirection: "column", gap: "8px", minHeight: "130px" }}>
-            <div style={{ fontSize: "28px", lineHeight: 1 }}>{card.icon}</div>
-            <div>
-              <div style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px", marginBottom: "3px" }}>{card.title}</div>
-              <div style={{ fontSize: "12px", color: C.textMid, lineHeight: 1.4 }}>{card.subtitle}</div>
+            <div style={{ fontSize: "13px", fontWeight: "600", color: "rgba(255,255,255,0.5)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>Daily Practice</div>
+            <div style={{ fontSize: "26px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px", marginBottom: "6px" }}>🎙 Practice</div>
+            <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>
+              {stats.practiceRetry > 0
+                ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry`
+                : "All caught up ✓"}
             </div>
-            {card.stat && (
-              <div style={{ marginTop: "auto", display: "flex", alignItems: "baseline", gap: "3px" }}>
-                <span style={{ fontSize: "22px", fontWeight: "900", color: card.accent, letterSpacing: "-1px" }}>{card.stat}</span>
-                <span style={{ fontSize: "10px", color: card.accent, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>{card.statLabel}</span>
-              </div>
-            )}
-          </button>
-        ))}
+          </div>
+          <div style={{ fontSize: "40px", opacity: 0.15 }}>→</div>
+        </button>
+
+        {/* Free Talk — big primary card */}
+        <button onClick={() => onNavigate("freetalk")}
+          className="primary-card"
+          style={{ width: "100%", background: C.bgSoft, borderRadius: "20px", padding: "28px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>Open Conversation</div>
+            <div style={{ fontSize: "26px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px", marginBottom: "6px" }}>💬 Free Talk</div>
+            <div style={{ fontSize: "13px", color: C.textMid, lineHeight: 1.4 }}>Speak freely in English</div>
+          </div>
+          <div style={{ fontSize: "40px", opacity: 0.1 }}>→</div>
+        </button>
+      </div>
+
+      {/* Secondary row — Community + My Phrases */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+
+        <button onClick={() => onNavigate("community")}
+          className="secondary-card"
+          style={{ background: C.bg, borderRadius: "16px", padding: "16px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.12s both", transition: "transform 0.15s" }}>
+          <div style={{ fontSize: "22px", marginBottom: "6px" }}>🌍</div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "3px" }}>Community</div>
+          <div style={{ fontSize: "11px", color: C.textLight }}>
+            {stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}
+          </div>
+        </button>
+
+        <button onClick={() => onNavigate("myphrases")}
+          className="secondary-card"
+          style={{ background: C.bg, borderRadius: "16px", padding: "16px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.18s both", transition: "transform 0.15s" }}>
+          <div style={{ fontSize: "22px", marginBottom: "6px" }}>⭐</div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "3px" }}>My Phrases</div>
+          <div style={{ fontSize: "11px", color: C.textLight }}>
+            {stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}
+          </div>
+        </button>
       </div>
     </div>
   );
 }
+
 
 // ── Teacher Voice/Text Comments on QoD Responses ──────────────────────────────
 // Supabase table: qod_comments (id, response_id, teacher_text, audio_url, created_at)
