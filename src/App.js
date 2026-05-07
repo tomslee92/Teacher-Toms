@@ -990,7 +990,7 @@ function StudentScreen({ user, group, isPreview, onBack }) {
           {tab !== "community" && activeFeature && (
             <button onClick={() => setTab("community")} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "20px", padding: "0", lineHeight: 1, color: C.text }}>←</button>
           )}
-          {WayveLogo()}
+          {WayveLogo({ size: 10, color: C.text })}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -4757,26 +4757,28 @@ function QodResponsesTab({ students, showMsg }) {
   );
 }
 
-// ── WAYVE Logo SVG ────────────────────────────────────────────────────────────
-function WayveLogo({ size = 72, color = "#1A1A1A" }) {
-  // Faithful SVG recreation of the WAYVE rounded geometric wordmark
-  return React.createElement("svg", {
-    viewBox: "0 0 280 52", width: size * (280/52), height: size,
-    xmlns: "http://www.w3.org/2000/svg", style: { display: "block" }
-  },
-    React.createElement("path", {
-      fill: color,
-      d: "M4 8 L16 40 L28 16 L40 40 L52 8 M68 8 L86 40 L104 8 M116 8 L134 28 L152 8 M168 8 L186 40 L204 8 M216 8 L252 8 M216 26 L248 26 M216 44 L252 44",
-      strokeLinecap: "round", strokeLinejoin: "round"
-    })
-  );
+// ── WAYVE Logo ────────────────────────────────────────────────────────────────
+function WayveLogo({ size = 22, color = "#1A1A1A" }) {
+  const fontSize = size * 2.2;
+  return React.createElement("div", {
+    style: {
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontSize: `${fontSize}px`,
+      fontWeight: "800",
+      letterSpacing: `${fontSize * 0.18}px`,
+      color: color,
+      lineHeight: 1,
+      textTransform: "uppercase",
+      userSelect: "none",
+      WebkitFontSmoothing: "antialiased",
+    }
+  }, "WAYVE");
 }
-
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "20px" }}>
-      {WayveLogo({ size: 28, color: C.text })}
+      {WayveLogo({ size: 14, color: C.text })}
       <Spinner />
     </div>
   );
@@ -4866,7 +4868,7 @@ function QodEntryScreen({ user, group, onEnter }) {
 
         {/* Logo */}
         <div style={{ marginBottom: "48px", animation: "qodEntryFade 0.5s ease both" }}>
-          {WayveLogo({ size: 22, color: C.text })}
+          {WayveLogo({ size: 18, color: C.text })}
         </div>
 
         {/* Date pill */}
