@@ -118,16 +118,15 @@ function highlightMissed(target, spoken) {
 const ELEVEN_KEY = process.env.REACT_APP_ELEVEN_KEY;
 const ELEVEN_VOICE_ID = "G5a1Ud6ZWQkWenDnvdV9";
 let currentAudio = null;
+let globalPlaybackSpeed = 1.0;
 
-async function speak(text) {
+async function speak(text, speed = null) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  const playSpeed = speed !== null ? speed : globalPlaybackSpeed;
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "xi-api-key": ELEVEN_KEY,
-      },
+      headers: { "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY },
       body: JSON.stringify({
         text,
         model_id: "eleven_turbo_v2_5",
@@ -138,11 +137,11 @@ async function speak(text) {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.playbackRate = playSpeed;
     currentAudio = audio;
     audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
     await audio.play();
   } catch(e) {
-    // Fallback to Groq TTS if ElevenLabs fails
     console.warn("ElevenLabs TTS failed, falling back to Groq:", e.message);
     try {
       const res = await fetch("https://api.groq.com/openai/v1/audio/speech", {
@@ -154,12 +153,12 @@ async function speak(text) {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = playSpeed;
       currentAudio = audio;
       audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
       await audio.play();
     } catch(e2) {
-      // Final fallback to Web Speech
-      try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.85; window.speechSynthesis.speak(u); } catch(e3) {}
+      try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.85 * playSpeed; window.speechSynthesis.speak(u); } catch(e3) {}
     }
   }
 }
@@ -728,6 +727,10 @@ function StudentScreen({ user, group, isPreview, onBack }) {
     const update = () => db.update("students", `id=eq.${user.id}`, { last_seen: new Date().toISOString() }).catch(() => {});
     update();
     const interval = setInterval(update, 30000);
+    // Request notification permission for push alerts
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
     return () => clearInterval(interval);
   }, [isPreview, user.id]);
 
@@ -862,6 +865,8 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   };
 
   const resetSession = (sessionNum) => {
+    // Mark session as reset locally - clears visual color state
+    // Does NOT touch Supabase - real progress persists and shows on next login
     setSessionResets(prev => ({ ...prev, [sessionNum]: Date.now() }));
   };
 
@@ -1129,8 +1134,15 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
   return (
     <div>
       {!hideContext && phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
-      <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "14px" }}>
+      <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "14px", flexWrap: "wrap" }}>
         <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "13px", padding: "7px 14px" }}>🔊 듣기</Btn>
+        {[1.0, 0.75, 0.5].map(s => (
+          React.createElement("button", {
+            key: s,
+            onClick: () => { globalPlaybackSpeed = s; speak(phrase.english, s); },
+            style: { padding: "5px 10px", borderRadius: "14px", border: `1px solid ${globalPlaybackSpeed === s ? C.text : C.border}`, background: globalPlaybackSpeed === s ? C.text : C.bg, color: globalPlaybackSpeed === s ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }
+          }, s + "x")
+        ))}
       </div>
       <div style={{ textAlign: "center" }}>
         {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ padding: "12px 32px", fontSize: "15px" }}>🎙 녹음 시작</Btn>}
@@ -1811,7 +1823,23 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
           const isFromOther = isTeacher ? !m.is_teacher : (m.is_teacher || m.sender !== user.name);
           return isFromOther && m.created_at > lastReadRef.current;
         }).length;
-        setUnread(prev => Math.max(prev, newUnread));
+        if (newUnread > 0) {
+          setUnread(prev => Math.max(prev, newUnread));
+          // Browser notification when app is in background
+          if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+            const latestNew = msgs.filter(m => {
+              const isFromOther = isTeacher ? !m.is_teacher : (m.is_teacher || m.sender !== user.name);
+              return isFromOther && m.created_at > lastReadRef.current;
+            }).slice(-1)[0];
+            if (latestNew) {
+              new Notification("Wayve 💬 새 메시지", {
+                body: `${latestNew.sender}: ${latestNew.content.slice(0, 80)}`,
+                icon: "/logo192.png",
+                tag: "wayve-chat",
+              });
+            }
+          }
+        }
       }
       if (open) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch(e) {}
@@ -1912,23 +1940,45 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
         )}
       </button>
 
-      {/* Chat drawer */}
+      {/* Chat drawer - full screen on mobile, popup on desktop */}
       {open && (
-        <div style={{ position: "fixed", bottom: "86px", right: "16px", width: "min(380px, calc(100vw - 32px))", height: "min(520px, calc(100vh - 120px))", background: C.bg, borderRadius: "16px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", zIndex: 99, display: "flex", flexDirection: "column", overflow: "hidden", border: `1px solid ${C.border}` }}>
+        <div style={{
+          position: "fixed",
+          // Mobile: full screen. Desktop: popup near bubble
+          bottom: window.innerWidth < 600 ? 0 : "86px",
+          right: window.innerWidth < 600 ? 0 : "16px",
+          left: window.innerWidth < 600 ? 0 : "auto",
+          top: window.innerWidth < 600 ? 0 : "auto",
+          width: window.innerWidth < 600 ? "100%" : "min(380px, calc(100vw - 32px))",
+          height: window.innerWidth < 600 ? "100%" : "min(560px, calc(100vh - 110px))",
+          background: C.bg,
+          borderRadius: window.innerWidth < 600 ? 0 : "16px",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+          zIndex: 200,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          border: window.innerWidth < 600 ? "none" : `1px solid ${C.border}`
+        }}>
 
           {/* Header */}
-          <div style={{ background: C.text, padding: "14px 16px", borderRadius: "16px 16px 0 0" }}>
+          <div style={{ background: C.text, padding: "14px 16px", flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <div style={{ fontSize: "15px", fontWeight: "600", color: "#fff" }}>
+                {mode === "group" ? "👥 Class Chat" : "🔒 Private Chat"}
+              </div>
+              <button onClick={() => setOpen(false)} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
             {isTeacher && groups.length > 1 && (
-              <select value={selectedGroup?.id || ""} onChange={e => { const g = groups.find(x => x.id === e.target.value); setSelectedGroup(g); setMessages([]); }} style={{ width: "100%", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: "12px", fontFamily: FONT, outline: "none", marginBottom: "8px", borderRadius: "4px", padding: "4px 6px" }}>
+              <select value={selectedGroup?.id || ""} onChange={e => { const g = groups.find(x => x.id === e.target.value); setSelectedGroup(g); setMessages([]); }} style={{ width: "100%", background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", fontSize: "12px", fontFamily: FONT, outline: "none", marginBottom: "8px", borderRadius: "6px", padding: "6px 8px" }}>
                 {groups.map(g => React.createElement("option", { key: g.id, value: g.id, style: { color: C.text, background: C.bg } }, g.name))}
               </select>
             )}
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "6px" }}>
               {[["group", "👥 Class"], ["private", "🔒 Private"]].map(([m, label]) =>
-                React.createElement("button", { key: m, onClick: () => { setMode(m); setSelectedStudent(null); setMessages([]); }, style: { padding: "5px 12px", borderRadius: "20px", border: "none", background: mode === m ? "rgba(255,255,255,0.25)" : "transparent", color: "#fff", fontSize: "12px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
+                React.createElement("button", { key: m, onClick: () => { setMode(m); setSelectedStudent(null); setMessages([]); }, style: { padding: "6px 14px", borderRadius: "20px", border: "none", background: mode === m ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)", color: "#fff", fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
               )}
             </div>
-            {/* Online indicators */}
             {mode === "group" && onlineStudents.length > 0 && (
               <div style={{ marginTop: "6px", fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>
                 🟢 {onlineStudents.map(s => s.name).join(", ")}
@@ -1938,9 +1988,9 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
 
           {/* Student selector for private */}
           {mode === "private" && isTeacher && (
-            <div style={{ padding: "8px 12px", borderBottom: `1px solid ${C.border}` }}>
-              <select value={selectedStudent?.id || ""} onChange={e => { setSelectedStudent(groupStudents.find(s => s.id === e.target.value) || null); setMessages([]); }} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "13px", fontFamily: FONT, outline: "none", background: C.bg }}>
-                <option value="">Select student…</option>
+            <div style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <select value={selectedStudent?.id || ""} onChange={e => { setSelectedStudent(groupStudents.find(s => s.id === e.target.value) || null); setMessages([]); }} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", fontFamily: FONT, outline: "none", background: C.bg }}>
+                <option value="">학생 선택…</option>
                 {groupStudents.map(s => React.createElement("option", { key: s.id, value: s.id }, s.name + (isOnline(s.last_seen) ? " 🟢" : "")))}
               </select>
             </div>
@@ -1983,17 +2033,17 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
           </div>
 
           {/* Input */}
-          <div style={{ padding: "10px 12px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "8px", alignItems: "flex-end" }}>
+          <div style={{ padding: "10px 12px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "8px", alignItems: "flex-end", flexShrink: 0, background: C.bg }}>
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="메시지 입력… (Enter로 전송)"
+              placeholder="메시지 입력…"
               rows={1}
-              style={{ flex: 1, padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "20px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "none", maxHeight: "80px", overflowY: "auto", lineHeight: 1.4, background: C.bgSoft }}
+              style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "22px", fontSize: "15px", fontFamily: FONT, outline: "none", resize: "none", maxHeight: "100px", overflowY: "auto", lineHeight: 1.4, background: C.bgSoft, WebkitAppearance: "none" }}
             />
-            <button onClick={send} disabled={sending || !input.trim()} style={{ width: "36px", height: "36px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", cursor: input.trim() ? "pointer" : "default", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+            <button onClick={send} disabled={sending || !input.trim()} style={{ width: "42px", height: "42px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", cursor: input.trim() ? "pointer" : "default", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
               {sending ? "⋯" : "➤"}
             </button>
           </div>
