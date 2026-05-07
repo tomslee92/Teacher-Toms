@@ -425,19 +425,29 @@ function useRecorder(onDone) {
   const onDoneRef = useRef(onDone);
   useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
 
+  // Pick best supported MIME type - iOS Safari needs mp4, others support webm
+  const getMimeType = () => {
+    const types = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"];
+    for (const t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
+    return "";
+  };
+
   const start = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunksRef.current = [];
-      const mr = new MediaRecorder(stream);
+      const mimeType = getMimeType();
+      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRef.current = mr;
-      mr.ondataavailable = e => chunksRef.current.push(e.data);
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
-        const b = new Blob(chunksRef.current, { type: "audio/webm" });
+        const type = mr.mimeType || mimeType || "audio/webm";
+        const b = new Blob(chunksRef.current, { type });
         setBlob(b); stream.getTracks().forEach(t => t.stop());
         if (onDoneRef.current) onDoneRef.current(b);
       };
-      mr.start(); setIsRec(true); setTime(0); setBlob(null);
+      mr.start(100); // collect data every 100ms for better reliability
+      setIsRec(true); setTime(0); setBlob(null);
       timerRef.current = setInterval(() => setTime(t => t + 1), 1000);
     } catch(e) { alert("Microphone access needed. Please allow microphone in browser settings."); }
   };
@@ -542,16 +552,14 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
       {feedback && (
         <div className="fade-in">
           {transcription && (
-            <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "10px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-              <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
-              {recordingUrl && (
-                <audio
-                  src={recordingUrl}
-                  controls
-                  style={{ height: "26px", maxWidth: "120px", flexShrink: 0 }}
-                  title="내 목소리"
-                />
-              )}
+            <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "8px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>
+              🎙 {highlightMissed(phrase.english, transcription)}
+            </div>
+          )}
+          {recordingUrl && (
+            <div style={{ marginBottom: "8px" }}>
+              <div style={{ fontSize: "10px", color: C.textLight, marginBottom: "3px" }}>▶ 내 목소리 듣기</div>
+              <audio src={recordingUrl} controls style={{ width: "100%", height: "36px" }} />
             </div>
           )}
           <FeedbackDisplay text={feedback.text} />
@@ -1141,16 +1149,14 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
       {feedback && (
         <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: `1px solid ${C.border}` }} className="fade-in">
           {transcription && (
-            <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-              <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
-              {recordingUrl && (
-                <audio
-                  src={recordingUrl}
-                  controls
-                  style={{ height: "28px", maxWidth: "140px", flexShrink: 0 }}
-                  title="내 목소리"
-                />
-              )}
+            <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>
+              🎙 {highlightMissed(phrase.english, transcription)}
+            </div>
+          )}
+          {recordingUrl && (
+            <div style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "4px", letterSpacing: "0.5px" }}>▶ 내 목소리 듣기</div>
+              <audio src={recordingUrl} controls style={{ width: "100%", height: "40px" }} />
             </div>
           )}
           <FeedbackDisplay text={feedback.text} />
