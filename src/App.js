@@ -114,7 +114,7 @@ function highlightMissed(target, spoken) {
 }
 
 // ── TTS — ElevenLabs (Teacher Tom's cloned voice) ─────────────────────────────
-const ELEVEN_KEY = "sk_6e3747f941640c53d35b8d3f684896e08cf2be245df67183";
+const ELEVEN_KEY = process.env.REACT_APP_ELEVEN_KEY;
 const ELEVEN_VOICE_ID = "G5a1Ud6ZWQkWenDnvdV9";
 let currentAudio = null;
 
