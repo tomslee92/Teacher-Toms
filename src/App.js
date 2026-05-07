@@ -543,11 +543,20 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
               <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
               {recordingBlob && (
                 <button onClick={() => {
-                  const url = URL.createObjectURL(recordingBlob);
-                  const a = new Audio(url);
-                  a.onended = () => URL.revokeObjectURL(url);
-                  a.play();
-                }} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "2px 7px", cursor: "pointer", fontSize: "10px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}>▶ 내 목소리</button>
+                  try {
+                    const url = URL.createObjectURL(recordingBlob);
+                    const a = document.createElement("audio");
+                    a.src = url;
+                    document.body.appendChild(a);
+                    a.play().then(() => {
+                      a.onended = () => { URL.revokeObjectURL(url); document.body.removeChild(a); };
+                    }).catch(() => {
+                      a.controls = true;
+                      a.style.cssText = "position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;width:200px;";
+                      setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e) {} }, 10000);
+                    });
+                  } catch(e) {}
+                }} style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "5px", padding: "2px 7px", cursor: "pointer", fontSize: "10px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}>▶ 내 목소리</button>
               )}
             </div>
           )}
@@ -1118,13 +1127,24 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
               {recordingBlob && (
                 <button
                   onClick={() => {
-                    const url = URL.createObjectURL(recordingBlob);
-                    const a = new Audio(url);
-                    a.onended = () => URL.revokeObjectURL(url);
-                    a.play();
+                    try {
+                      const url = URL.createObjectURL(recordingBlob);
+                      const a = document.createElement("audio");
+                      a.src = url;
+                      a.controls = false;
+                      document.body.appendChild(a);
+                      a.play().then(() => {
+                        a.onended = () => { URL.revokeObjectURL(url); document.body.removeChild(a); };
+                      }).catch(e => {
+                        // Fallback: show audio element briefly
+                        a.controls = true;
+                        a.style.cssText = "position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;width:200px;";
+                        setTimeout(() => { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch(e) {} }, 10000);
+                      });
+                    } catch(e) { console.error("Playback error:", e); }
                   }}
                   title="내 목소리 듣기"
-                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "3px 8px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}
+                  style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "5px", padding: "3px 8px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}
                 >▶ 내 목소리</button>
               )}
             </div>
@@ -1591,9 +1611,10 @@ function MyPhrasesTab({ user, isPreview }) {
 // ── My Phrase Row ─────────────────────────────────────────────────────────────
 function MyPhraseRow({ phrase, user, isPreview, onToggleHide, onDelete }) {
   const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div style={{ borderRadius: "8px", border: `1px solid ${phrase.hidden ? C.border : C.border}`, background: phrase.hidden ? C.bgSoft : C.bg, opacity: phrase.hidden ? 0.6 : 1 }}>
+    <div style={{ borderRadius: "8px", border: `1px solid ${C.border}`, background: phrase.hidden ? C.bgSoft : C.bg, opacity: phrase.hidden ? 0.6 : 1 }}>
       <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
         <div onClick={() => setOpen(o => !o)} style={{ flex: 1, cursor: "pointer" }}>
           <div style={{ fontSize: "14px", fontStyle: "italic", marginBottom: "2px" }}>"{phrase.english}"</div>
@@ -1604,7 +1625,14 @@ function MyPhraseRow({ phrase, user, isPreview, onToggleHide, onDelete }) {
           <button onClick={() => speak(phrase.english)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px" }}>🔊</button>
           <button onClick={() => setOpen(o => !o)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px" }}>🎙</button>
           <button onClick={onToggleHide} title={phrase.hidden ? "Show" : "Hide"} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px" }}>{phrase.hidden ? "👁" : "🙈"}</button>
-          <button onClick={() => { if (window.confirm("Remove this phrase?")) onDelete(); }} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px", color: C.error }}>×</button>
+          {confirmDelete ? (
+            <div style={{ display: "flex", gap: "3px" }}>
+              <button onClick={() => { onDelete(); setConfirmDelete(false); }} style={{ background: C.error, border: "none", borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "11px", color: "#fff", fontFamily: FONT }}>삭제</button>
+              <button onClick={() => setConfirmDelete(false)} style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 6px", cursor: "pointer", fontSize: "11px", fontFamily: FONT }}>취소</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px", color: C.error }}>×</button>
+          )}
         </div>
       </div>
       {open && (
@@ -2241,6 +2269,26 @@ function EditPhraseModal({ phrase, onSave, onClose }) {
     </div>
   );
 }
+// ── Student Row (inline delete confirm) ───────────────────────────────────────
+function StudentRow({ s, localGroups, onRename, onUpdateGroup, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  return React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${C.bgSoft}`, gap: "8px" } },
+    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+      React.createElement("div", { style: { fontSize: "13px", fontWeight: "500" } }, React.createElement(InlineEdit, { value: s.name, onSave: onRename })),
+      React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, "🔥 " + (s.streak || 0) + " streak")
+    ),
+    React.createElement("select", { value: s.group_id || "", onChange: e => onUpdateGroup(e.target.value), style: { padding: "5px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "12px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", maxWidth: "150px" } },
+      localGroups.map(grp => React.createElement("option", { key: grp.id, value: grp.id }, grp.name))
+    ),
+    confirmDelete
+      ? React.createElement("div", { style: { display: "flex", gap: "3px" } },
+        React.createElement("button", { onClick: () => { onDelete(); setConfirmDelete(false); }, style: { background: C.error, border: "none", borderRadius: "4px", color: "#fff", cursor: "pointer", fontSize: "11px", padding: "3px 7px", fontFamily: FONT } }, "삭제"),
+        React.createElement("button", { onClick: () => setConfirmDelete(false), style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "4px", cursor: "pointer", fontSize: "11px", padding: "3px 6px", fontFamily: FONT } }, "✕")
+      )
+      : React.createElement("button", { onClick: () => setConfirmDelete(true), style: { background: "transparent", border: "none", color: C.error, cursor: "pointer", fontSize: "16px", padding: "0 4px", lineHeight: 1 } }, "×")
+  );
+}
+
 function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMsg }) {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
@@ -2472,6 +2520,18 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
     catch(e) { showMsg("Error", "error"); }
   };
 
+  const deleteSession = async (n) => {
+    try {
+      // Delete all session_phrases for this session number in this group
+      const toDelete = sessionPhrases.filter(sp => sp.session_number === n);
+      for (const sp of toDelete) {
+        await db.delete("session_phrases", `id=eq.${sp.id}`);
+      }
+      setSessionPhrases(prev => prev.filter(sp => sp.session_number !== n));
+      showMsg("✓ Session " + n + " deleted");
+    } catch(e) { showMsg("Error deleting session: " + e.message, "error"); }
+  };
+
   return (
     <div>
       {editingPhrase && React.createElement(EditPhraseModal, { phrase: editingPhrase, onSave: updated => { setSessionPhrases(prev => prev.map(sp => sp.phrase_bank?.id === updated.id ? { ...sp, phrase_bank: updated } : sp)); setPhraseBank(prev => prev.map(p => p.id === updated.id ? updated : p)); setEditingPhrase(null); showMsg("✓ Phrase updated across all groups"); }, onClose: () => setEditingPhrase(null) })}
@@ -2536,23 +2596,45 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
         : sessionNums.length > 0 && (
           <div>
             <div style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", color: C.textLight, marginBottom: "10px" }}>{selectedGroup?.name} — All Sessions</div>
-            {sessionNums.map(n => React.createElement(Card, { key: n, style: { marginBottom: "10px" } },
-              React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: C.textMid, marginBottom: "8px" } }, "Session " + n + " (" + bySession[n].length + " phrases)"),
-              bySession[n].map(sp => React.createElement("div", { key: sp.id, style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "7px 0", borderTop: `1px solid ${C.bgSoft}`, fontSize: "13px" } },
-                React.createElement("div", { style: { flex: 1 } },
-                  React.createElement("div", { style: { fontStyle: "italic" } }, sp.phrase_bank?.english),
-                  sp.phrase_bank?.korean && React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, sp.phrase_bank.korean),
-                  sp.phrase_bank?.context && React.createElement("div", { style: { fontSize: "11px", color: C.gold } }, sp.phrase_bank.context)
-                ),
-                React.createElement("div", { style: { display: "flex", gap: "4px", flexShrink: 0 } },
-                  React.createElement("button", { onClick: () => setEditingPhrase(sp.phrase_bank), style: { background: "transparent", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.textMid, cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Edit"),
-                  React.createElement("button", { onClick: () => deleteSessionPhrase(sp.id), style: { background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "18px", padding: "0 4px" } }, "×")
-                )
-              ))
-            ))}
+            {sessionNums.map(n => React.createElement(SessionCard, { key: n, n, phrases: bySession[n], onEdit: setEditingPhrase, onDeletePhrase: deleteSessionPhrase, onDeleteSession: deleteSession }))}
           </div>
         )}
     </div>
+  );
+}
+
+// ── Session Card (teacher dashboard phrase management) ────────────────────────
+function SessionCard({ n, phrases, onEdit, onDeletePhrase, onDeleteSession }) {
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState(false);
+  const [confirmDeletePhrase, setConfirmDeletePhrase] = useState(null);
+
+  return React.createElement(Card, { style: { marginBottom: "10px" } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+      React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: C.textMid } }, "Session " + n + " (" + phrases.length + " phrases)"),
+      confirmDeleteSession
+        ? React.createElement("div", { style: { display: "flex", gap: "6px", alignItems: "center" } },
+          React.createElement("span", { style: { fontSize: "11px", color: C.error } }, "Delete entire session?"),
+          React.createElement("button", { onClick: () => { onDeleteSession(n); setConfirmDeleteSession(false); }, style: { background: C.error, border: "none", borderRadius: "4px", color: "#fff", cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Delete"),
+          React.createElement("button", { onClick: () => setConfirmDeleteSession(false), style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "4px", cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Cancel")
+        )
+        : React.createElement("button", { onClick: () => setConfirmDeleteSession(true), style: { background: "transparent", border: `1px solid ${C.error}`, borderRadius: "4px", color: C.error, cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Delete Session")
+    ),
+    phrases.map(sp => React.createElement("div", { key: sp.id, style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "7px 0", borderTop: `1px solid ${C.bgSoft}`, fontSize: "13px" } },
+      React.createElement("div", { style: { flex: 1 } },
+        React.createElement("div", { style: { fontStyle: "italic" } }, sp.phrase_bank?.english),
+        sp.phrase_bank?.korean && React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, sp.phrase_bank.korean),
+        sp.phrase_bank?.context && React.createElement("div", { style: { fontSize: "11px", color: C.gold } }, sp.phrase_bank.context)
+      ),
+      confirmDeletePhrase === sp.id
+        ? React.createElement("div", { style: { display: "flex", gap: "4px" } },
+          React.createElement("button", { onClick: () => { onDeletePhrase(sp.id); setConfirmDeletePhrase(null); }, style: { background: C.error, border: "none", borderRadius: "4px", color: "#fff", cursor: "pointer", fontSize: "11px", padding: "3px 7px", fontFamily: FONT } }, "삭제"),
+          React.createElement("button", { onClick: () => setConfirmDeletePhrase(null), style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "4px", cursor: "pointer", fontSize: "11px", padding: "3px 6px", fontFamily: FONT } }, "✕")
+        )
+        : React.createElement("div", { style: { display: "flex", gap: "4px", flexShrink: 0 } },
+          React.createElement("button", { onClick: () => onEdit(sp.phrase_bank), style: { background: "transparent", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.textMid, cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Edit"),
+          React.createElement("button", { onClick: () => setConfirmDeletePhrase(sp.id), style: { background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "18px", padding: "0 4px", lineHeight: 1 } }, "×")
+        )
+    ))
   );
 }
 
@@ -2588,7 +2670,6 @@ function StudentsTab({ students, setStudents, groups, showMsg }) {
   };
 
   const deleteStudent = async (id, name) => {
-    if (!window.confirm(`Delete ${name}?`)) return;
     try {
       await db.delete("student_progress", `student_id=eq.${id}`);
       await db.delete("student_phrases", `student_id=eq.${id}`);
@@ -2625,16 +2706,7 @@ function StudentsTab({ students, setStudents, groups, showMsg }) {
           ),
           gs.length === 0
             ? React.createElement("div", { style: { fontSize: "12px", color: C.textLight, fontStyle: "italic" } }, "No students yet")
-            : gs.map(s => React.createElement("div", { key: s.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${C.bgSoft}`, gap: "8px" } },
-              React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                React.createElement("div", { style: { fontSize: "13px", fontWeight: "500" } }, React.createElement(InlineEdit, { value: s.name, onSave: n => renameStudent(s.id, n) })),
-                React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, "🔥 " + (s.streak || 0) + " streak")
-              ),
-              React.createElement("select", { value: s.group_id || "", onChange: e => updateGroup(s.id, e.target.value), style: { padding: "5px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "12px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", maxWidth: "150px" } },
-                localGroups.map(grp => React.createElement("option", { key: grp.id, value: grp.id }, grp.name))
-              ),
-              React.createElement("button", { onClick: () => deleteStudent(s.id, s.name), style: { background: "transparent", border: "none", color: C.error, cursor: "pointer", fontSize: "16px", padding: "0 4px" } }, "×")
-            ))
+            : gs.map(s => React.createElement(StudentRow, { key: s.id, s, localGroups, onRename: n => renameStudent(s.id, n), onUpdateGroup: gid => updateGroup(s.id, gid), onDelete: () => deleteStudent(s.id, s.name) }))
         );
       })}
     </div>
