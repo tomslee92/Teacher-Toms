@@ -1687,7 +1687,7 @@ function ChatTab({ user, group, isPreview }) {
             React.createElement("div", { style: { maxWidth: "75%", padding: "9px 13px", borderRadius: isMe ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMe ? C.text : isTeacher ? C.goldBg : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacher ? `1px solid ${C.gold}` : "none" } }, msg.content)
           );
         })}
-        React.createElement("div", { ref: bottomRef })
+        <div ref={bottomRef} />
       </div>
 
       {/* Input */}
@@ -1945,7 +1945,7 @@ function TeacherMessagesTab({ groups, students }) {
             React.createElement("div", { style: { maxWidth: "75%", padding: "9px 13px", borderRadius: isMe ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isMe ? C.text : C.bg, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5 } }, msg.content)
           );
         })}
-        React.createElement("div", { ref: bottomRef })
+        <div ref={bottomRef} />
       </div>
 
       {/* Input */}
