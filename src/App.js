@@ -977,7 +977,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
     return () => clearInterval(interval);
   }, [isPreview, user.id]);
 
-  const activeFeature = ["community", "practice", "freetalk", "myphrases"].includes(tab) ? tab : null;
+  const activeFeature = ["community", "practice", "freetalk", "myphrases", "chat"].includes(tab) ? tab : null;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, paddingBottom: "72px" }}>
@@ -1030,6 +1030,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
         {tab === "practice" && <div className="feature-screen">{React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak })}</div>}
         {tab === "freetalk" && <div className="feature-screen">{React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak })}</div>}
         {tab === "myphrases" && <div className="feature-screen">{React.createElement(MyPhrasesTab, { user, isPreview })}</div>}
+        {tab === "chat" && <div className="feature-screen">{React.createElement(ChatTab, { user, group, isPreview })}</div>}
       </div>
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 20, paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -1043,7 +1044,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
         })}
       </div>
 
-      {!isPreview && React.createElement(FloatingChat, { user, group, isPreview, isTeacher: false, students: [] })}
+
     </div>
   );
 }
@@ -1521,33 +1522,36 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
         <div style={{ fontSize: "14px", fontWeight: "600", color: C.textMid }}>Free Talk</div>
       </div>
 
-      {/* Speak English — primary dark card */}
-      <button onClick={() => setActiveMode("speak")}
-        style={{ width: "100%", background: C.bgDark, borderRadius: "20px", padding: "28px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", animation: "ftReveal 0.25s ease both", transition: "transform 0.15s" }}
-        className="primary-card">
-        <div>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>Speak freely</div>
-          <div style={{ fontSize: "24px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "6px" }}>🎙 Speak English</div>
-          <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>Say anything and get instant feedback</div>
-        </div>
-        <div style={{ fontSize: "28px", opacity: 0.15, color: "#fff" }}>→</div>
-      </button>
-
-      {/* Secondary row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-        <button onClick={() => setActiveMode("howto")}
-          style={{ background: C.bgSoft, borderRadius: "16px", padding: "20px 18px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "ftReveal 0.25s ease 0.06s both", transition: "transform 0.15s", minHeight: "120px" }}
-          className="secondary-card">
-          <div style={{ fontSize: "24px", marginBottom: "8px" }}>🇰🇷→🇺🇸</div>
-          <div style={{ fontSize: "14px", fontWeight: "800", color: C.text, marginBottom: "4px", letterSpacing: "-0.2px" }}>어떻게 말해요?</div>
-          <div style={{ fontSize: "11px", color: C.textMid, lineHeight: 1.4 }}>Korean → English</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {/* Speak English — darkest */}
+        <button onClick={() => setActiveMode("speak")} className="primary-card"
+          style={{ width: "100%", background: C.bgDark, borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", display: "flex", alignItems: "center", justifyContent: "space-between", animation: "ftReveal 0.25s ease both", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Speak freely</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Speak English</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>Say anything and get instant feedback</div>
+          </div>
+          <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
         </button>
-        <button onClick={() => { setActiveMode("expr"); handleGenerateExpression(); }}
-          style={{ background: C.bgSoft, borderRadius: "16px", padding: "20px 18px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "ftReveal 0.25s ease 0.12s both", transition: "transform 0.15s", minHeight: "120px" }}
-          className="secondary-card">
-          <div style={{ fontSize: "24px", marginBottom: "8px" }}>✨</div>
-          <div style={{ fontSize: "14px", fontWeight: "800", color: C.text, marginBottom: "4px", letterSpacing: "-0.2px" }}>표현 생성기</div>
-          <div style={{ fontSize: "11px", color: C.textMid, lineHeight: 1.4 }}>New expression</div>
+        {/* How to say — mid grey */}
+        <button onClick={() => setActiveMode("howto")} className="primary-card"
+          style={{ width: "100%", background: "#3A3A3A", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", display: "flex", alignItems: "center", justifyContent: "space-between", animation: "ftReveal 0.25s ease 0.07s both", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Translate</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🇰🇷 어떻게 말해요?</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>Korean → natural English</div>
+          </div>
+          <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
+        </button>
+        {/* Expression — lightest */}
+        <button onClick={() => { setActiveMode("expr"); handleGenerateExpression(); }} className="primary-card"
+          style={{ width: "100%", background: "#F0F0F0", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", display: "flex", alignItems: "center", justifyContent: "space-between", animation: "ftReveal 0.25s ease 0.14s both", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Learn</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>✨ 표현 생성기</div>
+            <div style={{ fontSize: "12px", color: "#777" }}>New expression to try today</div>
+          </div>
+          <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
         </button>
       </div>
     </div>
@@ -1909,6 +1913,102 @@ function NoteCard({ note, noteType, user, isTeacher }) {
   );
 }
 
+
+// ── Chat Tab (full screen) ────────────────────────────────────────────────────
+function ChatTab({ user, group, isPreview }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    if (isPreview || !group) { setLoading(false); return; }
+    db.get("messages", `group_id=eq.${group.id}&order=created_at.asc&limit=100`)
+      .then(msgs => { setMessages(msgs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || sending || isPreview) return;
+    setInput(""); setSending(true);
+    const msg = { group_id: group?.id, sender_name: user.name, sender_id: user.id, text, created_at: new Date().toISOString(), is_teacher: false };
+    setMessages(prev => [...prev, { ...msg, id: "temp_" + Date.now() }]);
+    try { await db.insert("messages", msg); } catch(e) {}
+    setSending(false);
+  };
+
+  const fmt = (d) => {
+    const date = new Date(d);
+    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 130px)" }}>
+      {/* Header */}
+      <div style={{ background: C.bgDark, borderRadius: "16px", padding: "16px 20px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>👨‍🏫</div>
+        <div>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>Teacher Toms</div>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>{group?.name || "Group chat"}</div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", paddingBottom: "8px" }}>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px" }}>{React.createElement(Spinner)}</div>
+        ) : messages.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{ fontSize: "32px", marginBottom: "12px" }}>💬</div>
+            <div style={{ fontSize: "14px", fontWeight: "600", color: C.text, marginBottom: "4px" }}>Start the conversation</div>
+            <div style={{ fontSize: "12px", color: C.textLight }}>Message Teacher Toms or your group</div>
+          </div>
+        ) : messages.map((msg, i) => {
+          const isMe = msg.sender_id === user.id;
+          const isTeacher = msg.is_teacher;
+          return (
+            <div key={msg.id || i} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+              {!isMe && (
+                <div style={{ fontSize: "10px", color: C.textLight, marginBottom: "2px", marginLeft: "4px" }}>
+                  {isTeacher ? "👨‍🏫 Teacher Toms" : msg.sender_name}
+                </div>
+              )}
+              <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: isMe ? C.bgDark : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5 }}>
+                {msg.text}
+              </div>
+              <div style={{ fontSize: "10px", color: C.textLight, marginTop: "2px", marginLeft: "4px", marginRight: "4px" }}>
+                {fmt(msg.created_at)}
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", paddingTop: "8px", borderTop: `1px solid ${C.border}` }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && send()}
+          placeholder="메시지 입력…"
+          disabled={isPreview}
+          style={{ flex: 1, padding: "11px 16px", border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "14px", fontFamily: FONT, outline: "none", background: C.bgSoft }}
+        />
+        <button onClick={send} disabled={!input.trim() || sending || isPreview}
+          style={{ width: "40px", height: "40px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", fontSize: "16px", cursor: input.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+          ↑
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Floating Chat Bubble System ───────────────────────────────────────────────
 function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], students = [] }) {
@@ -4600,59 +4700,10 @@ function WayveLogo({ size = 22, color = "#1A1A1A" }) {
 
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
-  // Pure CSS animation — no React state changes = no re-render glitches
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
-      <style>{`
-        @keyframes wv-logo {
-          0%   { opacity: 0; transform: translateY(18px); }
-          100% { opacity: 1; transform: translateY(0px); }
-        }
-        @keyframes wv-line {
-          0%   { transform: scaleX(0); opacity: 0; }
-          10%  { opacity: 1; }
-          100% { transform: scaleX(1); opacity: 1; }
-        }
-        @keyframes wv-sub {
-          0%   { opacity: 0; transform: translateY(5px); }
-          100% { opacity: 1; transform: translateY(0px); }
-        }
-        .wv-logo {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          font-size: 34px;
-          font-weight: 800;
-          letter-spacing: 10px;
-          color: #1A1A1A;
-          line-height: 1;
-          -webkit-font-smoothing: antialiased;
-          opacity: 0;
-          animation: wv-logo 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
-        }
-        .wv-line {
-          height: 1.5px;
-          width: 48px;
-          background: #1A1A1A;
-          margin-top: 14px;
-          border-radius: 1px;
-          transform-origin: left center;
-          transform: scaleX(0);
-          opacity: 0;
-          animation: wv-line 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.9s forwards;
-        }
-        .wv-sub {
-          font-size: 10px;
-          color: #999999;
-          letter-spacing: 3.5px;
-          text-transform: uppercase;
-          margin-top: 12px;
-          opacity: 0;
-          animation: wv-sub 0.9s ease 1.5s forwards;
-        }
-      `}</style>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div className="wv-logo">WAYVE</div>
-        <div className="wv-line" />
-        <div className="wv-sub">English · Made for Korea</div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FFFFFF" }}>
+      <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", fontSize: "32px", fontWeight: "800", letterSpacing: "10px", color: "#1A1A1A", WebkitFontSmoothing: "antialiased" }}>
+        WAYVE
       </div>
     </div>
   );
@@ -4752,6 +4803,7 @@ function QodEntryScreen({ user, group, onEnter }) {
   const [showKorean, setShowKorean] = useState(false);
   const [loadingKorean, setLoadingKorean] = useState(false);
   const [milestoneEffect, setMilestoneEffect] = useState(null);
+  const [introVisible, setIntroVisible] = useState(true);
   const today = new Date().toISOString().split("T")[0];
   const streak = user.streak || 0;
   const isMilestone = streak > 0 && streak % 7 === 0;
@@ -4784,13 +4836,33 @@ function QodEntryScreen({ user, group, onEnter }) {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <style>{`@keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }`}</style>
+      <style>{`
+        @keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes wv-logo { 0%{opacity:0;transform:translateY(18px)} 100%{opacity:1;transform:translateY(0)} }
+        @keyframes wv-line { 0%{transform:scaleX(0);opacity:0} 10%{opacity:1} 100%{transform:scaleX(1);opacity:1} }
+        @keyframes wv-sub  { 0%{opacity:0;transform:translateY(5px)} 100%{opacity:1;transform:translateY(0)} }
+        @keyframes wv-out  { 0%{opacity:1} 100%{opacity:0;pointer-events:none} }
+        .wv-logo { font-family:'Inter',-apple-system,sans-serif; font-size:34px; font-weight:800; letter-spacing:10px; color:#1A1A1A; line-height:1; -webkit-font-smoothing:antialiased; opacity:0; animation:wv-logo 1.1s cubic-bezier(0.22,1,0.36,1) 0.2s forwards; }
+        .wv-line { height:1.5px; width:48px; background:#1A1A1A; margin-top:14px; border-radius:1px; transform-origin:left center; transform:scaleX(0); opacity:0; animation:wv-line 0.7s cubic-bezier(0.22,1,0.36,1) 1.0s forwards; }
+        .wv-sub  { font-size:10px; color:#999; letter-spacing:3.5px; text-transform:uppercase; margin-top:12px; font-family:${FONT}; opacity:0; animation:wv-sub 0.8s ease 1.6s forwards; }
+        .wv-out  { animation:wv-out 0.6s ease 2.4s forwards; }
+      `}</style>
+
+      {/* Intro overlay — sits on top, fades away, no component swap */}
+      {introVisible && (
+        <div className="wv-out" onAnimationEnd={() => setIntroVisible(false)}
+          style={{ position: "fixed", inset: 0, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, flexDirection: "column" }}>
+          <div className="wv-logo">WAYVE</div>
+          <div className="wv-line" />
+          <div className="wv-sub">English · Made for Korea</div>
+        </div>
+      )}
 
       {showFlow && qodPrompt && cityGroup && React.createElement(QodAnswerFlow, { prompt: qodPrompt, user, cityGroup, onPost: onEnter, onClose: () => setShowFlow(false) })}
       {milestoneEffect === "playing" && React.createElement(StreakMilestone, { streak, type: getMilestoneType(streak), onDone: () => setMilestoneEffect("done") })}
 
       {/* Streak badge */}
-      <div style={{ padding: "20px 24px 0", display: "flex", justifyContent: "center", animation: "qodEntryFade 0.4s ease both" }}>
+      <div style={{ padding: "clamp(10px, 2vh, 20px) 24px 0", display: "flex", justifyContent: "center", animation: "qodEntryFade 0.4s ease both" }}>
         {streak > 0 ? (
           <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.bgSoft, borderRadius: "100px", padding: "10px 20px", border: `1px solid ${C.border}` }}>
             <span style={{ fontSize: "20px", animation: "streakFire 2.5s ease-in-out infinite", display: "inline-block" }}>🔥</span>
@@ -4808,24 +4880,24 @@ function QodEntryScreen({ user, group, onEnter }) {
         )}
       </div>
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 28px 40px", textAlign: "center" }}>
-        <div style={{ marginBottom: "36px", animation: "qodEntryFade 0.5s ease both" }}>{WayveLogo({ size: 18, color: C.text })}</div>
-        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "20px", animation: "qodEntryFade 0.5s ease 0.1s both" }}>
+      {/* Main content — compact for all font sizes */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 24px 24px", textAlign: "center", minHeight: 0 }}>
+        <div style={{ marginBottom: "clamp(12px, 3vh, 28px)", animation: "qodEntryFade 0.5s ease both" }}>{WayveLogo({ size: 16, color: C.text })}</div>
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "clamp(10px, 2vh, 18px)", animation: "qodEntryFade 0.5s ease 0.1s both" }}>
           {new Date().toLocaleDateString("en", { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <div style={{ animation: "qodEntryFade 0.6s ease 0.2s both", maxWidth: "420px" }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "16px" }}>오늘의 질문</div>
-          <div style={{ fontSize: "clamp(20px, 5vw, 26px)", fontWeight: "700", lineHeight: 1.45, color: C.text, letterSpacing: "-0.3px", marginBottom: "16px", fontStyle: "italic" }}>
+        <div style={{ animation: "qodEntryFade 0.6s ease 0.2s both", maxWidth: "420px", width: "100%" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "clamp(8px, 1.5vh, 14px)" }}>오늘의 질문</div>
+          <div style={{ fontSize: "clamp(17px, 4.5vw, 24px)", fontWeight: "700", lineHeight: 1.4, color: C.text, letterSpacing: "-0.3px", marginBottom: "clamp(10px, 2vh, 16px)", fontStyle: "italic" }}>
             "{qodPrompt?.prompt || "Loading…"}"
           </div>
           {!showKorean ? (
-            <button onClick={handleRevealKorean} disabled={loadingKorean} style={{ background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "8px 18px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: "6px", marginBottom: "28px" }}>
+            <button onClick={handleRevealKorean} disabled={loadingKorean} style={{ background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "6px 16px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: "6px", marginBottom: "clamp(12px, 2.5vh, 22px)" }}>
               {loadingKorean ? React.createElement(Spinner) : "🇰🇷"}
               <span>{loadingKorean ? "번역 중…" : "한국어로 보기"}</span>
             </button>
           ) : (
-            <div style={{ background: C.bgSoft, borderRadius: "12px", padding: "12px 16px", marginBottom: "28px", fontSize: "14px", color: C.textMid, lineHeight: 1.7, display: "flex", alignItems: "flex-start", gap: "8px", textAlign: "left" }}>
+            <div style={{ background: C.bgSoft, borderRadius: "12px", padding: "10px 14px", marginBottom: "clamp(12px, 2.5vh, 22px)", fontSize: "13px", color: C.textMid, lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: "8px", textAlign: "left" }}>
               <span>🇰🇷</span>
               <span style={{ flex: 1 }}>{koreanTranslation}</span>
               <button onClick={() => setShowKorean(false)} style={{ background: "none", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px", flexShrink: 0 }}>×</button>
@@ -4835,13 +4907,13 @@ function QodEntryScreen({ user, group, onEnter }) {
         <div style={{ animation: "qodEntryFade 0.6s ease 0.35s both", width: "100%", maxWidth: "360px" }}>
           {!cityGroup ? (
             <div>
-              <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "20px", lineHeight: 1.6 }}>You're not in a city group yet.<br />Ask Teacher Toms to add you.</div>
-              <Btn onClick={onEnter} style={{ width: "100%", padding: "16px", fontSize: "16px", borderRadius: "100px" }}>Enter WAYVE →</Btn>
+              <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "16px", lineHeight: 1.5 }}>You're not in a city group yet.<br />Ask Teacher Toms to add you.</div>
+              <Btn onClick={onEnter} style={{ width: "100%", padding: "14px", fontSize: "15px", borderRadius: "100px" }}>Enter WAYVE →</Btn>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button onClick={() => setShowFlow(true)} style={{ width: "100%", padding: "16px", background: C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "16px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>🎙 Answer Now</button>
-              <button onClick={onEnter} style={{ width: "100%", padding: "14px", background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: FONT }}>Skip for now →</button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <button onClick={() => setShowFlow(true)} style={{ width: "100%", padding: "14px", background: C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "15px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>🎙 Answer Now</button>
+              <button onClick={onEnter} style={{ width: "100%", padding: "12px", background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: FONT }}>Skip for now →</button>
             </div>
           )}
         </div>
@@ -4886,38 +4958,56 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           <div style={{ fontSize: "28px", animation: "streakFire 2.5s ease-in-out infinite" }}>🔥</div>
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {/* Practice — darkest */}
         <button onClick={() => onNavigate("practice")} className="primary-card"
-          style={{ width: "100%", background: C.bgDark, borderRadius: "20px", padding: "28px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: C.bgDark, borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
-            <div style={{ fontSize: "12px", fontWeight: "600", color: "rgba(255,255,255,0.5)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>Daily Practice</div>
-            <div style={{ fontSize: "26px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px", marginBottom: "6px" }}>🎙 Practice</div>
-            <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>{stats.practiceRetry > 0 ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry` : "All caught up ✓"}</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>{stats.practiceRetry > 0 ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry` : "All caught up ✓"}</div>
           </div>
-          <div style={{ fontSize: "32px", opacity: 0.15, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
         </button>
+        {/* Free Talk — dark grey */}
         <button onClick={() => onNavigate("freetalk")} className="primary-card"
-          style={{ width: "100%", background: C.bgSoft, borderRadius: "20px", padding: "28px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "#3A3A3A", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
-            <div style={{ fontSize: "12px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>Open Conversation</div>
-            <div style={{ fontSize: "26px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px", marginBottom: "6px" }}>💬 Free Talk</div>
-            <div style={{ fontSize: "13px", color: C.textMid }}>Speak freely in English</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Open Conversation</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Free Talk</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>Speak freely in English</div>
           </div>
-          <div style={{ fontSize: "32px", opacity: 0.1 }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
         </button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-        <button onClick={() => onNavigate("community")} className="secondary-card"
-          style={{ background: C.bg, borderRadius: "16px", padding: "16px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.12s both", transition: "transform 0.15s" }}>
-          <div style={{ fontSize: "22px", marginBottom: "6px" }}>🌍</div>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "3px" }}>Community</div>
-          <div style={{ fontSize: "11px", color: C.textLight }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
+        {/* Community — light grey */}
+        <button onClick={() => onNavigate("community")} className="primary-card"
+          style={{ width: "100%", background: "#F0F0F0", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Classmates</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>🌍 Community</div>
+            <div style={{ fontSize: "12px", color: "#777" }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
+          </div>
+          <div style={{ fontSize: "24px", opacity: 0.12 }}>→</div>
         </button>
-        <button onClick={() => onNavigate("myphrases")} className="secondary-card"
-          style={{ background: C.bg, borderRadius: "16px", padding: "16px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.18s both", transition: "transform 0.15s" }}>
-          <div style={{ fontSize: "22px", marginBottom: "6px" }}>⭐</div>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "3px" }}>My Phrases</div>
-          <div style={{ fontSize: "11px", color: C.textLight }}>{stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}</div>
+        {/* Chat — light grey */}
+        <button onClick={() => onNavigate("chat")} className="primary-card"
+          style={{ width: "100%", background: "#E8E8E8", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
+            <div style={{ fontSize: "12px", color: "#777" }}>Message Teacher Toms</div>
+          </div>
+          <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
+        </button>
+        {/* My Phrases — white */}
+        <button onClick={() => onNavigate("myphrases")} className="primary-card"
+          style={{ width: "100%", background: C.bg, borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Saved</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Phrases</div>
+            <div style={{ fontSize: "12px", color: C.textMid }}>{stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}</div>
+          </div>
+          <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
         </button>
       </div>
     </div>
