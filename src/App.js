@@ -113,30 +113,40 @@ function highlightMissed(target, spoken) {
   );
 }
 
-// ── TTS — force American English ──────────────────────────────────────────────
-function speak(text) {
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-US";
-  u.rate = 0.85;
-  u.pitch = 1.0;
-  const go = () => {
-    const voices = window.speechSynthesis.getVoices();
-    // Strictly American English voices only
-    const americanPreferred = ["Samantha", "Allison", "Ava", "Susan", "Zoe", "Nicky"];
-    let v = null;
-    for (const name of americanPreferred) {
-      v = voices.find(x => x.name.includes(name) && x.lang === "en-US");
-      if (v) break;
-    }
-    // Fallback: any en-US local voice (not Google, not Australian)
-    if (!v) v = voices.find(x => x.lang === "en-US" && x.localService && !x.name.includes("Google"));
-    if (!v) v = voices.find(x => x.lang === "en-US" && !x.name.includes("Google"));
-    if (!v) v = voices.find(x => x.lang === "en-US");
-    if (v) u.voice = v;
-    window.speechSynthesis.speak(u);
-  };
-  if (window.speechSynthesis.getVoices().length === 0) { window.speechSynthesis.onvoiceschanged = go; } else { go(); }
+// ── TTS — Groq PlayAI (works on all devices including Android) ────────────────
+let currentAudio = null;
+
+async function speak(text) {
+  // Stop any currently playing audio
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({
+        model: "playai-tts",
+        input: text,
+        voice: "Calum-PlayAI", // Natural American English male voice
+        response_format: "mp3",
+      })
+    });
+    if (!res.ok) throw new Error("TTS failed: " + await res.text());
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+    audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
+    await audio.play();
+  } catch(e) {
+    // Fallback to Web Speech API if Groq TTS fails
+    console.warn("Groq TTS failed, falling back to Web Speech:", e.message);
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "en-US"; u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+    } catch(e2) { console.warn("Web Speech also failed:", e2); }
+  }
 }
 
 // ── Groq ──────────────────────────────────────────────────────────────────────
@@ -465,10 +475,13 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   const [started, setStarted] = useState(autoRecord);
+  const [recordingUrl, setRecordingUrl] = useState(null);
   const autoStarted = useRef(false);
 
   const handleStop = async (blob) => {
     if (isPreview) return;
+    const url = URL.createObjectURL(blob);
+    setRecordingUrl(url);
     setLoading(true); setFeedback(null); setTranscription(null); setErrMsg("");
     try {
       const said = await transcribe(blob);
@@ -511,7 +524,14 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
       {errMsg && <div style={{ color: C.error, fontSize: "12px", textAlign: "center" }}>{errMsg}</div>}
       {feedback && (
         <div className="fade-in">
-          {transcription && <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "10px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>🎙 {highlightMissed(phrase.english, transcription)}</div>}
+          {transcription && (
+            <div style={{ background: C.bgSoft, padding: "8px 10px", borderRadius: "6px", marginBottom: "10px", fontSize: "12px", color: C.textMid, borderLeft: `3px solid ${C.text}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+              <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
+              {recordingUrl && (
+                <button onClick={() => { const a = new Audio(recordingUrl); a.play(); }} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "2px 7px", cursor: "pointer", fontSize: "10px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}>▶ 내 목소리</button>
+              )}
+            </div>
+          )}
           <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8
             ? <div style={{ marginTop: "8px", padding: "8px 10px", background: C.successBg, borderRadius: "6px", fontSize: "12px", color: C.success, fontWeight: "500" }}>🎉 잘했어요!</div>
@@ -943,8 +963,15 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
   const [errMsg, setErrMsg] = useState("");
   const autoStarted = useRef(false);
 
+  const [recordingBlob, setRecordingBlob] = useState(null);
+  const [recordingUrl, setRecordingUrl] = useState(null);
+
   const handleStop = async (blob) => {
     if (isPreview) return;
+    // Save blob for self-playback
+    setRecordingBlob(blob);
+    const url = URL.createObjectURL(blob);
+    setRecordingUrl(url);
     setLoading(true); setFeedback(null); setTranscription(null); setErrMsg("");
     try {
       const said = await transcribe(blob);
@@ -995,7 +1022,18 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
       {errMsg && <div style={{ color: C.error, fontSize: "13px", marginTop: "10px", textAlign: "center" }}>{errMsg}</div>}
       {feedback && (
         <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: `1px solid ${C.border}` }} className="fade-in">
-          {transcription && <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>🎙 {highlightMissed(phrase.english, transcription)}</div>}
+          {transcription && (
+            <div style={{ background: C.bgSoft, padding: "9px 12px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+              <span>🎙 {highlightMissed(phrase.english, transcription)}</span>
+              {recordingUrl && (
+                <button
+                  onClick={() => { const a = new Audio(recordingUrl); a.play(); }}
+                  title="내 목소리 듣기"
+                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "3px 8px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}
+                >▶ 내 목소리</button>
+              )}
+            </div>
+          )}
           <FeedbackDisplay text={feedback.text} />
           {feedback.score >= 8 ? (
             <div style={{ marginTop: "12px" }}>
