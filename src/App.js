@@ -130,7 +130,7 @@ async function speak(text) {
       body: JSON.stringify({
         text,
         model_id: "eleven_turbo_v2_5",
-        voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.3, use_speaker_boost: true },
+        voice_settings: { stability: 0.3, similarity_boost: 0.75, style: 0.6, use_speaker_boost: true },
       })
     });
     if (!res.ok) throw new Error("ElevenLabs TTS failed: " + await res.text());
