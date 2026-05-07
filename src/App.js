@@ -459,12 +459,13 @@ function InlineEdit({ value, onSave, style = {} }) {
 }
 
 // ── Mini Phrase Practice (inline recording + feedback) ────────────────────────
-function MiniPractice({ phrase, user, isPreview, showListen = true }) {
+function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord = false }) {
   const [feedback, setFeedback] = useState(null);
   const [transcription, setTranscription] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(autoRecord);
+  const autoStarted = useRef(false);
 
   const handleStop = async (blob) => {
     if (isPreview) return;
@@ -479,6 +480,14 @@ function MiniPractice({ phrase, user, isPreview, showListen = true }) {
   };
 
   const rec = useRecorder(handleStop);
+
+  // If autoRecord, start recording immediately on mount
+  useEffect(() => {
+    if (autoRecord && !isPreview && !autoStarted.current) {
+      autoStarted.current = true;
+      setTimeout(() => rec.start(), 250);
+    }
+  }, []);
 
   if (!started) {
     return (
@@ -499,12 +508,6 @@ function MiniPractice({ phrase, user, isPreview, showListen = true }) {
         {rec.isRec && <Btn onClick={rec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error, fontSize: "12px", padding: "6px 14px" }}>⏹ 멈추기 ({rec.time}초)</Btn>}
         {loading && React.createElement(Spinner)}
       </div>
-      {!rec.isRec && !loading && !feedback && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", color: C.textLight, fontSize: "13px" }}>
-          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.error, animation: "spin 1s linear infinite" }} />
-          <span>마이크 연결 중…</span>
-        </div>
-      )}
       {errMsg && <div style={{ color: C.error, fontSize: "12px", textAlign: "center" }}>{errMsg}</div>}
       {feedback && (
         <div className="fade-in">
@@ -766,9 +769,14 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
 
   const handleProgressUpdate = (phraseId, prog) => {
     const prevProg = progress[phraseId];
+    // Fire confetti on first-time pass OR when passing again after a session reset
     const wasFirstPass = !(prevProg?.passed) && prog?.passed;
+    const wasResetPass = sessionResets[activeSession] && prog?.passed;
     setProgress(prev => ({ ...prev, [phraseId]: prog }));
-    if (wasFirstPass) { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2200); }
+    if (wasFirstPass || wasResetPass) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2200);
+    }
   };
 
   const resetSession = (sessionNum) => {
@@ -1232,7 +1240,7 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
                   </div>
                   {savedMsg.text && <div style={{ fontSize: "12px", color: savedMsg.type === "success" ? C.success : savedMsg.type === "warn" ? C.retry : C.error, marginBottom: "6px" }}>{savedMsg.text}</div>}
                   {showPractice && (
-                    <MiniPractice phrase={{ english: englishPhrase, korean: koreanText }} user={user} isPreview={isPreview} showListen={false} />
+                    <MiniPractice phrase={{ english: englishPhrase, korean: koreanText }} user={user} isPreview={isPreview} showListen={false} autoRecord={true} />
                   )}
                 </div>
               )}
@@ -1343,7 +1351,7 @@ function SituationPhraseRow({ phrase, user, isPreview, alreadySaved, onSave }) {
       </div>
       {open && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: "12px 16px", background: C.bgSoft }} className="fade-in">
-          <MiniPractice phrase={phrase} user={user} isPreview={isPreview} showListen={false} />
+          <MiniPractice phrase={phrase} user={user} isPreview={isPreview} showListen={false} autoRecord={true} />
         </div>
       )}
     </div>
