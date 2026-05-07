@@ -113,24 +113,27 @@ function highlightMissed(target, spoken) {
   );
 }
 
-// ── TTS — Groq PlayAI (works on all devices including Android) ────────────────
+// ── TTS — ElevenLabs (Teacher Tom's cloned voice) ─────────────────────────────
+const ELEVEN_KEY = "sk_6e3747f941640c53d35b8d3f684896e08cf2be245df67183";
+const ELEVEN_VOICE_ID = "G5a1Ud6ZWQkWenDnvdV9";
 let currentAudio = null;
 
 async function speak(text) {
-  // Stop any currently playing audio
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": ELEVEN_KEY,
+      },
       body: JSON.stringify({
-        model: "playai-tts",
-        input: text,
-        voice: "Calum-PlayAI", // Natural American English male voice
-        response_format: "mp3",
+        text,
+        model_id: "eleven_turbo_v2_5",
+        voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.3, use_speaker_boost: true },
       })
     });
-    if (!res.ok) throw new Error("TTS failed: " + await res.text());
+    if (!res.ok) throw new Error("ElevenLabs TTS failed: " + await res.text());
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -138,14 +141,25 @@ async function speak(text) {
     audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
     await audio.play();
   } catch(e) {
-    // Fallback to Web Speech API if Groq TTS fails
-    console.warn("Groq TTS failed, falling back to Web Speech:", e.message);
+    // Fallback to Groq TTS if ElevenLabs fails
+    console.warn("ElevenLabs TTS failed, falling back to Groq:", e.message);
     try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "en-US"; u.rate = 0.85;
-      window.speechSynthesis.speak(u);
-    } catch(e2) { console.warn("Web Speech also failed:", e2); }
+      const res = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify({ model: "playai-tts", input: text, voice: "Calum-PlayAI", response_format: "mp3" })
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
+      await audio.play();
+    } catch(e2) {
+      // Final fallback to Web Speech
+      try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.85; window.speechSynthesis.speak(u); } catch(e3) {}
+    }
   }
 }
 
