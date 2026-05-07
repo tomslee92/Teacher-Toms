@@ -4951,7 +4951,7 @@ function QodEntryScreen({ user, group, onEnter }) {
               <div style={{ textAlign: "left" }}>
                 <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, lineHeight: 1 }}>{streak} day streak</div>
                 <div style={{ fontSize: "10px", color: C.textLight, marginTop: "1px" }}>
-                  {streak % 7 === 0 ? "🏆 Milestone reached!" : `${7 - (streak % 7)} days to next milestone`}
+                  Keep it going 💪
                 </div>
               </div>
             </div>
@@ -4960,11 +4960,7 @@ function QodEntryScreen({ user, group, onEnter }) {
               Answer today to start your streak 🔥
             </div>
           )}
-          {cityGroup && (
-            <div style={{ fontSize: "11px", color: C.textLight }}>
-              {cityGroup.emoji} {cityGroup.name}
-            </div>
-          )}
+
         </div>
       </div>
     </div>
