@@ -1184,12 +1184,24 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
     if (!group?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const sp = await db.get("session_phrases", `group_id=eq.${group.id}&select=*,phrase_bank(*)&order=session_number.asc,created_at.asc`);
-      const bySession = {};
-      sp.forEach(row => { const s = row.session_number; if (!bySession[s]) bySession[s] = []; if (row.phrase_bank) bySession[s].push({ ...row.phrase_bank, sp_id: row.id }); });
-      setSessions(bySession);
-      const nums = Object.keys(bySession).map(Number).sort((a, b) => b - a);
-      if (nums.length > 0) setActiveSession(nums[0]);
+      // Fetch phrases for this group, ordered by created_at.
+      // Phrases are now organized by `in_library` (boolean) rather than session_number.
+      // in_library = false → "Most Recent Session" (current week's phrases)
+      // in_library = true  → "Library" (older archived phrases)
+      const sp = await db.get("session_phrases", `group_id=eq.${group.id}&select=*,phrase_bank(*)&order=created_at.asc`);
+      const recent = [];
+      const library = [];
+      sp.forEach(row => {
+        if (!row.phrase_bank) return;
+        const enriched = { ...row.phrase_bank, sp_id: row.id };
+        if (row.in_library) library.push(enriched);
+        else recent.push(enriched);
+      });
+      // Keep `sessions` shape for backwards compat with rest of the component:
+      // {recent: [...], library: [...]}
+      const grouped = { recent, library };
+      setSessions(grouped);
+      setActiveSession("recent");
       if (!isPreview) {
         const [prog, myP] = await Promise.all([
           db.get("student_progress", `student_id=eq.${user.id}`),
@@ -1199,8 +1211,8 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
         prog.forEach(p => { map[p.phrase_id] = p; });
         setProgress(map);
         setMyPhrases(myP);
-        // Phrase of day: prefer unpassed from current session
-        const allPractice = Object.values(bySession).flat();
+        // Phrase of day: prefer unpassed from current section
+        const allPractice = [...recent, ...library];
         const unpassed = allPractice.filter(p => !map[p.id]?.passed);
         const pool = unpassed.length > 0 ? unpassed : allPractice;
         if (pool.length > 0) {
@@ -1238,11 +1250,11 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
     setProgress(prev => {
       const updated = { ...prev, [phraseId]: prog };
 
-      // Check for full session completion using fresh state
-      const sessionPhrases = sessions[activeSession] || [];
-      if (sessionPhrases.length > 0) {
-        const allPassedNow = sessionPhrases.every(p => updated[p.id]?.passed);
-        const allPassedBefore = sessionPhrases.every(p => prev[p.id]?.passed);
+      // Check for full section completion using fresh state
+      const sectionPhrases = sessions[activeSession] || [];
+      if (sectionPhrases.length > 0) {
+        const allPassedNow = sectionPhrases.every(p => updated[p.id]?.passed);
+        const allPassedBefore = sectionPhrases.every(p => prev[p.id]?.passed);
         if (allPassedNow && !allPassedBefore) {
           // Use setTimeout to fire celebration outside of setState
           setTimeout(() => {
@@ -1256,8 +1268,8 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
     });
   };
 
-  const resetSession = async (sessionNum) => {
-    const phrases = sessions[sessionNum] || [];
+  const resetSection = async (sectionKey) => {
+    const phrases = sessions[sectionKey] || [];
     const phraseIds = phrases.map(p => p.id);
     // Clear progress in Supabase so reset persists across logins
     try {
@@ -1276,28 +1288,24 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
       phraseIds.forEach(id => { delete updated[id]; });
       return updated;
     });
-    setSessionResets(prev => ({ ...prev, [sessionNum]: Date.now() }));
+    setSessionResets(prev => ({ ...prev, [sectionKey]: Date.now() }));
   };
 
   if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "60px" } }, React.createElement(Spinner));
 
-  const sessionNums = Object.keys(sessions).map(Number).sort((a, b) => b - a);
+  const recentPhrases = sessions.recent || [];
+  const libraryPhrases = sessions.library || [];
+  const totalPhrases = recentPhrases.length + libraryPhrases.length;
 
-  if (!sessionNums.length) return React.createElement("div", { style: { textAlign: "center", padding: "60px 20px" } },
+  if (totalPhrases === 0) return React.createElement("div", { style: { textAlign: "center", padding: "60px 20px" } },
     React.createElement("div", { style: { fontSize: "40px", marginBottom: "16px" } }, "📭"),
     React.createElement("div", { style: { fontSize: "15px", color: C.textMid } }, "아직 배정된 문장이 없어요."),
     React.createElement("div", { style: { fontSize: "13px", color: C.textLight, marginTop: "8px" } }, "수업 후 선생님이 문장을 추가해 드릴게요!")
   );
 
-  const currentPhrases = sessions[activeSession] || [];
-  const sessionKey = sessionResets[activeSession] || 0;
-  const retry = currentPhrases.filter(p => progress[p.id]?.needs_retry && !progress[p.id]?.passed);
-  const others = currentPhrases.filter(p => !progress[p.id]?.needs_retry || progress[p.id]?.passed);
-  const ordered = [...retry, ...others];
-
-  // Session progress counts
-  const getSessionProgress = (n) => {
-    const phrases = sessions[n] || [];
+  // Section progress counts
+  const getSectionProgress = (key) => {
+    const phrases = sessions[key] || [];
     const passed = phrases.filter(p => progress[p.id]?.passed).length;
     return { passed, total: phrases.length };
   };
@@ -1312,8 +1320,8 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
           <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
           <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
           <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>
-            {sessionNums.reduce((acc, n) => acc + (sessions[n] || []).filter(p => progress[p.id]?.passed).length, 0)} of{" "}
-            {sessionNums.reduce((acc, n) => acc + (sessions[n] || []).length, 0)} phrases complete
+            {[...recentPhrases, ...libraryPhrases].filter(p => progress[p.id]?.passed).length} of{" "}
+            {totalPhrases} phrases complete
           </div>
         </div>
         <button onClick={pickRandom} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "8px 16px", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }}>🎲 Random</button>
@@ -1335,104 +1343,96 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
         </div>
       )}
 
-      {/* Scrollable session feed */}
-      <SessionFeed
-        sessionNums={sessionNums}
-        sessions={sessions}
-        progress={progress}
-        sessionResets={sessionResets}
-        user={user}
-        isPreview={isPreview}
-        onUpdate={handleProgressUpdate}
-        onPracticed={onPracticed}
-        getSessionProgress={getSessionProgress}
-        resetSession={resetSession}
-      />
+      {/* Most Recent Session — always visible, expanded */}
+      {recentPhrases.length > 0 && (
+        <PhraseSection
+          sectionKey="recent"
+          title="Most Recent Session"
+          titleKo="최근 수업"
+          phrases={recentPhrases}
+          progress={progress}
+          sessionReset={!!sessionResets.recent}
+          user={user}
+          isPreview={isPreview}
+          onUpdate={handleProgressUpdate}
+          onPracticed={onPracticed}
+          sectionProgress={getSectionProgress("recent")}
+          onReset={() => resetSection("recent")}
+          defaultCollapsed={false}
+          showNewBadge={true}
+        />
+      )}
+
+      {/* Library — collapsed by default */}
+      {libraryPhrases.length > 0 && (
+        <PhraseSection
+          sectionKey="library"
+          title="Library"
+          titleKo="라이브러리"
+          phrases={libraryPhrases}
+          progress={progress}
+          sessionReset={!!sessionResets.library}
+          user={user}
+          isPreview={isPreview}
+          onUpdate={handleProgressUpdate}
+          onPracticed={onPracticed}
+          sectionProgress={getSectionProgress("library")}
+          onReset={() => resetSection("library")}
+          defaultCollapsed={true}
+          showNewBadge={false}
+        />
+      )}
     </div>
   );
 }
 
-// ── Session Feed ──────────────────────────────────────────────────────────────
-function SessionFeed({ sessionNums, sessions, progress, sessionResets, user, isPreview, onUpdate, onPracticed, getSessionProgress, resetSession }) {
-  const [collapsed, setCollapsed] = useState({});
-  const latestSession = sessionNums[0];
-  const currentRef = useRef(null);
+// ── Phrase Section ────────────────────────────────────────────────────────────
+// Renders one of the two named phrase sections (Most Recent or Library).
+// Replaces the old SessionFeed which was per-session-number.
+function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge }) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const { passed, total } = sectionProgress;
+  const allDone = total > 0 && passed === total;
 
-  const toggleCollapse = (n) => setCollapsed(prev => ({ ...prev, [n]: !prev[n] }));
-
-  // Jump to current session button visibility
-  const [showJump, setShowJump] = useState(false);
-  useEffect(() => {
-    const handleScroll = () => setShowJump(window.scrollY > 300);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  // Sort: phrases needing retry first, then the rest
+  const retry = phrases.filter(p => progress[p.id]?.needs_retry && !progress[p.id]?.passed);
+  const others = phrases.filter(p => !progress[p.id]?.needs_retry || progress[p.id]?.passed);
+  const ordered = [...retry, ...others];
 
   return (
-    <div>
-      {/* Jump to current session button */}
-      {showJump && (
-        <button
-          onClick={() => currentRef.current?.scrollIntoView({ behavior: "smooth" })}
-          style={{ position: "fixed", bottom: "86px", left: "20px", background: C.text, color: "#fff", border: "none", borderRadius: "20px", padding: "8px 16px", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, zIndex: 90, boxShadow: "0 2px 12px rgba(0,0,0,0.15)", display: "flex", alignItems: "center", gap: "5px" }}
-        >↑ 최신 세션으로</button>
+    <div style={{ marginBottom: "20px" }}>
+      {/* Section header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {showNewBadge && (
+            <span style={{ background: C.text, color: "#fff", fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "100px", letterSpacing: "0.5px" }}>NEW</span>
+          )}
+          <div style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" }}>{title}</div>
+          <div style={{ fontSize: "11px", color: C.textLight }}>{titleKo}</div>
+          <span style={{ fontSize: "11px", fontWeight: "700", color: allDone ? C.success : C.textMid, background: allDone ? C.successBg : C.bgSoft, borderRadius: "100px", padding: "3px 10px", border: `1px solid ${allDone ? C.successBorder : C.border}` }}>
+            {passed}/{total}{allDone ? " ✓" : ""}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button onClick={onReset} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT }}>↺ 다시</button>
+          <button onClick={() => setCollapsed(c => !c)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: "3px 10px", borderRadius: "12px" }}>
+            {collapsed ? `펼치기 ▼` : `접기 ▲`}
+          </button>
+        </div>
+      </div>
+
+      {/* Phrase list */}
+      {!collapsed && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }} className="fade-in">
+          {ordered.map(phrase => React.createElement(ExpandableRow, {
+            key: `${phrase.id}-${sessionReset ? Date.now() : 0}`,
+            phrase, progress,
+            sessionReset,
+            user, isPreview,
+            onUpdate, onPracticed,
+          }))}
+        </div>
       )}
-
-      {sessionNums.map((n, idx) => {
-        const isLatest = n === latestSession;
-        const { passed, total } = getSessionProgress(n);
-        const allDone = total > 0 && passed === total;
-        const isCollapsed = isLatest ? false : (collapsed[n] !== false); // previous sessions start collapsed
-        const sessionKey = sessionResets[n] || 0;
-
-        const phrases = sessions[n] || [];
-        const retry = phrases.filter(p => progress[p.id]?.needs_retry && !progress[p.id]?.passed);
-        const others = phrases.filter(p => !progress[p.id]?.needs_retry || progress[p.id]?.passed);
-        const ordered = [...retry, ...others];
-
-        return (
-          <div key={n} ref={isLatest ? currentRef : null} style={{ marginBottom: "20px" }}>
-            {/* Session header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {isLatest && (
-                  <span style={{ background: C.text, color: "#fff", fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "100px", letterSpacing: "0.5px" }}>NEW</span>
-                )}
-                <div style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" }}>Session {n}</div>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: allDone ? C.success : C.textMid, background: allDone ? C.successBg : C.bgSoft, borderRadius: "100px", padding: "3px 10px", border: `1px solid ${allDone ? C.successBorder : C.border}` }}>
-                  {passed}/{total}{allDone ? " ✓" : ""}
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button onClick={() => resetSession(n)} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT }}>↺ 다시</button>
-                {!isLatest && (
-                  <button onClick={() => toggleCollapse(n)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: "3px 10px", borderRadius: "12px" }}>
-                    {isCollapsed ? `펼치기 ▼` : `접기 ▲`}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Phrase list */}
-            {!isCollapsed && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }} className="fade-in">
-                {ordered.map(phrase => React.createElement(ExpandableRow, {
-                  key: `${phrase.id}-${sessionKey}`,
-                  phrase, progress,
-                  sessionReset: !!sessionResets[n],
-                  user, isPreview,
-                  onUpdate, onPracticed,
-                }))}
-              </div>
-            )}
-
-            {/* Divider between sessions */}
-            {idx < sessionNums.length - 1 && (
-              <div style={{ height: "1px", background: C.border, marginTop: "16px" }} />
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -3403,7 +3403,6 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
 // ── Add Phrases Tab ───────────────────────────────────────────────────────────
 function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
   const [selectedGroup, setSelectedGroup] = useState(groups[0]);
-  const [sessionNum, setSessionNum] = useState(1);
   const [english, setEnglish] = useState("");
   const [korean, setKorean] = useState("");
   const [context, setContext] = useState("");
@@ -3413,21 +3412,23 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
   const [generateTopic, setGenerateTopic] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState([]);
-  const [sessionPhrases, setSessionPhrases] = useState([]);
+  const [groupPhrases, setGroupPhrases] = useState([]);
   const [loadingSP, setLoadingSP] = useState(false);
   const [editingPhrase, setEditingPhrase] = useState(null);
+  const [confirmRollover, setConfirmRollover] = useState(false);
 
   useEffect(() => {
     if (!selectedGroup) return;
     setLoadingSP(true);
-    db.get("session_phrases", `group_id=eq.${selectedGroup.id}&select=*,phrase_bank(*)&order=session_number.asc,created_at.asc`)
-      .then(data => { setSessionPhrases(data); const nums = [...new Set(data.map(d => d.session_number))]; if (nums.length > 0) setSessionNum(Math.max(...nums)); })
+    db.get("session_phrases", `group_id=eq.${selectedGroup.id}&select=*,phrase_bank(*)&order=created_at.asc`)
+      .then(data => setGroupPhrases(data))
       .catch(() => {}).finally(() => setLoadingSP(false));
   }, [selectedGroup]);
 
-  const sessionNums = [...new Set(sessionPhrases.map(sp => sp.session_number))].sort((a, b) => a - b);
-  const bySession = {};
-  sessionPhrases.forEach(sp => { if (!bySession[sp.session_number]) bySession[sp.session_number] = []; bySession[sp.session_number].push(sp); });
+  // Split phrases into recent (in_library = false) and library (in_library = true).
+  // Treats null/undefined in_library as false (so existing rows behave as "recent").
+  const recentPhrases = groupPhrases.filter(sp => !sp.in_library);
+  const libraryPhrases = groupPhrases.filter(sp => sp.in_library);
 
   const handleEnglishChange = val => {
     setEnglish(val);
@@ -3436,8 +3437,8 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
   };
 
   const selectSuggestion = p => {
-    const dup = sessionPhrases.find(sp => sp.phrase_id === p.id);
-    if (dup) { showMsg("Already in Session " + dup.session_number, "warn"); setShowSug(false); return; }
+    const dup = groupPhrases.find(sp => sp.phrase_id === p.id);
+    if (dup) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent"), "warn"); setShowSug(false); return; }
     setEnglish(p.english); setKorean(p.korean || ""); setContext(p.context || ""); setShowSug(false);
   };
 
@@ -3458,14 +3459,16 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
       let phrase;
       if (existing.length > 0) { phrase = existing[0]; if (korean.trim() || context.trim()) { await db.update("phrase_bank", `id=eq.${phrase.id}`, { korean: korean.trim() || phrase.korean, context: context.trim() || phrase.context }); phrase = { ...phrase, korean: korean.trim() || phrase.korean, context: context.trim() || phrase.context }; } }
       else { const r = await db.insert("phrase_bank", { english: english.trim(), korean: korean.trim(), context: context.trim() }); phrase = Array.isArray(r) ? r[0] : r; }
-      const dup = sessionPhrases.find(sp => sp.phrase_id === phrase.id);
-      if (dup) { showMsg("Already in Session " + dup.session_number, "warn"); return; }
-      const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: sessionNum });
+      const dup = groupPhrases.find(sp => sp.phrase_id === phrase.id);
+      if (dup) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent"), "warn"); return; }
+      // New phrases default to Most Recent (in_library = false). session_number kept at 1
+      // for legacy compatibility; we don't show or use it anymore.
+      const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: 1, in_library: false });
       const sp = Array.isArray(spR) ? spR[0] : spR;
       setPhraseBank(prev => [phrase, ...prev.filter(p => p.id !== phrase.id)]);
-      setSessionPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
+      setGroupPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
       setEnglish(""); setKorean(""); setContext("");
-      showMsg("✓ Added to Session " + sessionNum + ": " + phrase.english);
+      showMsg("✓ Added: " + phrase.english);
     } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
@@ -3475,52 +3478,52 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
       const existing = await db.get("phrase_bank", `english=eq.${encodeURIComponent(p.english)}`);
       let phrase;
       if (existing.length > 0) { phrase = existing[0]; } else { const r = await db.insert("phrase_bank", { english: p.english, korean: p.korean, context: p.context }); phrase = Array.isArray(r) ? r[0] : r; }
-      const dup = sessionPhrases.find(sp => sp.phrase_id === phrase.id);
-      if (dup) { showMsg("Already in Session " + dup.session_number + ": " + p.english, "warn"); return; }
-      const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: sessionNum });
+      const dup = groupPhrases.find(sp => sp.phrase_id === phrase.id);
+      if (dup) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent") + ": " + p.english, "warn"); return; }
+      const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: 1, in_library: false });
       const sp = Array.isArray(spR) ? spR[0] : spR;
-      setSessionPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
+      setGroupPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
       setPhraseBank(prev => [phrase, ...prev.filter(x => x.id !== phrase.id)]);
       showMsg("✓ Added: " + p.english);
     } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
   const deleteSessionPhrase = async id => {
-    try { await db.delete("session_phrases", `id=eq.${id}`); setSessionPhrases(prev => prev.filter(sp => sp.id !== id)); showMsg("Removed"); }
+    try { await db.delete("session_phrases", `id=eq.${id}`); setGroupPhrases(prev => prev.filter(sp => sp.id !== id)); showMsg("Removed"); }
     catch(e) { showMsg("Error", "error"); }
   };
 
-  const deleteSession = async (n) => {
+  // Move a single phrase between Most Recent and Library
+  const togglePhraseLibrary = async (id, makeLibrary) => {
     try {
-      // Delete all session_phrases for this session number in this group
-      const toDelete = sessionPhrases.filter(sp => sp.session_number === n);
-      for (const sp of toDelete) {
-        await db.delete("session_phrases", `id=eq.${sp.id}`);
+      await db.update("session_phrases", `id=eq.${id}`, { in_library: makeLibrary });
+      setGroupPhrases(prev => prev.map(sp => sp.id === id ? { ...sp, in_library: makeLibrary } : sp));
+      showMsg(makeLibrary ? "→ Moved to Library" : "← Moved to Most Recent");
+    } catch(e) { showMsg("Error: " + e.message, "error"); }
+  };
+
+  // Bulk: move ALL Most Recent phrases to Library at once. The "end the week" button.
+  const rolloverToLibrary = async () => {
+    const ids = recentPhrases.map(sp => sp.id);
+    if (ids.length === 0) return;
+    try {
+      // Update each one. Could batch with PATCH on filter, but per-row is safer
+      // and the volumes here (10-20 phrases per week) make it negligible.
+      for (const id of ids) {
+        await db.update("session_phrases", `id=eq.${id}`, { in_library: true });
       }
-      setSessionPhrases(prev => prev.filter(sp => sp.session_number !== n));
-      showMsg("✓ Session " + n + " deleted");
-    } catch(e) { showMsg("Error deleting session: " + e.message, "error"); }
+      setGroupPhrases(prev => prev.map(sp => ids.includes(sp.id) ? { ...sp, in_library: true } : sp));
+      showMsg(`✓ Moved ${ids.length} phrases to Library`);
+      setConfirmRollover(false);
+    } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
   return (
     <div>
-      {editingPhrase && React.createElement(EditPhraseModal, { phrase: editingPhrase, onSave: updated => { setSessionPhrases(prev => prev.map(sp => sp.phrase_bank?.id === updated.id ? { ...sp, phrase_bank: updated } : sp)); setPhraseBank(prev => prev.map(p => p.id === updated.id ? updated : p)); setEditingPhrase(null); showMsg("✓ Phrase updated across all groups"); }, onClose: () => setEditingPhrase(null) })}
+      {editingPhrase && React.createElement(EditPhraseModal, { phrase: editingPhrase, onSave: updated => { setGroupPhrases(prev => prev.map(sp => sp.phrase_bank?.id === updated.id ? { ...sp, phrase_bank: updated } : sp)); setPhraseBank(prev => prev.map(p => p.id === updated.id ? updated : p)); setEditingPhrase(null); showMsg("✓ Phrase updated across all groups"); }, onClose: () => setEditingPhrase(null) })}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }}>
         {groups.map(g => React.createElement("button", { key: g.id, onClick: () => setSelectedGroup(g), style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? "#fff" : C.textMid, fontSize: "13px", fontWeight: selectedGroup?.id === g.id ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, g.name))}
       </div>
-
-      <Card style={{ marginBottom: "14px" }}>
-        <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>Session Number</div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: sessionNums.length > 0 ? "10px" : "0" }}>
-          <input type="number" min="1" value={sessionNum} onChange={e => setSessionNum(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: "72px", padding: "8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "16px", fontWeight: "700", textAlign: "center", fontFamily: FONT, outline: "none" }} />
-          {sessionNums.length > 0 && <span style={{ fontSize: "12px", color: C.textLight }}>or pick existing:</span>}
-        </div>
-        {sessionNums.length > 0 && (
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-            {sessionNums.map(n => React.createElement("button", { key: n, onClick: () => setSessionNum(n), style: { padding: "4px 12px", borderRadius: "16px", border: `1px solid ${sessionNum === n ? C.gold : C.border}`, background: sessionNum === n ? C.goldBg : C.bg, color: sessionNum === n ? C.gold : C.textMid, fontSize: "12px", fontWeight: sessionNum === n ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, "Session " + n))}
-          </div>
-        )}
-      </Card>
 
       <Card style={{ marginBottom: "14px", borderLeft: `3px solid ${C.gold}` }}>
         <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold, marginBottom: "10px" }}>✨ AI Generate Phrases</div>
@@ -3538,7 +3541,7 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
               ),
               React.createElement(Btn, { onClick: () => addGeneratedPhrase(p), variant: "secondary", style: { fontSize: "11px", padding: "5px 10px", flexShrink: 0 } }, "+ Add")
             ))}
-            <Btn onClick={async () => { for (const p of generated) await addGeneratedPhrase(p); setGenerated([]); showMsg("✓ All added to Session " + sessionNum); }} style={{ width: "100%", marginTop: "10px" }}>+ Add All to Session {sessionNum}</Btn>
+            <Btn onClick={async () => { for (const p of generated) await addGeneratedPhrase(p); setGenerated([]); showMsg("✓ All added"); }} style={{ width: "100%", marginTop: "10px" }}>+ Add All to Most Recent</Btn>
           </div>
         )}
       </Card>
@@ -3559,49 +3562,94 @@ function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
         {autoFilling && <div style={{ fontSize: "11px", color: C.gold, marginBottom: "6px" }}>✨ Auto-filling Korean…</div>}
         <div style={{ marginBottom: "8px" }}><Input value={korean} onChange={e => setKorean(e.target.value)} placeholder="Korean translation" /></div>
         <div style={{ marginBottom: "12px" }}><Input value={context} onChange={e => setContext(e.target.value)} placeholder="Context in Korean — when to use this" /></div>
-        <Btn onClick={addPhrase} style={{ width: "100%" }}>Add to {selectedGroup?.name} — Session {sessionNum}</Btn>
+        <Btn onClick={addPhrase} style={{ width: "100%" }}>Add to {selectedGroup?.name} — Most Recent</Btn>
       </Card>
 
       {loadingSP ? React.createElement("div", { style: { textAlign: "center", padding: "20px" } }, React.createElement(Spinner))
-        : sessionNums.length > 0 && (
+        : (
           <div>
-            <div style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", color: C.textLight, marginBottom: "10px" }}>{selectedGroup?.name} — All Sessions</div>
-            {sessionNums.map(n => React.createElement(SessionCard, { key: n, n, phrases: bySession[n], onEdit: setEditingPhrase, onDeletePhrase: deleteSessionPhrase, onDeleteSession: deleteSession }))}
+            {/* Most Recent section with rollover button */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <div style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", color: C.textLight, fontWeight: "700" }}>
+                {selectedGroup?.name} — Most Recent ({recentPhrases.length})
+              </div>
+              {recentPhrases.length > 0 && (
+                confirmRollover ? (
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <span style={{ fontSize: "11px", color: C.textMid }}>Move all {recentPhrases.length} to Library?</span>
+                    <button onClick={rolloverToLibrary} style={{ background: C.text, border: "none", borderRadius: "100px", color: "#fff", fontSize: "11px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" }}>Yes, move</button>
+                    <button onClick={() => setConfirmRollover(false)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "11px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, color: C.textMid }}>Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmRollover(true)}
+                    style={{ background: C.text, border: "none", borderRadius: "100px", padding: "5px 14px", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
+                    📚 Move all to Library
+                  </button>
+                )
+              )}
+            </div>
+
+            <PhraseManageList
+              phrases={recentPhrases}
+              isLibrary={false}
+              emptyText="No phrases in Most Recent. Add some above."
+              onEdit={setEditingPhrase}
+              onDelete={deleteSessionPhrase}
+              onMove={(id) => togglePhraseLibrary(id, true)}
+            />
+
+            {/* Library section */}
+            {libraryPhrases.length > 0 && (
+              <>
+                <div style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", color: C.textLight, fontWeight: "700", marginTop: "24px", marginBottom: "10px" }}>
+                  📚 Library ({libraryPhrases.length})
+                </div>
+                <PhraseManageList
+                  phrases={libraryPhrases}
+                  isLibrary={true}
+                  emptyText=""
+                  onEdit={setEditingPhrase}
+                  onDelete={deleteSessionPhrase}
+                  onMove={(id) => togglePhraseLibrary(id, false)}
+                />
+              </>
+            )}
           </div>
         )}
     </div>
   );
 }
 
-// ── Session Card (teacher dashboard phrase management) ────────────────────────
-function SessionCard({ n, phrases, onEdit, onDeletePhrase, onDeleteSession }) {
-  const [confirmDeleteSession, setConfirmDeleteSession] = useState(false);
+// ── PhraseManageList ──────────────────────────────────────────────────────────
+// Replaces the old SessionCard. Renders a list of phrases (either Most Recent
+// or Library) with edit/delete/move buttons. The move button toggles between
+// "→ Library" and "← Restore" depending on which section the phrase is in.
+function PhraseManageList({ phrases, isLibrary, emptyText, onEdit, onDelete, onMove }) {
   const [confirmDeletePhrase, setConfirmDeletePhrase] = useState(null);
 
+  if (phrases.length === 0) {
+    return emptyText ? React.createElement("div", { style: { background: C.bgSoft, borderRadius: "10px", padding: "16px", textAlign: "center", fontSize: "12px", color: C.textLight, fontStyle: "italic" } }, emptyText) : null;
+  }
+
   return React.createElement(Card, { style: { marginBottom: "10px" } },
-    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
-      React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: C.textMid } }, "Session " + n + " (" + phrases.length + " phrases)"),
-      confirmDeleteSession
-        ? React.createElement("div", { style: { display: "flex", gap: "6px", alignItems: "center" } },
-          React.createElement("span", { style: { fontSize: "11px", color: C.error } }, "Delete entire session?"),
-          React.createElement("button", { onClick: () => { onDeleteSession(n); setConfirmDeleteSession(false); }, style: { background: C.error, border: "none", borderRadius: "4px", color: "#fff", cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Delete"),
-          React.createElement("button", { onClick: () => setConfirmDeleteSession(false), style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "4px", cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Cancel")
-        )
-        : React.createElement("button", { onClick: () => setConfirmDeleteSession(true), style: { background: "transparent", border: `1px solid ${C.error}`, borderRadius: "4px", color: C.error, cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Delete Session")
-    ),
-    phrases.map(sp => React.createElement("div", { key: sp.id, style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "7px 0", borderTop: `1px solid ${C.bgSoft}`, fontSize: "13px" } },
-      React.createElement("div", { style: { flex: 1 } },
-        React.createElement("div", { style: { fontStyle: "italic" } }, sp.phrase_bank?.english),
-        sp.phrase_bank?.korean && React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, sp.phrase_bank.korean),
-        sp.phrase_bank?.context && React.createElement("div", { style: { fontSize: "11px", color: C.gold } }, sp.phrase_bank.context)
+    phrases.map((sp, idx) => React.createElement("div", { key: sp.id, style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderTop: idx === 0 ? "none" : `1px solid ${C.bgSoft}`, fontSize: "13px", gap: "8px" } },
+      React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+        React.createElement("div", { style: { fontStyle: "italic", color: C.text } }, sp.phrase_bank?.english),
+        sp.phrase_bank?.korean && React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "2px" } }, sp.phrase_bank.korean),
+        sp.phrase_bank?.context && React.createElement("div", { style: { fontSize: "11px", color: C.gold, marginTop: "2px" } }, sp.phrase_bank.context)
       ),
       confirmDeletePhrase === sp.id
-        ? React.createElement("div", { style: { display: "flex", gap: "4px" } },
-          React.createElement("button", { onClick: () => { onDeletePhrase(sp.id); setConfirmDeletePhrase(null); }, style: { background: C.error, border: "none", borderRadius: "4px", color: "#fff", cursor: "pointer", fontSize: "11px", padding: "3px 7px", fontFamily: FONT } }, "삭제"),
-          React.createElement("button", { onClick: () => setConfirmDeletePhrase(null), style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "4px", cursor: "pointer", fontSize: "11px", padding: "3px 6px", fontFamily: FONT } }, "✕")
+        ? React.createElement("div", { style: { display: "flex", gap: "4px", flexShrink: 0 } },
+          React.createElement("button", { onClick: () => { onDelete(sp.id); setConfirmDeletePhrase(null); }, style: { background: C.error, border: "none", borderRadius: "6px", color: "#fff", cursor: "pointer", fontSize: "11px", padding: "4px 8px", fontFamily: FONT } }, "삭제"),
+          React.createElement("button", { onClick: () => setConfirmDeletePhrase(null), style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", padding: "4px 6px", fontFamily: FONT } }, "✕")
         )
-        : React.createElement("div", { style: { display: "flex", gap: "4px", flexShrink: 0 } },
-          React.createElement("button", { onClick: () => onEdit(sp.phrase_bank), style: { background: "transparent", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.textMid, cursor: "pointer", fontSize: "11px", padding: "3px 8px", fontFamily: FONT } }, "Edit"),
+        : React.createElement("div", { style: { display: "flex", gap: "4px", flexShrink: 0, alignItems: "flex-start" } },
+          React.createElement("button", {
+            onClick: () => onMove(sp.id),
+            title: isLibrary ? "Move back to Most Recent" : "Move to Library",
+            style: { background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", color: C.textMid, cursor: "pointer", fontSize: "11px", padding: "4px 8px", fontFamily: FONT }
+          }, isLibrary ? "← Restore" : "→ Library"),
+          React.createElement("button", { onClick: () => onEdit(sp.phrase_bank), style: { background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", color: C.textMid, cursor: "pointer", fontSize: "11px", padding: "4px 8px", fontFamily: FONT } }, "Edit"),
           React.createElement("button", { onClick: () => setConfirmDeletePhrase(sp.id), style: { background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "18px", padding: "0 4px", lineHeight: 1 } }, "×")
         )
     ))
