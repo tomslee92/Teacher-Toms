@@ -92,6 +92,21 @@ const cleanText = t => {
 
 // ── Feedback Display — rich formatted output ──────────────────────────────────
 function FeedbackDisplay({ text }) {
+  const [koreanFeedback, setKoreanFeedback] = useState(null);
+  const [loadingKo, setLoadingKo] = useState(false);
+  const [showKo, setShowKo] = useState(false);
+
+  const translateFeedback = async () => {
+    if (koreanFeedback) { setShowKo(s => !s); return; }
+    setLoadingKo(true);
+    try {
+      const t = await groqCall(`Translate this English feedback into natural Korean. Keep emojis. Return ONLY Korean translation: "${text}"`);
+      setKoreanFeedback(t.trim());
+      setShowKo(true);
+    } catch(e) {}
+    setLoadingKo(false);
+  };
+
   if (!text) return null;
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
@@ -110,7 +125,14 @@ function FeedbackDisplay({ text }) {
   const isAlt = l => l.startsWith("→");
 
   return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
-    lines.map((line, i) => {
+    // Korean translation toggle
+    React.createElement("button", { onClick: translateFeedback, disabled: loadingKo,
+      style: { background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "4px 12px", fontSize: "11px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: "4px", alignSelf: "flex-start" }
+    }, loadingKo ? React.createElement(Spinner) : "🇰🇷", React.createElement("span", null, loadingKo ? "번역 중…" : showKo ? "한국어 숨기기" : "한국어로 보기")),
+    showKo && koreanFeedback && React.createElement("div", {
+      style: { background: C.bgSoft, borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: C.textMid, lineHeight: 1.7, borderLeft: `3px solid ${C.border}` }
+    }, koreanFeedback),
+    ...lines.map((line, i) => {
       if (isScore(line)) return React.createElement("div", { key: i, style: { background: C.bgSoft, borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "8px" } },
         React.createElement("span", { style: { fontSize: "18px" } }, "🎯"),
         React.createElement("span", { style: { fontSize: "15px", fontWeight: "700", color: C.text } }, line.replace("🎯", "").trim())
@@ -470,9 +492,20 @@ function useRecorder(onDone) {
 
   // Pick best supported MIME type - iOS Safari needs mp4, others support webm
   const getMimeType = () => {
-    const types = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"];
-    for (const t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
-    return "";
+    // Priority order for cross-device compatibility:
+    // 1. AAC in MP4 — works on Safari AND Android
+    // 2. WebM/Opus — works on Android/Chrome but NOT Safari (iOS)
+    // 3. Plain MP4 — risky: Samsung defaults to Opus which breaks Safari
+    const types = [
+      "audio/mp4;codecs=aac",   // Best: works on iOS Safari + Android
+      "audio/mp4;codecs=mp4a",  // Alternative AAC name
+      "audio/webm;codecs=opus", // Android Chrome — won't play on iOS
+      "audio/webm",             // Generic webm
+    ];
+    for (const t of types) {
+      if (MediaRecorder.isTypeSupported(t)) return t;
+    }
+    return "audio/mp4"; // Last resort
   };
 
   const start = async () => {
@@ -1050,8 +1083,8 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
         )}
         {tab === "community" && <div className="feature-screen">{React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak })}</div>}
         {tab === "practice" && <div className="feature-screen">{React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak })}</div>}
-        {tab === "freetalk" && <div className="feature-screen">{React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak })}</div>}
-        {tab === "myphrases" && <div className="feature-screen">{React.createElement(MyPhrasesTab, { user, isPreview })}</div>}
+        {tab === "freetalk" && <div className="feature-screen">{React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak, onPhraseSaved: () => setMyPhrasesKey(k => k + 1) })}</div>}
+        {tab === "myphrases" && <div className="feature-screen">{React.createElement(MyPhrasesTab, { user, isPreview, refreshKey: myPhrasesKey })}</div>}
         {tab === "chat" && <div className="feature-screen">{React.createElement(ChatTab, { user, group, isPreview })}</div>}
       </div>
 
@@ -1524,7 +1557,7 @@ function KoreanVoiceInput({ onResult, loading }) {
   }, "🎙", React.createElement("span", null, "한국어로 말하기"));
 }
 
-function FreeTalkTab({ user, isPreview, onPracticed }) {
+function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
   const [activeMode, setActiveMode] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [transcript, setTranscript] = useState("");
@@ -1719,13 +1752,14 @@ STRICT RULES:
 - Avoid these phrases already known to the student: ${avoidList || "none"}
 - Each expression must be genuinely useful in real conversation
 - Include a mix of: idioms, useful sentence starters, polite phrases, and natural expressions
-- Explanations should be clear and practical
+- "korean" field must be a natural Korean translation of the expression (hangul only, no English)
+- "explanation" is a brief English explanation of when/how to use it
 - Examples must be realistic conversation sentences
 - Return ONLY valid JSON, no markdown
 
 Format:
 {"expressions": [
-  {"expression": "...", "explanation": "...", "example": "...", "level": "beginner|intermediate|advanced"},
+  {"expression": "...", "korean": "한국어 번역...", "explanation": "...", "example": "...", "level": "beginner|intermediate|advanced"},
   ...
 ]}`);
         const clean = text.replace(/```json|```/g, "").trim();
@@ -1744,12 +1778,17 @@ Format:
         await db.insert("student_phrases", {
           student_id: user.id,
           english: expr.expression,
-          korean: expr.explanation,
-          context: expr.example,
+          korean: expr.korean || expr.explanation || "",
+          context: expr.example || "",
           source: "expression_generator",
+          hidden: false,
         });
         setSavedIds(prev => new Set([...prev, expr.expression]));
-      } catch(e) {}
+        onPhraseSaved && onPhraseSaved();
+      } catch(e) {
+        console.error("Save phrase error:", e.message, e);
+        alert("저장 오류: " + e.message);
+      }
     };
 
     const levelColor = (l) => l === "beginner" ? C.success : l === "advanced" ? C.error : C.gold;
@@ -1805,7 +1844,12 @@ Format:
                     {expr.level || "intermediate"}
                   </span>
                 </div>
-                <div style={{ fontSize: "12px", color: C.textMid, lineHeight: 1.6, marginBottom: "6px" }}>
+                {expr.korean && (
+                  <div style={{ fontSize: "14px", fontWeight: "600", color: C.textMid, marginBottom: "6px", lineHeight: 1.4 }}>
+                    🇰🇷 {expr.korean}
+                  </div>
+                )}
+                <div style={{ fontSize: "12px", color: C.textLight, lineHeight: 1.6, marginBottom: "6px" }}>
                   {expr.explanation}
                 </div>
                 {expr.example && (
@@ -1815,7 +1859,7 @@ Format:
                 )}
               </div>
               {/* Actions */}
-              <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "8px", background: C.bgSoft }}>
+              <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "8px", alignItems: "center", background: C.bgSoft }}>
                 <button onClick={() => speak(expr.expression)}
                   style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
                   🔊 듣기
@@ -1825,9 +1869,12 @@ Format:
                   🔊 예문
                 </button>
                 <div style={{ flex: 1 }} />
-                <button onClick={() => !isSaved && savePhrase(expr)}
-                  style={{ background: isSaved ? C.successBg : C.text, border: `1px solid ${isSaved ? C.successBorder : C.text}`, borderRadius: "100px", padding: "5px 14px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : "#fff", cursor: isSaved ? "default" : "pointer", fontFamily: FONT, transition: "all 0.2s" }}>
-                  {isSaved ? "✓ 저장됨" : "⭐ 저장"}
+                <button onClick={async () => {
+                    if (isSaved) return;
+                    await savePhrase(expr);
+                  }}
+                  style={{ background: isSaved ? C.successBg : C.text, border: `1px solid ${isSaved ? C.successBorder : C.text}`, borderRadius: "100px", padding: "5px 14px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : "#fff", cursor: isSaved ? "default" : "pointer", fontFamily: FONT, transition: "all 0.3s ease" }}>
+                  {isSaved ? "✅ 저장됨" : "⭐ 저장"}
                 </button>
               </div>
             </div>
@@ -1848,7 +1895,7 @@ Format:
   return null;
 }
 
-function MyPhrasesTab({ user, isPreview }) {
+function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
   const [phrases, setPhrases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -1860,7 +1907,7 @@ function MyPhrasesTab({ user, isPreview }) {
     db.get("student_phrases", `student_id=eq.${user.id}&order=created_at.desc`)
       .then(data => { setPhrases(data || []); setLoading(false); })
       .catch(e => { console.error("MyPhrases load error:", e); setLoading(false); });
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   const toggleHide = async (id, hidden) => {
     try {
@@ -3812,8 +3859,14 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
     cancelAnimationFrame(rafRef.current);
     const audio = audioRef.current;
     if (!audio || !src) return;
-    // Set src directly — most compatible approach for Android
-    audio.src = src;
+    // Normalize src — strip non-standard codecs params from data URLs
+    // data:audio/mp4;codecs=opus;base64,... → data:audio/mp4;base64,...
+    // This fixes Samsung Galaxy recordings that Safari/iOS can't play
+    let normalizedSrc = src;
+    if (src.startsWith("data:") && src.includes(";codecs=")) {
+      normalizedSrc = src.replace(/;codecs=[^;,]+/, "");
+    }
+    audio.src = normalizedSrc;
     audio.load();
   }, [src]);
 
@@ -3823,7 +3876,14 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
     const onMeta  = () => setDuration(audio.duration || 0);
     const onReady = () => setCanPlay(true);
     const onEnded = () => { setPlaying(false); setProgress(0); setCurrentTime(0); cancelAnimationFrame(rafRef.current); };
-    const onErr   = (e) => console.warn("Audio error:", e.target.error?.code, e.target.error?.message, src?.slice(0,60));
+    const onErr   = (e) => {
+      const code = e.target.error?.code;
+      const msg = e.target.error?.message;
+      console.warn("Audio error code:", code, "message:", msg, "src:", src?.slice(0,80));
+      // Error codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+      setCanPlay(false);
+      setDuration(-1); // Use -1 to signal error state
+    };
     audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("canplay", onReady);
     audio.addEventListener("ended", onEnded);
@@ -3879,10 +3939,51 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
       setPlaying(true);
     } catch(e) {
       console.warn("Play failed:", e.message);
-      // Android fallback: create fresh Audio object
+      // Universal fallback: try Web Audio API for formats Safari can't play natively
+      try {
+        // Attempt to decode via Web Audio API and play via AudioBufferSourceNode
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          let arrayBuf;
+          if (src.startsWith("data:")) {
+            const base64 = src.split(",")[1];
+            const binary = atob(base64);
+            arrayBuf = new ArrayBuffer(binary.length);
+            const view = new Uint8Array(arrayBuf);
+            for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+          } else {
+            const resp = await fetch(src);
+            arrayBuf = await resp.arrayBuffer();
+          }
+          const audioBuf = await ctx.decodeAudioData(arrayBuf);
+          const source = ctx.createBufferSource();
+          source.buffer = audioBuf;
+          source.connect(ctx.destination);
+          source.start(0);
+          setPlaying(true);
+          setDuration(audioBuf.duration);
+          source.onended = () => { setPlaying(false); setProgress(0); ctx.close(); };
+          // Fake RAF progress for Web Audio
+          const startTime = ctx.currentTime;
+          const tick = () => {
+            const elapsed = ctx.currentTime - startTime;
+            setCurrentTime(elapsed);
+            setProgress(Math.min(elapsed / audioBuf.duration, 1));
+            if (elapsed < audioBuf.duration) rafRef.current = requestAnimationFrame(tick);
+          };
+          rafRef.current = requestAnimationFrame(tick);
+          return; // Success via Web Audio API
+        }
+      } catch(webAudioErr) {
+        console.warn("Web Audio API fallback also failed:", webAudioErr.message);
+      }
+      // Last resort: open in new tab
       try {
         const a = new Audio();
-        a.src = src;
+        a.src = src.startsWith("data:") && src.includes(";codecs=")
+          ? src.replace(/;codecs=[^;,]+/, "")
+          : src;
         a.playsInline = true;
         await a.play();
         setPlaying(true);
@@ -3941,13 +4042,14 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
       React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
           React.createElement("button", {
-            onClick: togglePlay,
-            style: { width: "32px", height: "32px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", flexShrink: 0, transition: "transform 0.1s", transform: playing ? "scale(0.92)" : "scale(1)" }
-          }, playing ? "⏸" : "▶"),
+            onClick: duration === -1 ? () => window.open(src, "_blank") : togglePlay,
+            title: duration === -1 ? "Open audio in new tab" : undefined,
+            style: { width: "32px", height: "32px", borderRadius: "50%", background: duration === -1 ? C.error : C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", flexShrink: 0, transition: "transform 0.1s", transform: playing ? "scale(0.92)" : "scale(1)" }
+          }, duration === -1 ? "↗" : playing ? "⏸" : "▶"),
           React.createElement("span", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid } }, label)
         ),
-        React.createElement("span", { style: { fontSize: "11px", color: C.textLight, fontVariantNumeric: "tabular-nums", minWidth: "80px", textAlign: "right" } },
-          duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : canPlay ? "0:00" : "—"
+        React.createElement("span", { style: { fontSize: "11px", color: duration === -1 ? C.error : C.textLight, fontVariantNumeric: "tabular-nums", minWidth: "80px", textAlign: "right" } },
+          duration === -1 ? "재생 오류" : duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : canPlay ? "0:00" : "—"
         )
       ),
       // Progress bar
@@ -4418,7 +4520,9 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
       if (finalBlob) {
         // Try Supabase Storage first
         try {
-          const mimeType = finalBlob.type || "audio/webm";
+          // Normalize MIME type - strip codecs param for Supabase compatibility
+          const rawMime = finalBlob.type || "audio/webm";
+          const mimeType = rawMime.split(";")[0]; // e.g. "audio/mp4" not "audio/mp4;codecs=opus"
           const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
           const fileName = `qod_${user.id}_${Date.now()}.${ext}`;
           const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/qod-audio/${fileName}`, {
@@ -4437,12 +4541,14 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
         // Fallback: convert to base64 and store directly in the DB
         if (!audioUrl) {
           try {
-            audioUrl = await new Promise((resolve, reject) => {
+            const rawDataUrl = await new Promise((resolve, reject) => {
               const reader = new FileReader();
               reader.onload = () => resolve(reader.result);
               reader.onerror = reject;
               reader.readAsDataURL(finalBlob);
             });
+            // Strip codecs param so Safari can play it
+            audioUrl = rawDataUrl.replace(/;codecs=[^;,]+/, "");
           } catch(e) {
             console.warn("Base64 fallback failed:", e.message);
           }
