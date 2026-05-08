@@ -3920,19 +3920,60 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
     if (playing) {
       audio.pause();
       setPlaying(false);
+      cancelAnimationFrame(rafRef.current);
       return;
     }
+    // For data: URLs (base64 stored audio), use Web Audio API
+    // This handles opus/mp4 which Safari's <audio> can't play
+    if (src.startsWith("data:")) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) throw new Error("No AudioContext");
+        const ctx = new AudioCtx();
+        if (ctx.state === "suspended") await ctx.resume();
+        const base64 = src.split(",")[1];
+        const binary = atob(base64);
+        const arrayBuf = new ArrayBuffer(binary.length);
+        const view = new Uint8Array(arrayBuf);
+        for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+        const audioBuf = await ctx.decodeAudioData(arrayBuf);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuf;
+        source.connect(ctx.destination);
+        source.start(0);
+        setPlaying(true);
+        setDuration(audioBuf.duration);
+        const startTime = ctx.currentTime;
+        const tick = () => {
+          const elapsed = ctx.currentTime - startTime;
+          setCurrentTime(Math.min(elapsed, audioBuf.duration));
+          setProgress(Math.min(elapsed / audioBuf.duration, 1));
+          if (elapsed < audioBuf.duration) {
+            rafRef.current = requestAnimationFrame(tick);
+          } else {
+            setPlaying(false); setProgress(0); setCurrentTime(0);
+            ctx.close();
+          }
+        };
+        rafRef.current = requestAnimationFrame(tick);
+        source.onended = () => {
+          setPlaying(false); setProgress(0); setCurrentTime(0);
+          cancelAnimationFrame(rafRef.current);
+          ctx.close();
+        };
+        return;
+      } catch(webAudioErr) {
+        console.warn("Web Audio API failed:", webAudioErr.message, "— trying <audio> element");
+      }
+    }
     try {
-      // Ensure loaded — critical for Android Chrome
       if (audio.readyState < 2) {
         if (!audio.src || audio.src !== src) { audio.src = src; }
         audio.load();
-        await new Promise((resolve, reject) => {
-          const onCan = () => { audio.removeEventListener("canplay", onCan); audio.removeEventListener("error", onErr); resolve(); };
-          const onErr = (e) => { audio.removeEventListener("canplay", onCan); audio.removeEventListener("error", onErr); reject(e); };
-          audio.addEventListener("canplay", onCan, { once: true });
-          audio.addEventListener("error", onErr, { once: true });
-          setTimeout(resolve, 5000); // timeout fallback
+        await new Promise((resolve) => {
+          audio.addEventListener("canplay", resolve, { once: true });
+          audio.addEventListener("error", resolve, { once: true });
+          setTimeout(resolve, 5000);
         });
       }
       await audio.play();
