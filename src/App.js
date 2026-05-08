@@ -66,6 +66,7 @@ const GlobalStyle = () => React.createElement("style", null, `
   @keyframes scaleIn{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,0.3);}50%{box-shadow:0 0 0 9px rgba(192,57,43,0);}}
   @keyframes streakFire{0%,100%{transform:scale(1) rotate(-1deg);}50%{transform:scale(1.1) rotate(1deg);}}
+  @keyframes speakerPulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.18);opacity:0.7;}}
   .fade-in{animation:fadeIn 0.2s ease both;}
   .fade-in-up{animation:fadeInUp 0.25s ease both;}
   .scale-in{animation:scaleIn 0.18s ease both;}
@@ -170,22 +171,73 @@ let currentAudio = null;
 let globalPlaybackSpeed = 1.0;
 
 const ttsCache = new Map();
+
+// ── Speaking state pub/sub ────────────────────────────────────────────────────
+// Tracks which text+speed combo is currently loading or playing, so any listen
+// button across the app can show a visual indicator without prop drilling.
+// State shape: { text, speed, status: 'idle' | 'loading' | 'playing' }
+// Speed is part of the key because the same phrase may have a normal-speed
+// button and a slow-speed button — they should show state independently.
+const speakingState = { text: null, speed: null, status: "idle" };
+const speakingSubscribers = new Set();
+function notifySpeaking() {
+  speakingSubscribers.forEach(fn => { try { fn(); } catch(e) {} });
+}
+function setSpeakingState(text, status, speed = null) {
+  speakingState.text = text;
+  speakingState.speed = speed;
+  speakingState.status = status;
+  notifySpeaking();
+}
+
+// React hook: returns { isLoading, isPlaying } for a given text.
+// By default matches any speed for this text (the common case — one main listen
+// button per text). When `exactSpeed` is true, only matches the given speed
+// (use for buttons that visually distinguish by speed, like "🐢 천천히" buttons
+// alongside a regular "🔊 듣기" button on the same row).
+function useSpeakingState(text, speed = null, exactSpeed = false) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const cb = () => force(n => n + 1);
+    speakingSubscribers.add(cb);
+    return () => { speakingSubscribers.delete(cb); };
+  }, []);
+  const targetKey = (text || "").trim();
+  const activeKey = (speakingState.text || "").trim();
+  const speedMatch = exactSpeed ? (speakingState.speed || null) === speed : true;
+  const isMatch = targetKey && targetKey === activeKey && speedMatch;
+  return {
+    isLoading: isMatch && speakingState.status === "loading",
+    isPlaying: isMatch && speakingState.status === "playing",
+    isActive: isMatch && speakingState.status !== "idle",
+  };
+}
+
 async function speak(text, speed = null) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   const playSpeed = speed !== null ? speed : globalPlaybackSpeed;
   const cacheKey = text.trim();
-  if (ttsCache.has(cacheKey)) {
+
+  // Set initial state — cached audio goes straight to "playing", uncached starts as "loading"
+  const isCached = ttsCache.has(cacheKey);
+  setSpeakingState(text, isCached ? "playing" : "loading", speed);
+
+  if (isCached) {
     try {
       currentAudio = new Audio(ttsCache.get(cacheKey));
       currentAudio.playbackRate = playSpeed;
       currentAudio.playsInline = true;
+      currentAudio.onended = () => { setSpeakingState(null, "idle"); currentAudio = null; };
+      currentAudio.onerror = () => { setSpeakingState(null, "idle"); currentAudio = null; };
       await currentAudio.play();
+      return;
     } catch(e) {
       // Cache URL may have expired, fall through to re-fetch
       ttsCache.delete(cacheKey);
+      setSpeakingState(text, "loading", speed);
     }
-    if (ttsCache.has(cacheKey)) return;
   }
+
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`, {
       method: "POST",
@@ -205,7 +257,9 @@ async function speak(text, speed = null) {
     audio.playbackRate = playSpeed;
     audio.playsInline = true;
     currentAudio = audio;
-    audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
+    audio.onplay = () => setSpeakingState(text, "playing", speed);
+    audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingState(null, "idle"); };
+    audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingState(null, "idle"); };
     await audio.play();
   } catch(e) {
     console.warn("ElevenLabs TTS failed, falling back to Groq:", e.message);
@@ -221,13 +275,43 @@ async function speak(text, speed = null) {
       const audio = new Audio(url);
       audio.playbackRate = playSpeed;
       currentAudio = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
+      audio.onplay = () => setSpeakingState(text, "playing", speed);
+      audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingState(null, "idle"); };
+      audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingState(null, "idle"); };
       await audio.play();
     } catch(e2) {
-      try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.85 * playSpeed; window.speechSynthesis.speak(u); } catch(e3) {}
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US";
+        u.rate = 0.85 * playSpeed;
+        u.onstart = () => setSpeakingState(text, "playing", speed);
+        u.onend = () => setSpeakingState(null, "idle");
+        u.onerror = () => setSpeakingState(null, "idle");
+        window.speechSynthesis.speak(u);
+      } catch(e3) {
+        setSpeakingState(null, "idle");
+      }
     }
   }
 }
+
+// ── ListenIcon ───────────────────────────────────────────────────────────────
+// Renders a 🔊 icon, ⏳ while loading, or 🔊 (pulsing) while playing. Used inside
+// listen buttons so they show what they're doing without each button reimplementing
+// the visual logic.
+function ListenIcon({ text, speed = null, exactSpeed = false, fallback = "🔊" }) {
+  const { isLoading, isPlaying } = useSpeakingState(text, speed, exactSpeed);
+  if (isLoading) return React.createElement("span", {
+    style: { display: "inline-block", animation: "spin 0.9s linear infinite" }
+  }, "⏳");
+  if (isPlaying) return React.createElement("span", {
+    style: { display: "inline-block", animation: "speakerPulse 0.9s ease-in-out infinite" }
+  }, "🔊");
+  return fallback;
+}
+
+// (ListenButton component is defined after Btn — see below)
 
 // ── Groq ──────────────────────────────────────────────────────────────────────
 const SYSTEM = `You are Tom, a warm English coach for Korean learners at Wayve.
@@ -484,6 +568,54 @@ const Card = ({ children, style = {} }) =>
 
 const Spinner = () => React.createElement("span", { style: { display: "inline-block", width: "16px", height: "16px", border: `2px solid ${C.border}`, borderTop: `2px solid ${C.text}`, borderRadius: "50%", animation: "spin 0.6s linear infinite", verticalAlign: "middle" } });
 
+// ── ListenButton ─────────────────────────────────────────────────────────────
+// Drop-in replacement for "speak()" buttons across the app. Shows a loading
+// indicator while audio is being fetched, a pulsing speaker while audio plays,
+// and disables itself for the duration to prevent double-triggers.
+//
+// Props:
+//   text       — the text to speak (also serves as the identity for state matching)
+//   speed      — optional playback speed (passed to speak())
+//   label      — optional text shown next to the icon (e.g. " 듣기", " 천천히")
+//   variant    — "btn" uses the styled <Btn> component; "plain" uses a raw <button>
+//   style      — additional inline styles merged onto the button
+function ListenButton({ text, speed = null, label = " 듣기", variant = "btn", style = {}, fallbackIcon = "🔊", exactSpeed = false }) {
+  const { isActive } = useSpeakingState(text, speed, exactSpeed);
+  const handleClick = () => {
+    if (isActive) return; // Prevent re-trigger while already loading/playing
+    speak(text, speed);
+  };
+  const content = React.createElement(React.Fragment, null,
+    React.createElement(ListenIcon, { text, speed, exactSpeed, fallback: fallbackIcon }),
+    label
+  );
+  if (variant === "btn") {
+    return React.createElement(Btn, {
+      onClick: handleClick,
+      disabled: isActive,
+      variant: "secondary",
+      style: { ...style, opacity: isActive ? 0.7 : 1 }
+    }, content);
+  }
+  // Plain button variant — caller fully controls the styling
+  return React.createElement("button", {
+    onClick: handleClick,
+    disabled: isActive,
+    style: {
+      background: "transparent",
+      border: `1px solid ${C.border}`,
+      borderRadius: "100px",
+      padding: "5px 12px",
+      fontSize: "12px",
+      color: C.textMid,
+      cursor: isActive ? "default" : "pointer",
+      fontFamily: FONT,
+      opacity: isActive ? 0.7 : 1,
+      ...style
+    }
+  }, content);
+}
+
 const Msg = ({ text, type = "success" }) => {
   if (!text) return null;
   const s = {
@@ -544,7 +676,7 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
     return (
       <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}`, textAlign: "center" }}>
         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-          {showListen && <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 듣기</Btn>}
+          {showListen && <ListenButton text={phrase.english} label=" 듣기" style={{ fontSize: "12px", padding: "6px 12px" }} />}
           <Btn onClick={() => { setStarted(true); setTimeout(() => rec.start(), 200); }} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 연습</Btn>
         </div>
       </div>
@@ -554,7 +686,7 @@ function MiniPractice({ phrase, user, isPreview, showListen = true, autoRecord =
   return (
     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "12px" }}>
-        {showListen && <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "12px", padding: "6px 12px" }}>🔊 듣기</Btn>}
+        {showListen && <ListenButton text={phrase.english} label=" 듣기" style={{ fontSize: "12px", padding: "6px 12px" }} />}
         {!rec.isRec && !loading && !feedback && <Btn onClick={rec.start} style={{ fontSize: "12px", padding: "6px 16px" }}>🎙 다시 시도</Btn>}
         {rec.isRec && <Btn onClick={rec.stop} variant="ghost" style={{ borderColor: C.error, color: C.error, fontSize: "12px", padding: "6px 14px" }}>⏹ 멈추기 ({rec.time}초)</Btn>}
         {loading && React.createElement(Spinner)}
@@ -1419,7 +1551,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
     <div>
       {!hideContext && phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "14px", flexWrap: "wrap" }}>
-        <Btn onClick={() => speak(phrase.english)} variant="secondary" style={{ fontSize: "13px", padding: "7px 14px" }}>🔊 듣기</Btn>
+        <ListenButton text={phrase.english} label=" 듣기" style={{ fontSize: "13px", padding: "7px 14px" }} />
         {[1.0, 0.75, 0.5].map(s => (
           React.createElement("button", {
             key: s,
@@ -1714,7 +1846,7 @@ RETURN ONLY THE JSON OBJECT:`);
             <Card key={i} style={{ marginBottom: "10px" }}>
               <div style={{ fontSize: "16px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>"{t.english}"</div>
               {t.note && <div style={{ fontSize: "12px", color: C.textMid, marginBottom: "6px" }}>{t.note}</div>}
-              <button onClick={() => speak(t.english)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "13px", fontFamily: FONT }}>🔊 듣기</button>
+              <ListenButton text={t.english} label=" 듣기" variant="plain" style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "13px", padding: "0" }} />
             </Card>
           ))}
         </div>
@@ -1857,14 +1989,8 @@ RETURN ONLY THE JSON OBJECT:`);
             )}
           </div>
           <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "6px", alignItems: "center", background: C.bgSoft, flexWrap: "wrap" }}>
-            <button onClick={() => speak(expr.expression)}
-              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
-              🔊 듣기
-            </button>
-            <button onClick={() => speak(expr.expression, 0.7)}
-              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
-              🐢 천천히
-            </button>
+            <ListenButton text={expr.expression} label=" 듣기" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
+            <ListenButton text={expr.expression} speed={0.7} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
             <button onClick={() => setPracticeTarget(expr)}
               style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
               🎙 연습
@@ -2048,14 +2174,8 @@ Return ONLY the Korean feedback, no English, no preamble.`);
             </div>
           )}
           <div style={{ display: "flex", gap: "6px" }}>
-            <button onClick={() => speak(phrase.expression)}
-              style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
-              🔊 듣기
-            </button>
-            <button onClick={() => speak(phrase.expression, 0.7)}
-              style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
-              🐢 천천히
-            </button>
+            <ListenButton text={phrase.expression} label=" 듣기" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
+            <ListenButton text={phrase.expression} speed={0.7} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
           </div>
         </div>
 
@@ -2226,7 +2346,7 @@ function MyPhraseRow({ phrase, user, isPreview, onToggleHide, onDelete }) {
           {phrase.context && <div style={{ fontSize: "11px", color: C.gold, marginTop: "2px" }}>{phrase.context}</div>}
         </div>
         <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-          <button onClick={() => speak(phrase.english)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px" }}>🔊</button>
+          <ListenButton text={phrase.english} label="" variant="plain" style={{ borderRadius: "5px", padding: "4px 8px", fontSize: "12px" }} />
           <button onClick={() => setOpen(o => !o)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px" }}>🎙</button>
           <button onClick={onToggleHide} title={phrase.hidden ? "Show" : "Hide"} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "5px", padding: "4px 8px", cursor: "pointer", fontSize: "12px" }}>{phrase.hidden ? "👁" : "🙈"}</button>
           {confirmDelete ? (
@@ -3988,7 +4108,7 @@ SPARK_5: [one sentence]`);
               </div>
             )}
             <div style={{ display: "flex", gap: "8px" }}>
-              <Btn onClick={() => speak(previewPrompt.prompt)} variant="secondary" style={{ flex: 1, fontSize: "13px" }}>🔊 Hear it</Btn>
+              <ListenButton text={previewPrompt.prompt} label=" Hear it" style={{ flex: 1, fontSize: "13px" }} />
               <Btn onClick={() => setPreviewPrompt(null)} variant="ghost" style={{ fontSize: "13px" }}>Close</Btn>
             </div>
           </div>
@@ -4972,7 +5092,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
         ),
     // Listen controls
     React.createElement("div", { style: { display: "flex", gap: "7px", flexWrap: "wrap", marginTop: "12px" } },
-      React.createElement(Btn, { onClick: () => speak(prompt.prompt, playbackSpeed), variant: "secondary", style: { fontSize: "12px", padding: "7px 14px" } }, "🔊 듣기"),
+      React.createElement(ListenButton, { text: prompt.prompt, label: " 듣기", style: { fontSize: "12px", padding: "7px 14px" } }),
       ...[1.0, 0.75, 0.5].map(s =>
         React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(prompt.prompt, s); },
           style: { padding: "7px 12px", borderRadius: "100px", border: `1px solid ${playbackSpeed === s ? C.text : C.border}`, background: playbackSpeed === s ? C.text : C.bg, color: playbackSpeed === s ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, transition: "all 0.12s" } }, s + "x")
@@ -5039,7 +5159,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                             React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); },
                               style: { padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s + "x")
                           )}
-                          <button onClick={() => speak(scaffoldedEnglish, playbackSpeed)} style={{ padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px", cursor: "pointer", fontFamily: FONT }}>🔊</button>
+                          <ListenButton text={scaffoldedEnglish} speed={playbackSpeed} label="" variant="plain" style={{ padding: "4px 10px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
                         </div>
                       </div>
                       <Btn onClick={() => setStep("practice")} style={{ width: "100%" }}>🎙 이걸로 녹음하기</Btn>
@@ -5094,7 +5214,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                             React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); },
                               style: { padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s + "x")
                           )}
-                          <button onClick={() => speak(scaffoldedEnglish, playbackSpeed)} style={{ padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px", cursor: "pointer", fontFamily: FONT }}>🔊</button>
+                          <ListenButton text={scaffoldedEnglish} speed={playbackSpeed} label="" variant="plain" style={{ padding: "4px 10px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: "8px" }}>
