@@ -297,17 +297,18 @@ async function speak(text, speed = null) {
 }
 
 // ── ListenIcon ───────────────────────────────────────────────────────────────
-// Renders a 🔊 icon, ⏳ while loading, or 🔊 (pulsing) while playing. Used inside
-// listen buttons so they show what they're doing without each button reimplementing
-// the visual logic.
+// Renders the icon for a listen button. Idle = static icon. Loading = same
+// icon, dimmed (signals "something is happening" without changing identity).
+// Playing = icon pulses gently. The pulse subtly grows and fades, mirroring
+// audio waves — without being noisy.
 function ListenIcon({ text, speed = null, exactSpeed = false, fallback = "🔊" }) {
   const { isLoading, isPlaying } = useSpeakingState(text, speed, exactSpeed);
   if (isLoading) return React.createElement("span", {
-    style: { display: "inline-block", animation: "spin 0.9s linear infinite" }
-  }, "⏳");
+    style: { display: "inline-block", opacity: 0.45, transition: "opacity 0.2s" }
+  }, fallback);
   if (isPlaying) return React.createElement("span", {
     style: { display: "inline-block", animation: "speakerPulse 0.9s ease-in-out infinite" }
-  }, "🔊");
+  }, fallback);
   return fallback;
 }
 
@@ -1135,11 +1136,11 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
         {tab === "chat" && <div className="feature-screen">{React.createElement(ChatTab, { user, group, isPreview })}</div>}
       </div>
 
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 20, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 20, paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)", paddingTop: "4px" }}>
         {[["community","❓","Daily Question"],["practice","🎙","Practice"],["freetalk","💬","Free Talk"],["myphrases","⭐","My Phrases"]].map(([id, icon, label]) => {
           const active = tab === id;
           const showBadge = id === "community" && unreadCommentIds.size > 0;
-          return React.createElement("button", { key: id, className: "nav-btn", onClick: () => setTab(id), style: { flex: 1, padding: "10px 4px 8px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", position: "relative" } },
+          return React.createElement("button", { key: id, className: "nav-btn", onClick: () => setTab(id), style: { flex: 1, padding: "14px 4px 12px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", position: "relative" } },
             React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative" } },
               icon,
               showBadge && React.createElement("span", { style: { position: "absolute", top: "-2px", right: "-8px", minWidth: "16px", height: "16px", borderRadius: "100px", background: C.error, color: "#fff", fontSize: "10px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", border: `2px solid ${C.bg}` } }, unreadCommentIds.size)
@@ -1166,6 +1167,16 @@ function PracticeTab({ user, group, isPreview, onPracticed }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [celebrationType, setCelebrationType] = useState(null);
   const [sessionResets, setSessionResets] = useState({}); // tracks local resets per session
+
+  // Lock body scroll while the random phrase modal is open. Prevents the
+  // perceived "off-center" effect on mobile where the page scrolls behind
+  // the modal and the modal appears jammed against the viewport edge.
+  useEffect(() => {
+    if (!randomPhrase) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [randomPhrase]);
 
   const loadData = useCallback(async () => {
     if (!group?.id) { setLoading(false); return; }
@@ -1514,13 +1525,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
       {!hideContext && phrase.context && <div style={{ background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", borderRadius: "0 4px 4px 0", marginBottom: "14px", fontSize: "13px", color: C.textMid }}>{phrase.context}</div>}
       <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", marginBottom: "14px", flexWrap: "wrap" }}>
         <ListenButton text={phrase.english} label=" 듣기" style={{ fontSize: "13px", padding: "7px 14px" }} />
-        {[1.0, 0.75, 0.5].map(s => (
-          React.createElement("button", {
-            key: s,
-            onClick: () => { globalPlaybackSpeed = s; speak(phrase.english, s); },
-            style: { padding: "5px 10px", borderRadius: "14px", border: `1px solid ${globalPlaybackSpeed === s ? C.text : C.border}`, background: globalPlaybackSpeed === s ? C.text : C.bg, color: globalPlaybackSpeed === s ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }
-          }, s + "x")
-        ))}
+        <ListenButton text={phrase.english} speed={0.6} label=" 천천히" fallbackIcon="🐢" style={{ fontSize: "13px", padding: "7px 14px" }} exactSpeed={true} />
       </div>
       <div style={{ textAlign: "center" }}>
         {!rec.isRec && !loading && <Btn onClick={rec.start} style={{ padding: "12px 32px", fontSize: "15px" }}>🎙 녹음 시작</Btn>}
@@ -1934,7 +1939,7 @@ RETURN ONLY THE JSON OBJECT:`);
           </div>
           <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "6px", alignItems: "center", background: C.bgSoft, flexWrap: "wrap" }}>
             <ListenButton text={expr.expression} label=" 듣기" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
-            <ListenButton text={expr.expression} speed={0.5} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
+            <ListenButton text={expr.expression} speed={0.6} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
             <button onClick={() => setPracticeTarget(expr)}
               style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
               🎙 연습
@@ -2097,7 +2102,7 @@ Return ONLY the Korean feedback, no English, no preamble.`);
           )}
           <div style={{ display: "flex", gap: "6px" }}>
             <ListenButton text={phrase.expression} label=" 듣기" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
-            <ListenButton text={phrase.expression} speed={0.5} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
+            <ListenButton text={phrase.expression} speed={0.6} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
           </div>
         </div>
 
@@ -4823,7 +4828,7 @@ function StudentCommentView({ responseId, userId, onCommentSeen }) {
 function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
   // path: null | "direct" | "korean_type" | "korean_voice"
   const [path, setPath] = useState(null);
-  const [step, setStep] = useState("main"); // main | practice | nickname | posting
+  const [step, setStep] = useState("main"); // main | practice | posting
 
   // Translation
   const [koreanTranslation, setKoreanTranslation] = useState(null);
@@ -4832,7 +4837,6 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
   const [translationError, setTranslationError] = useState(false);
 
   // Playback speed
-  const [playbackSpeed, setPlaybackSpeed] = useState(0.75);
 
   // Korean scaffold
   const [koreanInput, setKoreanInput] = useState("");
@@ -4853,10 +4857,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
   const [finalTranscript, setFinalTranscript] = useState("");
   const [attempts, setAttempts] = useState([]);
 
-  // Nickname
-  const [nickname, setNickname] = useState(user.nickname || "");
   const [posting, setPosting] = useState(false);
-  const isFirstTime = !user.nickname;
 
   const handleRevealKorean = async () => {
     if (koreanTranslation) { setShowKorean(s => !s); return; }
@@ -4934,10 +4935,9 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
   const rec = useRecorder(handleRecordingDone);
 
   const handleSubmit = async () => {
-    const nick = nickname.trim() || user.name;
-    if (nick !== user.nickname) {
-      try { await db.update("students", `id=eq.${user.id}`, { nickname: nick }); user.nickname = nick; } catch(e) {}
-    }
+    // Nickname feature removed — always use the student's real name.
+    // Existing nickname column stays for backward compat with old submissions.
+    const nick = user.name;
     setPosting(true);
     console.log("Submitting - finalBlob:", finalBlob ? `${finalBlob.size} bytes` : "NULL", "finalTranscript:", finalTranscript);
     try {
@@ -5012,13 +5012,10 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                 React.createElement("button", { onClick: handleRetranslate, title: "Retranslate", style: { background: "none", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px", flexShrink: 0, padding: "0 2px" } }, "🔄")
               )
         ),
-    // Listen controls
+    // Listen controls — normal + turtle (slow), no speed picker
     React.createElement("div", { style: { display: "flex", gap: "7px", flexWrap: "wrap", marginTop: "12px" } },
       React.createElement(ListenButton, { text: prompt.prompt, label: " 듣기", style: { fontSize: "12px", padding: "7px 14px" } }),
-      ...[1.0, 0.75, 0.5].map(s =>
-        React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(prompt.prompt, s); },
-          style: { padding: "7px 12px", borderRadius: "100px", border: `1px solid ${playbackSpeed === s ? C.text : C.border}`, background: playbackSpeed === s ? C.text : C.bg, color: playbackSpeed === s ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, transition: "all 0.12s" } }, s + "x")
-      )
+      React.createElement(ListenButton, { text: prompt.prompt, speed: 0.6, label: " 천천히", fallbackIcon: "🐢", exactSpeed: true, style: { fontSize: "12px", padding: "7px 14px" } })
     )
   );
 
@@ -5077,11 +5074,8 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                         <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>English Version</div>
                         <div style={{ fontSize: "15px", fontWeight: "600", fontStyle: "italic", lineHeight: 1.5 }}>"{scaffoldedEnglish}"</div>
                         <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
-                          {[1.0, 0.75, 0.5].map(s =>
-                            React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); },
-                              style: { padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s + "x")
-                          )}
-                          <ListenButton text={scaffoldedEnglish} speed={playbackSpeed} label="" variant="plain" style={{ padding: "4px 10px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
+                          <ListenButton text={scaffoldedEnglish} label=" 듣기" variant="plain" style={{ padding: "5px 12px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
+                          <ListenButton text={scaffoldedEnglish} speed={0.6} label=" 천천히" fallbackIcon="🐢" exactSpeed={true} variant="plain" style={{ padding: "5px 12px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
                         </div>
                       </div>
                       <Btn onClick={() => setStep("practice")} style={{ width: "100%" }}>🎙 이걸로 녹음하기</Btn>
@@ -5132,11 +5126,8 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                         <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>English Version</div>
                         <div style={{ fontSize: "15px", fontWeight: "600", fontStyle: "italic", lineHeight: 1.5 }}>"{scaffoldedEnglish}"</div>
                         <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
-                          {[1.0, 0.75, 0.5].map(s =>
-                            React.createElement("button", { key: s, onClick: () => { setPlaybackSpeed(s); speak(scaffoldedEnglish, s); },
-                              style: { padding: "4px 10px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.25)", background: playbackSpeed === s ? "rgba(255,255,255,0.15)" : "transparent", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s + "x")
-                          )}
-                          <ListenButton text={scaffoldedEnglish} speed={playbackSpeed} label="" variant="plain" style={{ padding: "4px 10px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
+                          <ListenButton text={scaffoldedEnglish} label=" 듣기" variant="plain" style={{ padding: "5px 12px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
+                          <ListenButton text={scaffoldedEnglish} speed={0.6} label=" 천천히" fallbackIcon="🐢" exactSpeed={true} variant="plain" style={{ padding: "5px 12px", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#fff", fontSize: "11px" }} />
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: "8px" }}>
@@ -5207,7 +5198,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                   {currentFeedback.score >= 7 ? "🎉 잘했어요! 이 답변으로 제출할 수 있어요." : "💪 다시 해보거나 그냥 제출해도 돼요!"}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <Btn onClick={() => { if (isFirstTime) { setStep("nickname"); } else { handleSubmit(); } }} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
+                  <Btn onClick={handleSubmit} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
                     ✅ 제출하기 · Submit
                   </Btn>
                   <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); }} variant="ghost" style={{ width: "100%", padding: "11px" }}>
@@ -5220,31 +5211,6 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
             <button onClick={() => { setStep("main"); setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); setAttempts([]); }} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "12px", marginTop: "4px" }}>
               ← 처음으로
             </button>
-          </div>
-        )}
-
-        {/* ── NICKNAME (first time) ── */}
-        {step === "nickname" && (
-          <div>
-            <div style={{ textAlign: "center", marginBottom: "24px" }}>
-              <div style={{ fontSize: "40px", marginBottom: "12px" }}>👋</div>
-              <div style={{ fontSize: "22px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "8px" }}>커뮤니티 닉네임</div>
-              <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.7 }}>
-                처음으로 커뮤니티에 올리는 거예요!<br />
-                다른 학생들이 볼 닉네임을 정해주세요.
-                <br /><span style={{ fontSize: "12px", color: C.textLight }}>You can change it anytime in your profile.</span>
-              </div>
-            </div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>닉네임</div>
-            <Input value={nickname} onChange={e => setNickname(e.target.value)}
-              placeholder="e.g. SunnySeoul, WaveRider, MorningMike"
-              style={{ marginBottom: "8px", fontSize: "16px", padding: "13px 16px" }} />
-            <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "20px" }}>
-              💡 나중에 언제든지 바꿀 수 있어요.
-            </div>
-            <Btn onClick={() => handleSubmit()} disabled={!nickname.trim() || posting} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
-              {posting ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, "올리는 중…")) : "완료 → Submit Answer"}
-            </Btn>
           </div>
         )}
 
@@ -5261,7 +5227,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🌊</div>
                 <div style={{ fontSize: "20px", fontWeight: "800", letterSpacing: "-0.5px", marginBottom: "8px" }}>준비 완료!</div>
                 <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "24px", lineHeight: 1.6 }}>
-                  <strong>{nickname || user.name}</strong>으로<br />{cityGroup.emoji} {cityGroup.name}에 올릴게요.
+                  <strong>{user.name}</strong>으로<br />{cityGroup.emoji} {cityGroup.name}에 올릴게요.
                 </div>
                 <Btn onClick={handleSubmit} style={{ padding: "14px 32px", fontSize: "15px", marginBottom: "10px" }}>
                   🌍 공유하기
@@ -5595,8 +5561,21 @@ function QodEntryScreen({ user, group, onEnter }) {
   useEffect(() => {
     const load = async () => {
       try {
+        // Skip this screen entirely if the student already submitted today's answer.
+        // Avoids re-prompting them with the same QoD they've already answered.
         let prompts = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
         let prompt = prompts[0] || await autoGenerateQod();
+        if (prompt?.id) {
+          const existing = await db.get(
+            "qod_responses",
+            `prompt_id=eq.${prompt.id}&student_id=eq.${user.id}&limit=1`
+          ).catch(() => []);
+          if (existing.length > 0) {
+            // Already answered today — go straight into the app
+            onEnter();
+            return;
+          }
+        }
         setQodPrompt(prompt);
         if (group?.id) {
           const cm = await db.get("city_group_members", `group_id=eq.${group.id}&select=*,city_groups(*)`).catch(() => []);
@@ -5726,55 +5705,55 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {/* Practice — darkest */}
+        {/* Practice — deepest navy, the hero */}
         <button onClick={() => onNavigate("practice")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #1E1E1E 0%, #2A2A2A 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #0A1628 0%, #142340 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.08)" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
             <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>{stats.practiceRetry > 0 ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry` : "All caught up ✓"}</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.2, color: "#fff" }}>→</div>
         </button>
-        {/* Free Talk — dark grey, lightening toward bottom to bridge to lighter cards below */}
+        {/* Free Talk — slightly lighter navy */}
         <button onClick={() => onNavigate("freetalk")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #363636 0%, #525252 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #162A47 0%, #1F3556 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.06)" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Open Conversation</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Free Talk</div>
             <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>Speak freely in English</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.2, color: "#fff" }}>→</div>
         </button>
-        {/* Daily Question — light grey, top slightly darker to meet darker card above */}
+        {/* Daily Question — mid navy */}
         <button onClick={() => onNavigate("community")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #DCDCDC 0%, #F0F0F0 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #22405F 0%, #2E4D6F 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.05)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily</div>
-            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>❓ Daily Question</div>
-            <div style={{ fontSize: "12px", color: "#777" }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.5)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>❓ Daily Question</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.12 }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.22, color: "#fff" }}>→</div>
         </button>
-        {/* Chat — light grey, gentle gradient continuing the lightening flow */}
+        {/* Chat — softer slate-blue */}
         <button onClick={() => onNavigate("chat")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #E8E8E8 0%, #F4F4F4 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #3A5470 0%, #476485 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.04)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
-            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
-            <div style={{ fontSize: "12px", color: "#777" }}>Message your group</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.55)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)" }}>Message your group</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.25, color: "#fff" }}>→</div>
         </button>
-        {/* My Phrases — white, subtle gradient as the final lightest card */}
+        {/* My Phrases — softest steel-blue, still navy enough for white text */}
         <button onClick={() => onNavigate("myphrases")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #F8F8F8 0%, #FFFFFF 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #4E6A85 0%, #5C7896 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.04)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Saved</div>
-            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Phrases</div>
-            <div style={{ fontSize: "12px", color: C.textMid }}>{stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.6)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Saved</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Phrases</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>{stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.3, color: "#fff" }}>→</div>
         </button>
       </div>
     </div>
