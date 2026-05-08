@@ -1681,39 +1681,161 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   }
 
 
-  // ── EXPRESSION MODE ───────────────────────────────────────────────────────
-  if (activeMode === "expr") return (
+  // ── EXPRESSION MODE ────────────────────────────────────────────────────────
+  if (activeMode === "expr") {
+    const [exprContext, setExprContext] = useState("");
+    const [exprList, setExprList] = useState(expression ? [expression] : []);
+    const [savedIds, setSavedIds] = useState(new Set());
+
+    const generateExpressions = async () => {
+      setLoadingExpr(true);
+      // Load existing phrases to avoid duplicates
+      let existingPhrases = [];
+      try {
+        const sp = await db.get("session_phrases", "select=english").catch(() => []);
+        const mp = await db.get("student_phrases", `student_id=eq.${user.id}&select=english`).catch(() => []);
+        existingPhrases = [...sp, ...mp].map(p => p.english?.toLowerCase()).filter(Boolean);
+      } catch(e) {}
+
+      const avoidList = existingPhrases.slice(0, 30).join(", ");
+      const contextPrompt = exprContext.trim()
+        ? `The student wants expressions for this context: "${exprContext}".`
+        : "Generate expressions useful for everyday Korean adult English learners.";
+
+      try {
+        const text = await groqCall(`You are an expert English language coach for Korean adults.
+${contextPrompt}
+Generate 6 high-quality natural English expressions or phrases.
+
+STRICT RULES:
+- Avoid these phrases already known to the student: ${avoidList || "none"}
+- Each expression must be genuinely useful in real conversation
+- Include a mix of: idioms, useful sentence starters, polite phrases, and natural expressions
+- Explanations should be clear and practical
+- Examples must be realistic conversation sentences
+- Return ONLY valid JSON, no markdown
+
+Format:
+{"expressions": [
+  {"expression": "...", "explanation": "...", "example": "...", "level": "beginner|intermediate|advanced"},
+  ...
+]}`);
+        const clean = text.replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(clean);
+        setExprList(parsed.expressions || []);
+        setExpression(parsed.expressions?.[0] || null);
+        setSavedIds(new Set());
+      } catch(e) {
+        setExprList([{ expression: "오류 발생", explanation: "다시 시도해 주세요", example: "", level: "beginner" }]);
+      }
+      setLoadingExpr(false);
+    };
+
+    const savePhrase = async (expr) => {
+      try {
+        await db.insert("student_phrases", {
+          student_id: user.id,
+          english: expr.expression,
+          korean: expr.explanation,
+          context: expr.example,
+          source: "expression_generator",
+        });
+        setSavedIds(prev => new Set([...prev, expr.expression]));
+      } catch(e) {}
+    };
+
+    const levelColor = (l) => l === "beginner" ? C.success : l === "advanced" ? C.error : C.gold;
+    const levelBg = (l) => l === "beginner" ? C.successBg : l === "advanced" ? C.errorBg : C.goldBg;
+
+    return (
     <div className="feature-screen">
       {React.createElement(BackBtn)}
-      <div style={{ marginBottom: "16px" }}>
-        <div style={{ fontSize: "18px", fontWeight: "800", color: C.text, marginBottom: "4px" }}>✨ 표현 생성기</div>
-        <div style={{ fontSize: "13px", color: C.textMid }}>오늘 배울 새로운 영어 표현이에요.</div>
+
+      {/* Header */}
+      <div style={{ background: C.bgDark, borderRadius: "20px", padding: "22px 24px", marginBottom: "16px" }}>
+        <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>AI Expression Generator</div>
+        <div style={{ fontSize: "20px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "12px" }}>✨ 표현 생성기</div>
+        {/* Context input */}
+        <input
+          value={exprContext}
+          onChange={e => setExprContext(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && !loadingExpr && generateExpressions()}
+          placeholder="상황 입력 (예: 카페에서 주문할 때, 친구와 계획 세울 때…)"
+          style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "none", background: "rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px", fontFamily: FONT, outline: "none", marginBottom: "10px" }}
+        />
+        <button onClick={generateExpressions} disabled={loadingExpr}
+          style={{ width: "100%", padding: "11px", borderRadius: "100px", background: loadingExpr ? "rgba(255,255,255,0.15)" : "#fff", border: "none", color: loadingExpr ? "rgba(255,255,255,0.5)" : C.text, fontSize: "14px", fontWeight: "700", cursor: loadingExpr ? "default" : "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", transition: "all 0.15s" }}>
+          {loadingExpr ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", null, "생성 중…")) : "✨ 표현 생성하기"}
+        </button>
       </div>
-      {loadingExpr ? (
+
+      {/* Expression list */}
+      {loadingExpr && exprList.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px" }}>{React.createElement(Spinner)}</div>
-      ) : expression && (
-        <div style={{ animation: "fadeIn 0.25s ease" }}>
-          <div style={{ background: C.bgDark, borderRadius: "16px", padding: "24px", marginBottom: "12px", color: "#fff" }}>
-            <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" }}>Today's Expression</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", marginBottom: "8px", letterSpacing: "-0.3px" }}>"{expression.expression}"</div>
-            <button onClick={() => speak(expression.expression)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: "100px", padding: "5px 14px", fontSize: "12px", cursor: "pointer", fontFamily: FONT }}>🔊 듣기</button>
-          </div>
-          <Card style={{ marginBottom: "10px" }}>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>Meaning</div>
-            <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.6 }}>{expression.explanation}</div>
-          </Card>
-          {expression.example && (
-            <Card style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>Example</div>
-              <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.6, fontStyle: "italic" }}>"{expression.example}"</div>
-              <button onClick={() => speak(expression.example)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "12px", fontFamily: FONT, padding: "6px 0 0" }}>🔊 듣기</button>
-            </Card>
-          )}
-          <Btn onClick={handleGenerateExpression} variant="secondary" style={{ width: "100%" }}>🔄 새로운 표현 보기</Btn>
+      )}
+
+      {exprList.length === 0 && !loadingExpr && (
+        <div style={{ textAlign: "center", padding: "30px 20px", background: C.bgSoft, borderRadius: "16px", color: C.textMid }}>
+          <div style={{ fontSize: "28px", marginBottom: "10px" }}>✨</div>
+          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>상황을 입력하고 표현을 생성해보세요</div>
+          <div style={{ fontSize: "12px", color: C.textLight }}>또는 그냥 생성하면 다양한 표현이 나와요</div>
         </div>
       )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {exprList.map((expr, i) => {
+          const isSaved = savedIds.has(expr.expression);
+          return (
+            <div key={i} style={{ background: C.bg, borderRadius: "16px", border: `1px solid ${C.border}`, overflow: "hidden", animation: `cardReveal 0.3s ease ${i * 0.05}s both` }}>
+              {/* Level badge + expression */}
+              <div style={{ padding: "16px 16px 12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px", flex: 1, lineHeight: 1.3 }}>
+                    "{expr.expression}"
+                  </div>
+                  <span style={{ fontSize: "10px", fontWeight: "700", color: levelColor(expr.level), background: levelBg(expr.level), padding: "2px 8px", borderRadius: "100px", marginLeft: "10px", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    {expr.level || "intermediate"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: C.textMid, lineHeight: 1.6, marginBottom: "6px" }}>
+                  {expr.explanation}
+                </div>
+                {expr.example && (
+                  <div style={{ fontSize: "12px", color: C.textLight, fontStyle: "italic", lineHeight: 1.5 }}>
+                    e.g. "{expr.example}"
+                  </div>
+                )}
+              </div>
+              {/* Actions */}
+              <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "8px", background: C.bgSoft }}>
+                <button onClick={() => speak(expr.expression)}
+                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+                  🔊 듣기
+                </button>
+                <button onClick={() => speak(expr.example)}
+                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: expr.example ? "block" : "none" }}>
+                  🔊 예문
+                </button>
+                <div style={{ flex: 1 }} />
+                <button onClick={() => !isSaved && savePhrase(expr)}
+                  style={{ background: isSaved ? C.successBg : C.text, border: `1px solid ${isSaved ? C.successBorder : C.text}`, borderRadius: "100px", padding: "5px 14px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : "#fff", cursor: isSaved ? "default" : "pointer", fontFamily: FONT, transition: "all 0.2s" }}>
+                  {isSaved ? "✓ 저장됨" : "⭐ 저장"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {exprList.length > 0 && !loadingExpr && (
+        <button onClick={generateExpressions}
+          style={{ width: "100%", marginTop: "12px", padding: "12px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "13px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+          🔄 새로운 표현 더 보기
+        </button>
+      )}
     </div>
-  );
+    );
+  }
 
   return null;
 }
