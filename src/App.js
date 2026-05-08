@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://ulpnmewvejvpancvqnrp.supabase.co";
-const SUPABASE_KEY = "sb_publishable_sDP-kuCv5E2LmpDMPp8Y4A_n1ryWhNO";
+// Prefer env var so we can rotate keys without code changes. Falls back to the
+// hardcoded publishable key so the app keeps working if the env var is missing.
+// Set REACT_APP_SUPABASE_KEY in Vercel → Settings → Environment Variables.
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || "sb_publishable_sDP-kuCv5E2LmpDMPp8Y4A_n1ryWhNO";
 const GROQ_KEY = process.env.REACT_APP_GROQ_KEY;
 const TEACHER_PASS = "wayve2026";
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -5705,55 +5708,55 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {/* Practice — deepest navy, the hero */}
+        {/* Practice — saturated sky blue, the hero */}
         <button onClick={() => onNavigate("practice")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #0A1628 0%, #142340 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.08)" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #5B8BB8 0%, #7DA8CC 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(91,139,184,0.12)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.7)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>{stats.practiceRetry > 0 ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry` : "All caught up ✓"}</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>{stats.practiceRetry > 0 ? `${stats.practiceRetry} phrase${stats.practiceRetry !== 1 ? "s" : ""} to retry` : "All caught up ✓"}</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.2, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.4, color: "#fff" }}>→</div>
         </button>
-        {/* Free Talk — slightly lighter navy */}
+        {/* Free Talk — softer sky blue, white text */}
         <button onClick={() => onNavigate("freetalk")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #162A47 0%, #1F3556 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.06)" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #7FA8C9 0%, #9DBCD8 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(91,139,184,0.10)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Open Conversation</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.75)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Open Conversation</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Free Talk</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>Speak freely in English</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.85)" }}>Speak freely in English</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.2, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.45, color: "#fff" }}>→</div>
         </button>
-        {/* Daily Question — mid navy */}
+        {/* Daily Question — pale blue, white text still works at this depth */}
         <button onClick={() => onNavigate("community")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #22405F 0%, #2E4D6F 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.05)" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #A5C2DB 0%, #C2D6E6 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(91,139,184,0.08)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.5)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.85)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>❓ Daily Question</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.95)" }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.22, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.5, color: "#fff" }}>→</div>
         </button>
-        {/* Chat — softer slate-blue */}
+        {/* Chat — very pale blue, dark text for legibility */}
         <button onClick={() => onNavigate("chat")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #3A5470 0%, #476485 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.04)" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #C7DBE8 0%, #DCE9F1 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(91,139,184,0.06)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.55)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
-            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)" }}>Message your group</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(34,64,95,0.7)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#1A2B3F", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
+            <div style={{ fontSize: "12px", color: "rgba(34,64,95,0.75)" }}>Message your group</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.25, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.35, color: "#1A2B3F" }}>→</div>
         </button>
-        {/* My Phrases — softest steel-blue, still navy enough for white text */}
+        {/* My Phrases — dissolves into the white page background, dark text */}
         <button onClick={() => onNavigate("myphrases")} className="primary-card"
-          style={{ width: "100%", background: "linear-gradient(180deg, #4E6A85 0%, #5C7896 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(8,16,32,0.04)" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #E8F0F7 0%, #FFFFFF 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s", boxShadow: "0 1px 3px rgba(91,139,184,0.04)" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.6)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Saved</div>
-            <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Phrases</div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>{stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(34,64,95,0.55)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Saved</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: "#1A2B3F", letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Phrases</div>
+            <div style={{ fontSize: "12px", color: "rgba(34,64,95,0.65)" }}>{stats.myPhrases > 0 ? `${stats.myPhrases} saved` : "Save phrases here"}</div>
           </div>
-          <div style={{ fontSize: "24px", opacity: 0.3, color: "#fff" }}>→</div>
+          <div style={{ fontSize: "24px", opacity: 0.3, color: "#1A2B3F" }}>→</div>
         </button>
       </div>
     </div>
