@@ -1526,6 +1526,10 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
   const [koreanText, setKoreanText] = useState("");
   const [howToSay, setHowToSay] = useState(null);
   const [loadingHowTo, setLoadingHowTo] = useState(false);
+  // Expression generator state — must be at top level (no hooks in conditionals)
+  const [exprContext, setExprContext] = useState("");
+  const [exprList, setExprList] = useState([]);
+  const [savedIds, setSavedIds] = useState(new Set());
 
   const handleRecordingDone = async (blob) => {
     setLoadingFeedback(true);
@@ -1683,10 +1687,6 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
 
   // ── EXPRESSION MODE ────────────────────────────────────────────────────────
   if (activeMode === "expr") {
-    const [exprContext, setExprContext] = useState("");
-    const [exprList, setExprList] = useState(expression ? [expression] : []);
-    const [savedIds, setSavedIds] = useState(new Set());
-
     const generateExpressions = async () => {
       setLoadingExpr(true);
       // Load existing phrases to avoid duplicates
