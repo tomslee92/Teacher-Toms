@@ -1780,14 +1780,14 @@ Format:
           english: expr.expression,
           korean: expr.korean || expr.explanation || "",
           context: expr.example || "",
-          source: "expression_generator",
           hidden: false,
         });
         setSavedIds(prev => new Set([...prev, expr.expression]));
         onPhraseSaved && onPhraseSaved();
       } catch(e) {
         console.error("Save phrase error:", e.message, e);
-        alert("저장 오류: " + e.message);
+        // Show error in the button itself rather than an intrusive alert
+        setSavedIds(prev => new Set([...prev, expr.expression + "_error"]));
       }
     };
 
