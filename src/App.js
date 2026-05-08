@@ -3864,18 +3864,31 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
       setPlaying(false);
     } else {
       try {
-        // iOS Safari: must resume AudioContext if suspended
-        if (window.AudioContext || window.webkitAudioContext) {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          if (ctx.state === "suspended") await ctx.resume();
+        // Force reload for Android Chrome which sometimes loses the source
+        if (audio.readyState === 0) {
+          audio.load();
+          await new Promise(resolve => {
+            audio.addEventListener("canplay", resolve, { once: true });
+            setTimeout(resolve, 3000); // fallback timeout
+          });
         }
-        await audio.play();
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
         setPlaying(true);
       } catch(e) {
-        // Autoplay blocked or format unsupported — try reloading src
-        console.warn("Audio play failed:", e.message);
-        audio.load();
-        try { await audio.play(); setPlaying(true); } catch(e2) {}
+        console.warn("Audio play failed:", e.message, "src:", src?.slice(0, 50));
+        // Last resort: try creating a new Audio object
+        try {
+          const fallback = new Audio(src);
+          fallback.playsInline = true;
+          await fallback.play();
+          setPlaying(true);
+          fallback.onended = () => setPlaying(false);
+        } catch(e2) {
+          console.error("Fallback audio also failed:", e2.message);
+        }
       }
     }
   };
@@ -3893,7 +3906,23 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
   const fmt = s => isNaN(s) || !isFinite(s) ? "0:00" : `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
 
   return React.createElement("div", { style: { marginBottom: "10px" } },
-    React.createElement("audio", { ref: audioRef, src, preload: "auto", playsInline: true, "webkit-playsinline": "true", crossOrigin: "anonymous" }),
+    React.createElement("audio", {
+      ref: audioRef,
+      preload: "auto",
+      playsInline: true,
+      "webkit-playsinline": "true",
+      style: { display: "none" }
+    },
+    // Multiple source types for cross-device compatibility
+    src && React.createElement("source", { src,
+      type: src.includes(".mp4") || src.startsWith("data:audio/mp4") ? "audio/mp4"
+          : src.includes(".ogg") || src.startsWith("data:audio/ogg") ? "audio/ogg;codecs=opus"
+          : "audio/webm;codecs=opus"
+    }),
+    src && React.createElement("source", { src, type: "audio/mp4" }),
+    src && React.createElement("source", { src, type: "audio/webm" }),
+    src && React.createElement("source", { src })
+  ),
     React.createElement("div", {
       style: { background: C.bgSoft, borderRadius: "12px", padding: "10px 14px", border: `1px solid ${C.border}` }
     },
@@ -4402,10 +4431,12 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
       if (finalBlob) {
         // Try Supabase Storage first
         try {
-          const fileName = `qod_${user.id}_${Date.now()}.webm`;
+          const mimeType = finalBlob.type || "audio/webm";
+          const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
+          const fileName = `qod_${user.id}_${Date.now()}.${ext}`;
           const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/qod-audio/${fileName}`, {
             method: "POST",
-            headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "audio/webm" },
+            headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": mimeType },
             body: finalBlob
           });
           if (uploadRes.ok) {
