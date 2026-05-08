@@ -153,10 +153,16 @@ async function speak(text, speed = null) {
   const playSpeed = speed !== null ? speed : globalPlaybackSpeed;
   const cacheKey = text.trim();
   if (ttsCache.has(cacheKey)) {
-    currentAudio = new Audio(ttsCache.get(cacheKey));
-    currentAudio.playbackRate = playSpeed;
-    currentAudio.play();
-    return;
+    try {
+      currentAudio = new Audio(ttsCache.get(cacheKey));
+      currentAudio.playbackRate = playSpeed;
+      currentAudio.playsInline = true;
+      await currentAudio.play();
+    } catch(e) {
+      // Cache URL may have expired, fall through to re-fetch
+      ttsCache.delete(cacheKey);
+    }
+    if (ttsCache.has(cacheKey)) return;
   }
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`, {
@@ -172,8 +178,10 @@ async function speak(text, speed = null) {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     ttsCache.set(text.trim(), url);
-    const audio = new Audio(url);
+    const audio = new Audio();
+    audio.src = url;
     audio.playbackRate = playSpeed;
+    audio.playsInline = true;
     currentAudio = audio;
     audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
     await audio.play();
@@ -3783,61 +3791,51 @@ Format:
 }
 
 // ── Rich Audio Player ────────────────────────────────────────────────────────
-// Clean minimal iMessage-style player — thin progress line, perfectly smooth
 function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", showTranslation = false }) {
-  const [translation, setTranslation] = useState(null);
-  const [loadingTranslation, setLoadingTranslation] = useState(false);
-  const [showTrans, setShowTrans] = useState(false);
-
-  const handleTranslate = async () => {
-    if (translation) { setShowTrans(s => !s); return; }
-    setLoadingTranslation(true);
-    try {
-      const t = await groqCall(`Translate this English text into natural Korean. Return ONLY the Korean translation, nothing else: "${transcript}"`);
-      // Filter to Korean characters only
-      const korean = t.trim().split("").filter(c => {
-        const code = c.charCodeAt(0);
-        return (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F) || [" ","?","!",".",",","·","…"].includes(c);
-      }).join("").trim() || t.trim();
-      setTranslation(t.trim());
-      setShowTrans(true);
-    } catch(e) {}
-    setLoadingTranslation(false);
-  };
   const audioRef = useRef(null);
   const rafRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [canPlay, setCanPlay] = useState(false);
+  const [translation, setTranslation] = useState(null);
+  const [loadingTranslation, setLoadingTranslation] = useState(false);
+  const [showTrans, setShowTrans] = useState(false);
 
   useEffect(() => {
     setPlaying(false);
     setProgress(0);
     setCurrentTime(0);
     setDuration(0);
+    setCanPlay(false);
     cancelAnimationFrame(rafRef.current);
+    const audio = audioRef.current;
+    if (!audio || !src) return;
+    // Set src directly — most compatible approach for Android
+    audio.src = src;
+    audio.load();
   }, [src]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onMeta = () => setDuration(audio.duration || 0);
-    const onEnded = () => {
-      setPlaying(false);
-      setProgress(0);
-      setCurrentTime(0);
-      cancelAnimationFrame(rafRef.current);
-    };
+    const onMeta  = () => setDuration(audio.duration || 0);
+    const onReady = () => setCanPlay(true);
+    const onEnded = () => { setPlaying(false); setProgress(0); setCurrentTime(0); cancelAnimationFrame(rafRef.current); };
+    const onErr   = (e) => console.warn("Audio error:", e.target.error?.code, e.target.error?.message, src?.slice(0,60));
     audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("canplay", onReady);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onErr);
     return () => {
       audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("canplay", onReady);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onErr);
     };
   }, [src]);
 
-  // 60fps RAF — only runs while playing
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -3858,37 +3856,43 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
 
   const togglePlay = async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !src) return;
     if (playing) {
       audio.pause();
       setPlaying(false);
-    } else {
+      return;
+    }
+    try {
+      // Ensure loaded — critical for Android Chrome
+      if (audio.readyState < 2) {
+        if (!audio.src || audio.src !== src) { audio.src = src; }
+        audio.load();
+        await new Promise((resolve, reject) => {
+          const onCan = () => { audio.removeEventListener("canplay", onCan); audio.removeEventListener("error", onErr); resolve(); };
+          const onErr = (e) => { audio.removeEventListener("canplay", onCan); audio.removeEventListener("error", onErr); reject(e); };
+          audio.addEventListener("canplay", onCan, { once: true });
+          audio.addEventListener("error", onErr, { once: true });
+          setTimeout(resolve, 5000); // timeout fallback
+        });
+      }
+      await audio.play();
+      setPlaying(true);
+    } catch(e) {
+      console.warn("Play failed:", e.message);
+      // Android fallback: create fresh Audio object
       try {
-        // Force reload for Android Chrome which sometimes loses the source
-        if (audio.readyState === 0) {
-          audio.load();
-          await new Promise(resolve => {
-            audio.addEventListener("canplay", resolve, { once: true });
-            setTimeout(resolve, 3000); // fallback timeout
-          });
-        }
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-        }
+        const a = new Audio();
+        a.src = src;
+        a.playsInline = true;
+        await a.play();
         setPlaying(true);
-      } catch(e) {
-        console.warn("Audio play failed:", e.message, "src:", src?.slice(0, 50));
-        // Last resort: try creating a new Audio object
-        try {
-          const fallback = new Audio(src);
-          fallback.playsInline = true;
-          await fallback.play();
-          setPlaying(true);
-          fallback.onended = () => setPlaying(false);
-        } catch(e2) {
-          console.error("Fallback audio also failed:", e2.message);
-        }
+        a.addEventListener("timeupdate", () => {
+          setCurrentTime(a.currentTime);
+          if (a.duration) setProgress(a.currentTime / a.duration);
+        });
+        a.addEventListener("ended", () => { setPlaying(false); setProgress(0); });
+      } catch(e2) {
+        console.error("All audio playback failed:", e2.message);
       }
     }
   };
@@ -3903,35 +3907,39 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
     setCurrentTime(ratio * duration);
   };
 
+  const handleTranslate = async () => {
+    if (translation) { setShowTrans(s => !s); return; }
+    setLoadingTranslation(true);
+    try {
+      const t = await groqCall(`Translate this English into natural Korean. Return ONLY the Korean: "${transcript}"`);
+      const korean = t.trim().split("").filter(c => {
+        const code = c.charCodeAt(0);
+        return (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F) || [" ","?","!",".",","].includes(c);
+      }).join("").trim() || t.trim();
+      setTranslation(korean);
+      setShowTrans(true);
+    } catch(e) {}
+    setLoadingTranslation(false);
+  };
+
   const fmt = s => isNaN(s) || !isFinite(s) ? "0:00" : `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
 
+  if (!src) return null;
+
   return React.createElement("div", { style: { marginBottom: "10px" } },
+    // Single <audio> element — src set imperatively via useEffect
     React.createElement("audio", {
       ref: audioRef,
-      preload: "auto",
+      preload: src?.startsWith("data:") ? "auto" : "metadata",
       playsInline: true,
-      "webkit-playsinline": "true",
-      style: { display: "none" }
-    },
-    // Multiple source types for cross-device compatibility
-    src && React.createElement("source", { src,
-      type: src.includes(".mp4") || src.startsWith("data:audio/mp4") ? "audio/mp4"
-          : src.includes(".ogg") || src.startsWith("data:audio/ogg") ? "audio/ogg;codecs=opus"
-          : "audio/webm;codecs=opus"
+      style: { display: "none" },
     }),
-    src && React.createElement("source", { src, type: "audio/mp4" }),
-    src && React.createElement("source", { src, type: "audio/webm" }),
-    src && React.createElement("source", { src })
-  ),
     React.createElement("div", {
       style: { background: C.bgSoft, borderRadius: "12px", padding: "10px 14px", border: `1px solid ${C.border}` }
     },
-      // Top row: label + time
-      React.createElement("div", {
-        style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }
-      },
+      // Label + time
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
-          // Play/pause button
           React.createElement("button", {
             onClick: togglePlay,
             style: { width: "32px", height: "32px", borderRadius: "50%", background: C.text, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", flexShrink: 0, transition: "transform 0.1s", transform: playing ? "scale(0.92)" : "scale(1)" }
@@ -3939,38 +3947,17 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
           React.createElement("span", { style: { fontSize: "12px", fontWeight: "600", color: C.textMid } }, label)
         ),
         React.createElement("span", { style: { fontSize: "11px", color: C.textLight, fontVariantNumeric: "tabular-nums", minWidth: "80px", textAlign: "right" } },
-          duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : "—"
+          duration > 0 ? `${fmt(currentTime)} / ${fmt(duration)}` : canPlay ? "0:00" : "—"
         )
       ),
-      // Progress track — thin clean line
-      React.createElement("div", {
-        onClick: seek,
-        style: { position: "relative", height: "20px", cursor: "pointer", display: "flex", alignItems: "center" }
-      },
-        // Track background
-        React.createElement("div", {
-          style: { position: "absolute", left: 0, right: 0, height: "3px", background: C.bgMid, borderRadius: "100px" }
-        }),
-        // Filled portion — width driven by RAF at 60fps
-        React.createElement("div", {
-          style: { position: "absolute", left: 0, height: "3px", background: C.text, borderRadius: "100px", width: `${progress * 100}%` }
-        }),
-        // Thumb dot
-        duration > 0 && React.createElement("div", {
-          style: {
-            position: "absolute",
-            left: `calc(${progress * 100}% - 6px)`,
-            width: "12px", height: "12px",
-            borderRadius: "50%", background: C.text,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-            transition: playing ? "none" : "left 0.1s",
-          }
-        })
+      // Progress bar
+      React.createElement("div", { onClick: seek, style: { position: "relative", height: "20px", cursor: "pointer", display: "flex", alignItems: "center" } },
+        React.createElement("div", { style: { position: "absolute", left: 0, right: 0, height: "3px", background: C.bgMid, borderRadius: "100px" } }),
+        React.createElement("div", { style: { position: "absolute", left: 0, height: "3px", background: C.text, borderRadius: "100px", width: `${progress * 100}%` } }),
+        duration > 0 && React.createElement("div", { style: { position: "absolute", left: `calc(${progress * 100}% - 6px)`, width: "12px", height: "12px", borderRadius: "50%", background: C.text, boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: playing ? "none" : "left 0.1s" } })
       ),
-      // Transcript + optional Korean translation
-      (transcript && transcript.trim().length > 0) && React.createElement("div", {
-        style: { marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }
-      },
+      // Transcript + translation
+      (transcript && transcript.trim().length > 0) && React.createElement("div", { style: { marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${C.border}` } },
         React.createElement("div", { style: { fontSize: "13px", color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginBottom: showTranslation ? "6px" : "0" } }, `"${transcript}"`),
         showTranslation && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
           !showTrans
@@ -3979,7 +3966,7 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
                 loadingTranslation ? React.createElement(Spinner) : "🇰🇷",
                 React.createElement("span", null, loadingTranslation ? "번역 중…" : "한국어로 보기")
               )
-            : React.createElement("div", { style: { fontSize: "12px", color: C.textMid, lineHeight: 1.6, background: C.bgSoft, borderRadius: "8px", padding: "6px 10px", display: "flex", gap: "6px", alignItems: "flex-start" } },
+            : React.createElement("div", { style: { fontSize: "12px", color: C.textMid, lineHeight: 1.6, background: C.bgSoft, borderRadius: "8px", padding: "6px 10px", display: "flex", gap: "6px", alignItems: "flex-start", width: "100%" } },
                 React.createElement("span", null, "🇰🇷"),
                 React.createElement("span", { style: { flex: 1 } }, translation),
                 React.createElement("button", { onClick: () => setShowTrans(false), style: { background: "none", border: "none", color: C.textLight, cursor: "pointer", fontSize: "12px" } }, "×")
