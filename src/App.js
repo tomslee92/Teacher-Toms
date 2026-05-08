@@ -5728,7 +5728,7 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {/* Practice — darkest */}
         <button onClick={() => onNavigate("practice")} className="primary-card"
-          style={{ width: "100%", background: C.bgDark, borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #1E1E1E 0%, #2A2A2A 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
@@ -5736,9 +5736,9 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           </div>
           <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
         </button>
-        {/* Free Talk — dark grey */}
+        {/* Free Talk — dark grey, lightening toward bottom to bridge to lighter cards below */}
         <button onClick={() => onNavigate("freetalk")} className="primary-card"
-          style={{ width: "100%", background: "#3A3A3A", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #363636 0%, #525252 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.06s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Open Conversation</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Free Talk</div>
@@ -5746,9 +5746,9 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           </div>
           <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
         </button>
-        {/* Daily Question — light grey */}
+        {/* Daily Question — light grey, top slightly darker to meet darker card above */}
         <button onClick={() => onNavigate("community")} className="primary-card"
-          style={{ width: "100%", background: "#F0F0F0", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #DCDCDC 0%, #F0F0F0 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>❓ Daily Question</div>
@@ -5756,9 +5756,9 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           </div>
           <div style={{ fontSize: "24px", opacity: 0.12 }}>→</div>
         </button>
-        {/* Chat — light grey */}
+        {/* Chat — light grey, gentle gradient continuing the lightening flow */}
         <button onClick={() => onNavigate("chat")} className="primary-card"
-          style={{ width: "100%", background: "#E8E8E8", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #E8E8E8 0%, #F4F4F4 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.18s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Messages</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>💬 Chat</div>
@@ -5766,9 +5766,9 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           </div>
           <div style={{ fontSize: "24px", opacity: 0.1 }}>→</div>
         </button>
-        {/* My Phrases — white */}
+        {/* My Phrases — white, subtle gradient as the final lightest card */}
         <button onClick={() => onNavigate("myphrases")} className="primary-card"
-          style={{ width: "100%", background: C.bg, borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
+          style={{ width: "100%", background: "linear-gradient(180deg, #F8F8F8 0%, #FFFFFF 100%)", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: `1px solid ${C.border}`, animation: "cardReveal 0.3s ease 0.24s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
             <div style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Saved</div>
             <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Phrases</div>
