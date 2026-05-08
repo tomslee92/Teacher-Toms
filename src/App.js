@@ -1001,6 +1001,7 @@ function Confetti() { return React.createElement(ConfettiEffect); }
 // ── Student Screen ────────────────────────────────────────────────────────────
 function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', setFontSize = () => {} }) {
   const [tab, setTab] = useState(null);
+  const [myPhrasesKey, setMyPhrasesKey] = useState(0);
   const [streak, setStreak] = useState(user.streak || 0);
   const [longest, setLongest] = useState(user.longest_streak || 0);
   const [showStreakBanner, setShowStreakBanner] = useState(false);
@@ -1744,31 +1745,28 @@ function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
         : "Generate expressions useful for everyday Korean adult English learners.";
 
       try {
-        const text = await groqCall(`You are an expert English language coach for Korean adults.
-${contextPrompt}
-Generate 6 high-quality natural English expressions or phrases.
-
-STRICT RULES:
-- Avoid these phrases already known to the student: ${avoidList || "none"}
-- Each expression must be genuinely useful in real conversation
-- Include a mix of: idioms, useful sentence starters, polite phrases, and natural expressions
-- "korean" field must be a natural Korean translation of the expression (hangul only, no English)
-- "explanation" is a brief English explanation of when/how to use it
-- Examples must be realistic conversation sentences
-- Return ONLY valid JSON, no markdown
-
-Format:
-{"expressions": [
-  {"expression": "...", "korean": "한국어 번역...", "explanation": "...", "example": "...", "level": "beginner|intermediate|advanced"},
-  ...
-]}`);
-        const clean = text.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(clean);
+        const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
+Generate 6 English expressions for Korean adult learners. ${contextPrompt}
+Avoid these: ${avoidList ? avoidList.slice(0, 80) : "none"}
+JSON format: {"expressions":[{"expression":"phrase here","korean":"한국어 번역","explanation":"when to use it","example":"example sentence","level":"beginner"}]}
+RETURN ONLY THE JSON OBJECT:`);
+        // More robust parsing - find JSON object anywhere in response
+        let parsed = null;
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try { parsed = JSON.parse(jsonMatch[0]); } catch(e2) {}
+        }
+        if (!parsed) {
+          const clean = text.replace(/```json|```/g, "").trim();
+          parsed = JSON.parse(clean);
+        }
         setExprList(parsed.expressions || []);
         setExpression(parsed.expressions?.[0] || null);
         setSavedIds(new Set());
       } catch(e) {
-        setExprList([{ expression: "오류 발생", explanation: "다시 시도해 주세요", example: "", level: "beginner" }]);
+        console.error("Expression generation error:", e.message);
+        // Retry without context if first attempt failed
+        setExprList([]);
       }
       setLoadingExpr(false);
     };
@@ -1937,8 +1935,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
 
   if (isPreview || user.id === "preview") return React.createElement("div", { style: { textAlign: "center", padding: "40px", color: C.textLight, fontStyle: "italic" } }, "My Phrases not available in preview mode.");
 
-  try {
-    return (
+  return (
     <div>
       <Card style={{ marginBottom: "16px", borderLeft: `3px solid ${C.gold}` }}>
         <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>⭐ 나의 표현 모음</div>
@@ -1992,14 +1989,6 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
       )}
     </div>
   );
-  } catch(err) {
-    console.error('MyPhrasesTab render error:', err.message, err.stack);
-    return React.createElement('div', { style: { padding: '40px', textAlign: 'center' } },
-      React.createElement('div', { style: { fontSize: '32px', marginBottom: '12px' } }, '⚠️'),
-      React.createElement('div', { style: { fontSize: '14px', color: C.error, marginBottom: '8px' } }, '오류가 발생했어요'),
-      React.createElement('div', { style: { fontSize: '11px', color: C.textLight } }, err.message)
-    );
-  }
 }
 
 // ── My Phrase Row ─────────────────────────────────────────────────────────────
