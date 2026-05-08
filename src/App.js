@@ -364,44 +364,6 @@ async function transcribe(blob) {
   return (await res.text()).trim();
 }
 
-// ── Difficulty Rubric for Expression Generator ────────────────────────────────
-// This rubric is the single source of truth used by both the live generator
-// and the one-time backfill script in the teacher dashboard.
-const EXPR_RUBRIC = `DIFFICULTY RUBRIC (apply strictly):
-
-BEGINNER:
-- 5 words or fewer
-- Simple subject + verb + object structure, or single phrases
-- Present tense, or simple past with very common verbs (went, had, was)
-- High-frequency vocabulary only — words a learner meets in their first 6 months
-- NO phrasal verbs, NO idioms
-- Contractions limited to: I'm, it's, don't, can't, won't
-- Examples: "Can I get a coffee?" / "I'll think about it." / "That sounds great."
-
-INTERMEDIATE:
-- 6 to 12 words
-- May include ONE phrasal verb OR ONE common idiom (not both)
-- Past, future, present perfect, or conditional tenses are okay
-- Everyday casual vocabulary from TV and conversation
-- Examples: "I'm going to head out in a few minutes." / "That's not really my thing, to be honest." / "Could you run that by me again?"
-
-ADVANCED:
-- 10+ words, OR shorter with sophisticated nuance
-- Multiple clauses, or layered idiomatic expressions
-- Native casual register: contractions, hedging, sentence-final particles ("…or something," "…I guess")
-- Cultural/contextual subtlety: sarcasm, understatement, indirect speech
-- Phrasal verbs and idioms used naturally
-- Examples: "I was kind of hoping we could push that to next week if it's not a hassle." / "Don't take this the wrong way, but…"`;
-
-// Build the level-targeting line for a given level filter
-const levelInstruction = (level) => {
-  if (level === "beginner") return `Generate ONLY beginner-level phrases per the rubric. Every phrase must satisfy the BEGINNER criteria.`;
-  if (level === "intermediate") return `Generate ONLY intermediate-level phrases per the rubric. Every phrase must satisfy the INTERMEDIATE criteria.`;
-  if (level === "advanced") return `Generate ONLY advanced-level phrases per the rubric. Every phrase must satisfy the ADVANCED criteria.`;
-  // mix
-  return `Generate a MIX of difficulty levels: 2 beginner, 2 intermediate, 2 advanced phrases. Tag each one accurately per the rubric.`;
-};
-
 async function getPhraseFeedback(said, phrase) {
   // Normalize both strings for comparison
   const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
@@ -1174,7 +1136,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
       </div>
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 20, paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {[["community","🌍","Community"],["practice","🎙","Practice"],["freetalk","💬","Free Talk"],["myphrases","⭐","My Phrases"]].map(([id, icon, label]) => {
+        {[["community","❓","Daily Question"],["practice","🎙","Practice"],["freetalk","💬","Free Talk"],["myphrases","⭐","My Phrases"]].map(([id, icon, label]) => {
           const active = tab === id;
           const showBadge = id === "community" && unreadCommentIds.size > 0;
           return React.createElement("button", { key: id, className: "nav-btn", onClick: () => setTab(id), style: { flex: 1, padding: "10px 4px 8px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", position: "relative" } },
@@ -1660,7 +1622,6 @@ function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
   const [exprContext, setExprContext] = useState("");
   const [exprList, setExprList] = useState([]);
   const [savedIds, setSavedIds] = useState(new Set());
-  const [exprLevel, setExprLevel] = useState("mix"); // beginner | intermediate | advanced | mix
   const [todaysExpr, setTodaysExpr] = useState(null);
   const [loadingTodays, setLoadingTodays] = useState(false);
   const [practiceTarget, setPracticeTarget] = useState(null); // phrase object when modal is open
@@ -1690,13 +1651,11 @@ function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
       try {
         const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
 
-${EXPR_RUBRIC}
-
-Generate ONE interesting, useful English expression or idiom for a Korean adult learner. Pick something genuinely useful in everyday conversation. Tag the level accurately per the rubric.
+Generate ONE interesting, useful English expression or idiom for a Korean adult learner. Pick something genuinely useful in everyday conversation.
 
 CRITICAL: The "explanation" field MUST be in Korean (한국어), NOT English.
 
-JSON format: {"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence","level":"intermediate"}
+JSON format: {"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence"}
 RETURN ONLY THE JSON OBJECT:`);
         if (cancelled) return;
         let parsed = null;
@@ -1876,16 +1835,12 @@ RETURN ONLY THE JSON OBJECT:`);
       try {
         const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
 
-${EXPR_RUBRIC}
-
-${levelInstruction(exprLevel)}
-
 Generate 6 English expressions for Korean adult learners. ${contextPrompt}
 Avoid these: ${avoidList ? avoidList.slice(0, 80) : "none"}
 
 CRITICAL: The "explanation" field MUST be written in Korean (한국어), NOT English. Explain when and how to use the phrase, in Korean.
 
-JSON format: {"expressions":[{"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence","level":"beginner"}]}
+JSON format: {"expressions":[{"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence"}]}
 RETURN ONLY THE JSON OBJECT:`);
         // More robust parsing - find JSON object anywhere in response
         let parsed = null;
@@ -1913,13 +1868,11 @@ RETURN ONLY THE JSON OBJECT:`);
       try {
         const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
 
-${EXPR_RUBRIC}
-
-Generate ONE interesting, useful English expression or idiom for a Korean adult learner. Pick something genuinely useful in everyday conversation. Tag the level accurately per the rubric.
+Generate ONE interesting, useful English expression or idiom for a Korean adult learner. Pick something genuinely useful in everyday conversation.
 
 CRITICAL: The "explanation" field MUST be in Korean (한국어), NOT English.
 
-JSON format: {"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence","level":"intermediate"}
+JSON format: {"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence"}
 RETURN ONLY THE JSON OBJECT:`);
         let parsed = null;
         const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -1956,23 +1909,14 @@ RETURN ONLY THE JSON OBJECT:`);
       }
     };
 
-    const levelColor = (l) => l === "beginner" ? C.success : l === "advanced" ? C.error : C.gold;
-    const levelBg = (l) => l === "beginner" ? C.successBg : l === "advanced" ? C.errorBg : C.goldBg;
-    const levelLabelKo = (l) => l === "beginner" ? "초급" : l === "advanced" ? "고급" : "중급";
-
     // Renders a single phrase card (used by both Today's Expression and the generator list)
     const renderPhraseCard = (expr, i, keyPrefix = "") => {
       const isSaved = savedIds.has(expr.expression);
       return (
         <div key={`${keyPrefix}${i}`} style={{ background: C.bg, borderRadius: "16px", border: `1px solid ${C.border}`, overflow: "hidden", animation: `cardReveal 0.3s ease ${i * 0.05}s both` }}>
           <div style={{ padding: "16px 16px 12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-              <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px", flex: 1, lineHeight: 1.3 }}>
-                "{expr.expression}"
-              </div>
-              <span style={{ fontSize: "10px", fontWeight: "700", color: levelColor(expr.level), background: levelBg(expr.level), padding: "2px 8px", borderRadius: "100px", marginLeft: "10px", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                {expr.level || "intermediate"}
-              </span>
+            <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px", lineHeight: 1.3, marginBottom: "8px" }}>
+              "{expr.expression}"
             </div>
             {expr.korean && (
               <div style={{ fontSize: "14px", fontWeight: "600", color: C.textMid, marginBottom: "6px", lineHeight: 1.4 }}>
@@ -1990,7 +1934,7 @@ RETURN ONLY THE JSON OBJECT:`);
           </div>
           <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "6px", alignItems: "center", background: C.bgSoft, flexWrap: "wrap" }}>
             <ListenButton text={expr.expression} label=" 듣기" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
-            <ListenButton text={expr.expression} speed={0.7} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
+            <ListenButton text={expr.expression} speed={0.5} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
             <button onClick={() => setPracticeTarget(expr)}
               style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
               🎙 연습
@@ -2034,28 +1978,6 @@ RETURN ONLY THE JSON OBJECT:`);
         <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>AI Expression Generator</div>
         <div style={{ fontSize: "20px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "12px" }}>✨ 표현 생성기</div>
 
-        {/* Level pills */}
-        <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
-          {[
-            { id: "beginner", label: "초급" },
-            { id: "intermediate", label: "중급" },
-            { id: "advanced", label: "고급" },
-            { id: "mix", label: "다양하게" },
-          ].map(opt => (
-            <button key={opt.id} onClick={() => setExprLevel(opt.id)}
-              style={{
-                padding: "6px 14px", borderRadius: "100px",
-                background: exprLevel === opt.id ? "#fff" : "rgba(255,255,255,0.08)",
-                border: `1px solid ${exprLevel === opt.id ? "#fff" : "rgba(255,255,255,0.15)"}`,
-                color: exprLevel === opt.id ? C.text : "rgba(255,255,255,0.85)",
-                fontSize: "12px", fontWeight: exprLevel === opt.id ? "700" : "500",
-                cursor: "pointer", fontFamily: FONT, transition: "all 0.15s"
-              }}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
         {/* Context input */}
         <input
           value={exprContext}
@@ -2078,7 +2000,7 @@ RETURN ONLY THE JSON OBJECT:`);
       {exprList.length === 0 && !loadingExpr && (
         <div style={{ textAlign: "center", padding: "30px 20px", background: C.bgSoft, borderRadius: "16px", color: C.textMid }}>
           <div style={{ fontSize: "28px", marginBottom: "10px" }}>✨</div>
-          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>레벨을 선택하고 표현을 생성해보세요</div>
+          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>표현을 생성해보세요</div>
           <div style={{ fontSize: "12px", color: C.textLight }}>상황을 입력하면 더 정확한 표현이 나와요</div>
         </div>
       )}
@@ -2175,7 +2097,7 @@ Return ONLY the Korean feedback, no English, no preamble.`);
           )}
           <div style={{ display: "flex", gap: "6px" }}>
             <ListenButton text={phrase.expression} label=" 듣기" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
-            <ListenButton text={phrase.expression} speed={0.7} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
+            <ListenButton text={phrase.expression} speed={0.5} label=" 천천히" fallbackIcon="🐢" variant="plain" style={{ background: C.bg, fontSize: "12px", padding: "5px 12px" }} exactSpeed={true} />
           </div>
         </div>
 
@@ -5824,12 +5746,12 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak }) {
           </div>
           <div style={{ fontSize: "24px", opacity: 0.15, color: "#fff" }}>→</div>
         </button>
-        {/* Community — light grey */}
+        {/* Daily Question — light grey */}
         <button onClick={() => onNavigate("community")} className="primary-card"
           style={{ width: "100%", background: "#F0F0F0", borderRadius: "20px", padding: "22px 24px", textAlign: "left", cursor: "pointer", fontFamily: FONT, border: "none", animation: "cardReveal 0.3s ease 0.12s both", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "transform 0.15s" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Classmates</div>
-            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>🌍 Community</div>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: "#888", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily</div>
+            <div style={{ fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.4px", marginBottom: "5px" }}>❓ Daily Question</div>
             <div style={{ fontSize: "12px", color: "#777" }}>{stats.communityVoices > 0 ? `${stats.communityVoices} voices today` : "Be first today"}</div>
           </div>
           <div style={{ fontSize: "24px", opacity: 0.12 }}>→</div>
