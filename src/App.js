@@ -1927,7 +1927,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
     if (!showHidden && p.hidden) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return p.english.toLowerCase().includes(q) || (p.korean && p.korean.includes(q));
+    return (p.english || '').toLowerCase().includes(q) || (p.korean && p.korean.toLowerCase().includes(q));
   });
 
   const visible = filtered.filter(p => !p.hidden);
@@ -1937,7 +1937,8 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
 
   if (isPreview || user.id === "preview") return React.createElement("div", { style: { textAlign: "center", padding: "40px", color: C.textLight, fontStyle: "italic" } }, "My Phrases not available in preview mode.");
 
-  return (
+  try {
+    return (
     <div>
       <Card style={{ marginBottom: "16px", borderLeft: `3px solid ${C.gold}` }}>
         <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>⭐ 나의 표현 모음</div>
@@ -1991,6 +1992,14 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
       )}
     </div>
   );
+  } catch(err) {
+    console.error('MyPhrasesTab render error:', err.message, err.stack);
+    return React.createElement('div', { style: { padding: '40px', textAlign: 'center' } },
+      React.createElement('div', { style: { fontSize: '32px', marginBottom: '12px' } }, '⚠️'),
+      React.createElement('div', { style: { fontSize: '14px', color: C.error, marginBottom: '8px' } }, '오류가 발생했어요'),
+      React.createElement('div', { style: { fontSize: '11px', color: C.textLight } }, err.message)
+    );
+  }
 }
 
 // ── My Phrase Row ─────────────────────────────────────────────────────────────
