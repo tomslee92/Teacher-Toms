@@ -752,32 +752,49 @@ function CelebrationEffect({ type }) {
 }
 
 function ConfettiEffect() {
-  const colors = ["#1A1A1A", "#B8973A", "#1A7A45", "#C0392B", "#2563EB", "#7C3AED"];
-  const pieces = Array.from({ length: 60 }, (_, i) => ({
-    id: i, color: colors[i % colors.length],
-    left: Math.random() * 100,
-    delay: Math.random() * 0.8,
-    size: 5 + Math.random() * 8,
-    spin: Math.random() > 0.5,
-    drift: (Math.random() - 0.5) * 120,
+  const colors = ["#1A1A1A", "#B8973A", "#1A7A45", "#C0392B", "#2563EB", "#7C3AED", "#E8913A", "#F9D923"];
+  // 120 pieces in multiple waves for full-screen coverage
+  const pieces = Array.from({ length: 120 }, (_, i) => ({
+    id: i,
+    color: colors[i % colors.length],
+    left: (i * 0.83) % 100, // spread evenly across full width
+    delay: (i % 3) * 0.15 + Math.random() * 0.4, // 3 waves
+    size: 7 + Math.random() * 10,
+    spin: Math.random() > 0.4,
+    drift: (Math.random() - 0.5) * 200,
+    duration: 1.8 + Math.random() * 1.0,
+    startY: -20 - Math.random() * 60, // stagger start heights
   }));
   return React.createElement(React.Fragment, null,
     React.createElement("style", null, `
       @keyframes confettiFall {
-        0% { transform: translateY(-30px) translateX(0) rotate(0deg); opacity: 1; }
-        100% { transform: translateY(105vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
+        0%   { transform: translateY(var(--sy)) translateX(0) rotate(0deg) scale(1); opacity: 1; }
+        20%  { opacity: 1; }
+        100% { transform: translateY(110vh) translateX(var(--drift)) rotate(900deg) scale(0.6); opacity: 0; }
+      }
+      @keyframes confettiBurst {
+        0%   { transform: scale(0); opacity: 0; }
+        15%  { transform: scale(1.2); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
       }
     `),
+    // Full-screen dark overlay tint for impact
+    React.createElement("div", {
+      style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.15)", zIndex: 998, pointerEvents: "none",
+        animation: "confettiBurst 0.3s ease forwards" }
+    }),
     ...pieces.map(p => React.createElement("div", {
       key: p.id,
       style: {
         position: "fixed", top: 0, left: `${p.left}%`,
-        width: `${p.size}px`, height: `${p.size * (p.spin ? 1 : 2.5)}px`,
+        width: `${p.size}px`, height: `${p.size * (p.spin ? 1 : 2.8)}px`,
         background: p.color,
-        borderRadius: p.spin ? "50%" : "2px",
-        animation: `confettiFall 2s ease-in ${p.delay}s forwards`,
+        borderRadius: p.spin ? "50%" : "3px",
+        animation: `confettiFall ${p.duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${p.delay}s both`,
         "--drift": `${p.drift}px`,
+        "--sy": `${p.startY}px`,
         zIndex: 999, pointerEvents: "none",
+        boxShadow: `0 2px 4px rgba(0,0,0,0.15)`,
       }
     }))
   );
@@ -1454,6 +1471,51 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
 }
 
 // ── Free Talk Tab ─────────────────────────────────────────────────────────────
+// ── Korean Voice Input ───────────────────────────────────────────────────────
+function KoreanVoiceInput({ onResult, loading }) {
+  const [recording, setRecording] = useState(false);
+  const chunksRef = useRef([]);
+  const mediaRef = useRef(null);
+
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mediaRef.current = mr;
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setRecording(false);
+        try {
+          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+          const said = await transcribe(blob);
+          onResult(said);
+        } catch(e) {}
+      };
+      mr.start(100);
+      setRecording(true);
+    } catch(e) { alert("마이크 접근이 필요합니다."); }
+  };
+
+  const stop = () => mediaRef.current?.stop();
+
+  if (recording) {
+    return React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: "10px", background: "#FFF0F0", border: `1px solid ${C.errorBorder}`, borderRadius: "12px", padding: "12px 16px", marginBottom: "10px" }
+    },
+      React.createElement("div", { style: { width: "10px", height: "10px", borderRadius: "50%", background: C.error, animation: "recPulse 1.5s ease-in-out infinite", flexShrink: 0 } }),
+      React.createElement("span", { style: { flex: 1, fontSize: "13px", color: C.error, fontWeight: "600" } }, "녹음 중… 한국어로 말하세요"),
+      React.createElement("button", { onClick: stop, style: { background: C.error, border: "none", borderRadius: "100px", padding: "5px 12px", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, "⏹ 완료")
+    );
+  }
+
+  return React.createElement("button", {
+    onClick: start, disabled: loading,
+    style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", background: C.bgSoft, border: `1px dashed ${C.border}`, borderRadius: "12px", padding: "12px", fontSize: "13px", color: C.textMid, cursor: "pointer", fontFamily: FONT, marginBottom: "10px" }
+  }, "🎙", React.createElement("span", null, "한국어로 말하기"));
+}
+
 function FreeTalkTab({ user, isPreview, onPracticed }) {
   const [activeMode, setActiveMode] = useState(null);
   const [feedback, setFeedback] = useState(null);
@@ -1587,17 +1649,19 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
     </div>
   );
 
-  // ── HOW TO SAY MODE ───────────────────────────────────────────────────────
-  if (activeMode === "howto") return (
+  // ── HOW TO SAY MODE ────────────────────────────────────────────────────────
+  if (activeMode === "howto") {
+    return (
     <div className="feature-screen">
       {React.createElement(BackBtn)}
       <div style={{ marginBottom: "16px" }}>
         <div style={{ fontSize: "18px", fontWeight: "800", color: C.text, marginBottom: "4px" }}>🇰🇷 → 🇺🇸 어떻게 말해요?</div>
-        <div style={{ fontSize: "13px", color: C.textMid }}>한국어로 입력하면 자연스러운 영어 표현으로 바꿔드려요.</div>
+        <div style={{ fontSize: "13px", color: C.textMid }}>한국어로 입력하거나 말하면 자연스러운 영어 표현으로 바꿔드려요.</div>
       </div>
+      {React.createElement(KoreanVoiceInput, { onResult: (text) => { setKoreanText(text); }, loading: loadingHowTo })}
       <textarea value={koreanText} onChange={e => setKoreanText(e.target.value)}
-        placeholder="한국어로 표현하고 싶은 말을 입력하세요…"
-        style={{ width: "100%", padding: "12px 14px", border: `1px solid ${C.border}`, borderRadius: "12px", fontSize: "15px", fontFamily: FONT, outline: "none", resize: "none", minHeight: "90px", lineHeight: 1.6, background: C.bg, marginBottom: "10px" }} />
+        placeholder="또는 한국어로 직접 입력하세요…"
+        style={{ width: "100%", padding: "12px 14px", border: `1px solid ${C.border}`, borderRadius: "12px", fontSize: "15px", fontFamily: FONT, outline: "none", resize: "none", minHeight: "80px", lineHeight: 1.6, background: C.bg, marginBottom: "10px" }} />
       <Btn onClick={handleHowToSay} disabled={loadingHowTo || !koreanText.trim()} style={{ width: "100%", marginBottom: "16px" }}>
         {loadingHowTo ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, "번역 중…")) : "영어로 변환하기 →"}
       </Btn>
@@ -1606,14 +1670,16 @@ function FreeTalkTab({ user, isPreview, onPracticed }) {
           {howToSay.translations?.map((t, i) => (
             <Card key={i} style={{ marginBottom: "10px" }}>
               <div style={{ fontSize: "16px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>"{t.english}"</div>
-              {t.note && <div style={{ fontSize: "12px", color: C.textMid }}>{t.note}</div>}
-              <button onClick={() => speak(t.english)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "13px", fontFamily: FONT, padding: "6px 0 0" }}>🔊 듣기</button>
+              {t.note && <div style={{ fontSize: "12px", color: C.textMid, marginBottom: "6px" }}>{t.note}</div>}
+              <button onClick={() => speak(t.english)} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "13px", fontFamily: FONT }}>🔊 듣기</button>
             </Card>
           ))}
         </div>
       )}
     </div>
-  );
+    );
+  }
+
 
   // ── EXPRESSION MODE ───────────────────────────────────────────────────────
   if (activeMode === "expr") return (
@@ -3596,7 +3662,26 @@ Format:
 
 // ── Rich Audio Player ────────────────────────────────────────────────────────
 // Clean minimal iMessage-style player — thin progress line, perfectly smooth
-function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) {
+function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", showTranslation = false }) {
+  const [translation, setTranslation] = useState(null);
+  const [loadingTranslation, setLoadingTranslation] = useState(false);
+  const [showTrans, setShowTrans] = useState(false);
+
+  const handleTranslate = async () => {
+    if (translation) { setShowTrans(s => !s); return; }
+    setLoadingTranslation(true);
+    try {
+      const t = await groqCall(`Translate this English text into natural Korean. Return ONLY the Korean translation, nothing else: "${transcript}"`);
+      // Filter to Korean characters only
+      const korean = t.trim().split("").filter(c => {
+        const code = c.charCodeAt(0);
+        return (code >= 0xAC00 && code <= 0xD7A3) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F) || [" ","?","!",".",",","·","…"].includes(c);
+      }).join("").trim() || t.trim();
+      setTranslation(t.trim());
+      setShowTrans(true);
+    } catch(e) {}
+    setLoadingTranslation(false);
+  };
   const audioRef = useRef(null);
   const rafRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -3649,11 +3734,28 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) 
     return () => cancelAnimationFrame(rafRef.current);
   }, [playing]);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) { audio.pause(); setPlaying(false); }
-    else { audio.play().catch(() => {}); setPlaying(true); }
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      try {
+        // iOS Safari: must resume AudioContext if suspended
+        if (window.AudioContext || window.webkitAudioContext) {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          if (ctx.state === "suspended") await ctx.resume();
+        }
+        await audio.play();
+        setPlaying(true);
+      } catch(e) {
+        // Autoplay blocked or format unsupported — try reloading src
+        console.warn("Audio play failed:", e.message);
+        audio.load();
+        try { await audio.play(); setPlaying(true); } catch(e2) {}
+      }
+    }
   };
 
   const seek = (e) => {
@@ -3669,7 +3771,7 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) 
   const fmt = s => isNaN(s) || !isFinite(s) ? "0:00" : `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,"0")}`;
 
   return React.createElement("div", { style: { marginBottom: "10px" } },
-    React.createElement("audio", { ref: audioRef, src, preload: "auto" }),
+    React.createElement("audio", { ref: audioRef, src, preload: "auto", playsInline: true, "webkit-playsinline": "true", crossOrigin: "anonymous" }),
     React.createElement("div", {
       style: { background: C.bgSoft, borderRadius: "12px", padding: "10px 14px", border: `1px solid ${C.border}` }
     },
@@ -3714,10 +3816,25 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "" }) 
           }
         })
       ),
-      // Transcript
+      // Transcript + optional Korean translation
       (transcript && transcript.trim().length > 0) && React.createElement("div", {
-        style: { fontSize: "13px", color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }
-      }, `"${transcript}"`)
+        style: { marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }
+      },
+        React.createElement("div", { style: { fontSize: "13px", color: C.textMid, fontStyle: "italic", lineHeight: 1.6, marginBottom: showTranslation ? "6px" : "0" } }, `"${transcript}"`),
+        showTranslation && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+          !showTrans
+            ? React.createElement("button", { onClick: handleTranslate, disabled: loadingTranslation,
+                style: { background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "100px", padding: "3px 10px", fontSize: "11px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: "4px" } },
+                loadingTranslation ? React.createElement(Spinner) : "🇰🇷",
+                React.createElement("span", null, loadingTranslation ? "번역 중…" : "한국어로 보기")
+              )
+            : React.createElement("div", { style: { fontSize: "12px", color: C.textMid, lineHeight: 1.6, background: C.bgSoft, borderRadius: "8px", padding: "6px 10px", display: "flex", gap: "6px", alignItems: "flex-start" } },
+                React.createElement("span", null, "🇰🇷"),
+                React.createElement("span", { style: { flex: 1 } }, translation),
+                React.createElement("button", { onClick: () => setShowTrans(false), style: { background: "none", border: "none", color: C.textLight, cursor: "pointer", fontSize: "12px" } }, "×")
+              )
+        )
+      )
     )
   );
 }
@@ -3992,7 +4109,7 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index }) {
 
       {/* Audio player — use RichAudioPlayer if audio exists, else show transcript */}
       {response.audio_url ? (
-        React.createElement(RichAudioPlayer, { src: response.audio_url, label: `${response.nickname || "Student"}'s answer`, transcript: response.transcript || "" })
+        React.createElement(RichAudioPlayer, { src: response.audio_url, label: `${response.nickname || "Student"}'s answer`, transcript: response.transcript || "", showTranslation: true })
       ) : (
         response.transcript && (
           <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "10px 14px", marginBottom: "10px", fontSize: "14px", color: C.text, fontStyle: "italic", lineHeight: 1.5 }}>
@@ -4648,27 +4765,8 @@ function WayveLogo({ size = 22, color = "#1A1A1A" }) {
 // ── Loading Screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
-    <div style={{
-      position: "fixed", inset: 0,
-      background: "#FFFFFF",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <style>{`
-        @keyframes wvFadeIn {
-          0%   { opacity: 0; }
-          100% { opacity: 1; }
-        }
-      `}</style>
-      <div style={{
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        fontSize: "32px",
-        fontWeight: "800",
-        letterSpacing: "10px",
-        color: "#1A1A1A",
-        WebkitFontSmoothing: "antialiased",
-        opacity: 0,
-        animation: "wvFadeIn 1.8s ease 0.4s forwards",
-      }}>
+    <div style={{ position: "fixed", inset: 0, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", fontSize: "32px", fontWeight: "800", letterSpacing: "10px", color: "#1A1A1A" }}>
         WAYVE
       </div>
     </div>
@@ -4800,7 +4898,7 @@ function QodEntryScreen({ user, group, onEnter }) {
   if (loading) return React.createElement(LoadingScreen);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", animation: "wvFadeIn 1.0s ease 0.1s both" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column",  }}>
       <style>{`
         @keyframes qodEntryFade { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes wvFadeIn { from{opacity:0} to{opacity:1} }
