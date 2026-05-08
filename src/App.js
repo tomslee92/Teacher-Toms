@@ -280,6 +280,44 @@ async function transcribe(blob) {
   return (await res.text()).trim();
 }
 
+// ── Difficulty Rubric for Expression Generator ────────────────────────────────
+// This rubric is the single source of truth used by both the live generator
+// and the one-time backfill script in the teacher dashboard.
+const EXPR_RUBRIC = `DIFFICULTY RUBRIC (apply strictly):
+
+BEGINNER:
+- 5 words or fewer
+- Simple subject + verb + object structure, or single phrases
+- Present tense, or simple past with very common verbs (went, had, was)
+- High-frequency vocabulary only — words a learner meets in their first 6 months
+- NO phrasal verbs, NO idioms
+- Contractions limited to: I'm, it's, don't, can't, won't
+- Examples: "Can I get a coffee?" / "I'll think about it." / "That sounds great."
+
+INTERMEDIATE:
+- 6 to 12 words
+- May include ONE phrasal verb OR ONE common idiom (not both)
+- Past, future, present perfect, or conditional tenses are okay
+- Everyday casual vocabulary from TV and conversation
+- Examples: "I'm going to head out in a few minutes." / "That's not really my thing, to be honest." / "Could you run that by me again?"
+
+ADVANCED:
+- 10+ words, OR shorter with sophisticated nuance
+- Multiple clauses, or layered idiomatic expressions
+- Native casual register: contractions, hedging, sentence-final particles ("…or something," "…I guess")
+- Cultural/contextual subtlety: sarcasm, understatement, indirect speech
+- Phrasal verbs and idioms used naturally
+- Examples: "I was kind of hoping we could push that to next week if it's not a hassle." / "Don't take this the wrong way, but…"`;
+
+// Build the level-targeting line for a given level filter
+const levelInstruction = (level) => {
+  if (level === "beginner") return `Generate ONLY beginner-level phrases per the rubric. Every phrase must satisfy the BEGINNER criteria.`;
+  if (level === "intermediate") return `Generate ONLY intermediate-level phrases per the rubric. Every phrase must satisfy the INTERMEDIATE criteria.`;
+  if (level === "advanced") return `Generate ONLY advanced-level phrases per the rubric. Every phrase must satisfy the ADVANCED criteria.`;
+  // mix
+  return `Generate a MIX of difficulty levels: 2 beginner, 2 intermediate, 2 advanced phrases. Tag each one accurately per the rubric.`;
+};
+
 async function getPhraseFeedback(said, phrase) {
   // Normalize both strings for comparison
   const normalize = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
@@ -1005,6 +1043,27 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
   const [streak, setStreak] = useState(user.streak || 0);
   const [longest, setLongest] = useState(user.longest_streak || 0);
   const [showStreakBanner, setShowStreakBanner] = useState(false);
+  const [unreadCommentIds, setUnreadCommentIds] = useState(new Set());
+
+  // Refresh unread teacher comments. Called on mount + after viewing the
+  // Community tab so the badge updates when comments are marked seen.
+  const refreshUnreadComments = useCallback(async () => {
+    if (isPreview) return;
+    try {
+      // Find the student's responses, then comments on those responses
+      // where seen_at is null. Two-step because Supabase REST doesn't easily
+      // do this as a single join via PostgREST without a foreign-key relation.
+      const myResponses = await db.get("qod_responses", `student_id=eq.${user.id}&select=id`).catch(() => []);
+      if (myResponses.length === 0) { setUnreadCommentIds(new Set()); return; }
+      const ids = myResponses.map(r => r.id).join(",");
+      const comments = await db.get("qod_comments", `response_id=in.(${ids})&seen_at=is.null&select=id,response_id`).catch(() => []);
+      setUnreadCommentIds(new Set(comments.map(c => c.id)));
+    } catch(e) {
+      console.error("Unread comments fetch error:", e);
+    }
+  }, [isPreview, user.id]);
+
+  useEffect(() => { refreshUnreadComments(); }, [refreshUnreadComments]);
 
   useEffect(() => {
     if (isPreview) return;
@@ -1082,7 +1141,7 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
             {React.createElement(HomeGrid, { user, group, isPreview, onNavigate: setTab, streak })}
           </div>
         )}
-        {tab === "community" && <div className="feature-screen">{React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak })}</div>}
+        {tab === "community" && <div className="feature-screen">{React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak, unreadCommentIds, refreshUnreadComments })}</div>}
         {tab === "practice" && <div className="feature-screen">{React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak })}</div>}
         {tab === "freetalk" && <div className="feature-screen">{React.createElement(FreeTalkTab, { user, isPreview, onPracticed: updateStreak, onPhraseSaved: () => setMyPhrasesKey(k => k + 1) })}</div>}
         {tab === "myphrases" && <div className="feature-screen">{React.createElement(MyPhrasesTab, { user, isPreview, refreshKey: myPhrasesKey })}</div>}
@@ -1092,8 +1151,12 @@ function StudentScreen({ user, group, isPreview, onBack, fontSize = 'default', s
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg, borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 20, paddingBottom: "env(safe-area-inset-bottom)" }}>
         {[["community","🌍","Community"],["practice","🎙","Practice"],["freetalk","💬","Free Talk"],["myphrases","⭐","My Phrases"]].map(([id, icon, label]) => {
           const active = tab === id;
-          return React.createElement("button", { key: id, className: "nav-btn", onClick: () => setTab(id), style: { flex: 1, padding: "10px 4px 8px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" } },
-            React.createElement("div", { style: { fontSize: "20px", lineHeight: 1 } }, icon),
+          const showBadge = id === "community" && unreadCommentIds.size > 0;
+          return React.createElement("button", { key: id, className: "nav-btn", onClick: () => setTab(id), style: { flex: 1, padding: "10px 4px 8px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", position: "relative" } },
+            React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative" } },
+              icon,
+              showBadge && React.createElement("span", { style: { position: "absolute", top: "-2px", right: "-8px", minWidth: "16px", height: "16px", borderRadius: "100px", background: C.error, color: "#fff", fontSize: "10px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", border: `2px solid ${C.bg}` } }, unreadCommentIds.size)
+            ),
             React.createElement("div", { style: { fontSize: "10px", fontWeight: active ? "700" : "400", color: active ? C.text : C.textLight } }, label),
             React.createElement("div", { style: { width: "4px", height: "4px", borderRadius: "50%", background: active ? C.text : "transparent", marginTop: "1px", transition: "background 0.2s ease" } })
           );
@@ -1572,6 +1635,10 @@ function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
   const [exprContext, setExprContext] = useState("");
   const [exprList, setExprList] = useState([]);
   const [savedIds, setSavedIds] = useState(new Set());
+  const [exprLevel, setExprLevel] = useState("mix"); // beginner | intermediate | advanced | mix
+  const [todaysExpr, setTodaysExpr] = useState(null);
+  const [loadingTodays, setLoadingTodays] = useState(false);
+  const [practiceTarget, setPracticeTarget] = useState(null); // phrase object when modal is open
 
   const handleRecordingDone = async (blob) => {
     setLoadingFeedback(true);
@@ -1585,6 +1652,43 @@ function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
     setLoadingFeedback(false);
   };
   const rec = useRecorder(handleRecordingDone);
+
+  // Auto-load a fresh "Today's Expression" each time the user enters the
+  // expression generator. We re-roll on every entry per the spec — this
+  // screen's purpose is discovery, not daily ritual.
+  useEffect(() => {
+    if (activeMode !== "expr") return;
+    let cancelled = false;
+    (async () => {
+      setLoadingTodays(true);
+      setTodaysExpr(null);
+      try {
+        const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
+
+${EXPR_RUBRIC}
+
+Generate ONE interesting, useful English expression or idiom for a Korean adult learner. Pick something genuinely useful in everyday conversation. Tag the level accurately per the rubric.
+
+CRITICAL: The "explanation" field MUST be in Korean (한국어), NOT English.
+
+JSON format: {"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence","level":"intermediate"}
+RETURN ONLY THE JSON OBJECT:`);
+        if (cancelled) return;
+        let parsed = null;
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) { try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {} }
+        if (!parsed) {
+          const clean = text.replace(/```json|```/g, "").trim();
+          parsed = JSON.parse(clean);
+        }
+        if (!cancelled) setTodaysExpr(parsed);
+      } catch(e) {
+        if (!cancelled) console.error("Today's expression error:", e.message);
+      }
+      if (!cancelled) setLoadingTodays(false);
+    })();
+    return () => { cancelled = true; };
+  }, [activeMode]);
 
   const handleGenerateExpression = async () => {
     setLoadingExpr(true); setExpression(null);
@@ -1746,9 +1850,17 @@ function FreeTalkTab({ user, isPreview, onPracticed, onPhraseSaved }) {
 
       try {
         const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
+
+${EXPR_RUBRIC}
+
+${levelInstruction(exprLevel)}
+
 Generate 6 English expressions for Korean adult learners. ${contextPrompt}
 Avoid these: ${avoidList ? avoidList.slice(0, 80) : "none"}
-JSON format: {"expressions":[{"expression":"phrase here","korean":"한국어 번역","explanation":"when to use it","example":"example sentence","level":"beginner"}]}
+
+CRITICAL: The "explanation" field MUST be written in Korean (한국어), NOT English. Explain when and how to use the phrase, in Korean.
+
+JSON format: {"expressions":[{"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence","level":"beginner"}]}
 RETURN ONLY THE JSON OBJECT:`);
         // More robust parsing - find JSON object anywhere in response
         let parsed = null;
@@ -1771,6 +1883,36 @@ RETURN ONLY THE JSON OBJECT:`);
       setLoadingExpr(false);
     };
 
+    const generateTodaysExpression = async () => {
+      setLoadingTodays(true);
+      try {
+        const text = await groqCall(`You are a JSON API. Return ONLY a JSON object, no markdown, no explanation.
+
+${EXPR_RUBRIC}
+
+Generate ONE interesting, useful English expression or idiom for a Korean adult learner. Pick something genuinely useful in everyday conversation. Tag the level accurately per the rubric.
+
+CRITICAL: The "explanation" field MUST be in Korean (한국어), NOT English.
+
+JSON format: {"expression":"phrase here","korean":"한국어 번역","explanation":"한국어로 사용 상황 설명","example":"example sentence","level":"intermediate"}
+RETURN ONLY THE JSON OBJECT:`);
+        let parsed = null;
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try { parsed = JSON.parse(jsonMatch[0]); } catch(e2) {}
+        }
+        if (!parsed) {
+          const clean = text.replace(/```json|```/g, "").trim();
+          parsed = JSON.parse(clean);
+        }
+        setTodaysExpr(parsed);
+      } catch(e) {
+        console.error("Today's expression error:", e.message);
+        setTodaysExpr(null);
+      }
+      setLoadingTodays(false);
+    };
+
     const savePhrase = async (expr) => {
       try {
         await db.insert("student_phrases", {
@@ -1791,15 +1933,110 @@ RETURN ONLY THE JSON OBJECT:`);
 
     const levelColor = (l) => l === "beginner" ? C.success : l === "advanced" ? C.error : C.gold;
     const levelBg = (l) => l === "beginner" ? C.successBg : l === "advanced" ? C.errorBg : C.goldBg;
+    const levelLabelKo = (l) => l === "beginner" ? "초급" : l === "advanced" ? "고급" : "중급";
+
+    // Renders a single phrase card (used by both Today's Expression and the generator list)
+    const renderPhraseCard = (expr, i, keyPrefix = "") => {
+      const isSaved = savedIds.has(expr.expression);
+      return (
+        <div key={`${keyPrefix}${i}`} style={{ background: C.bg, borderRadius: "16px", border: `1px solid ${C.border}`, overflow: "hidden", animation: `cardReveal 0.3s ease ${i * 0.05}s both` }}>
+          <div style={{ padding: "16px 16px 12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px", flex: 1, lineHeight: 1.3 }}>
+                "{expr.expression}"
+              </div>
+              <span style={{ fontSize: "10px", fontWeight: "700", color: levelColor(expr.level), background: levelBg(expr.level), padding: "2px 8px", borderRadius: "100px", marginLeft: "10px", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                {expr.level || "intermediate"}
+              </span>
+            </div>
+            {expr.korean && (
+              <div style={{ fontSize: "14px", fontWeight: "600", color: C.textMid, marginBottom: "6px", lineHeight: 1.4 }}>
+                🇰🇷 {expr.korean}
+              </div>
+            )}
+            <div style={{ fontSize: "12px", color: C.textLight, lineHeight: 1.6, marginBottom: "6px" }}>
+              {expr.explanation}
+            </div>
+            {expr.example && (
+              <div style={{ fontSize: "12px", color: C.textLight, fontStyle: "italic", lineHeight: 1.5 }}>
+                e.g. "{expr.example}"
+              </div>
+            )}
+          </div>
+          <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "6px", alignItems: "center", background: C.bgSoft, flexWrap: "wrap" }}>
+            <button onClick={() => speak(expr.expression)}
+              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+              🔊 듣기
+            </button>
+            <button onClick={() => speak(expr.expression, 0.7)}
+              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+              🐢 천천히
+            </button>
+            <button onClick={() => setPracticeTarget(expr)}
+              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+              🎙 연습
+            </button>
+            <div style={{ flex: 1 }} />
+            <button onClick={async () => {
+                if (isSaved) return;
+                await savePhrase(expr);
+              }}
+              style={{ background: isSaved ? C.successBg : C.text, border: `1px solid ${isSaved ? C.successBorder : C.text}`, borderRadius: "100px", padding: "5px 14px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : "#fff", cursor: isSaved ? "default" : "pointer", fontFamily: FONT, transition: "all 0.3s ease" }}>
+              {isSaved ? "✅ 저장됨" : "⭐ 저장"}
+            </button>
+          </div>
+        </div>
+      );
+    };
 
     return (
     <div className="feature-screen">
       {React.createElement(BackBtn)}
 
-      {/* Header */}
+      {/* ── TOP CARD: Today's Expression ─────────────────────────────────── */}
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", padding: "0 4px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textMid, letterSpacing: "1.5px", textTransform: "uppercase" }}>오늘의 표현</div>
+          <button onClick={generateTodaysExpression} disabled={loadingTodays}
+            style={{ background: "transparent", border: "none", fontSize: "11px", color: C.textLight, cursor: loadingTodays ? "default" : "pointer", fontFamily: FONT, fontWeight: "500" }}>
+            {loadingTodays ? "..." : "🔄 새로 받기"}
+          </button>
+        </div>
+        {loadingTodays && !todaysExpr && (
+          <div style={{ background: C.bg, borderRadius: "16px", border: `1px solid ${C.border}`, padding: "30px", textAlign: "center" }}>
+            {React.createElement(Spinner)}
+          </div>
+        )}
+        {todaysExpr && renderPhraseCard(todaysExpr, 0, "today_")}
+      </div>
+
+      {/* ── BOTTOM CARD: Generator ───────────────────────────────────────── */}
       <div style={{ background: C.bgDark, borderRadius: "20px", padding: "22px 24px", marginBottom: "16px" }}>
         <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>AI Expression Generator</div>
         <div style={{ fontSize: "20px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "12px" }}>✨ 표현 생성기</div>
+
+        {/* Level pills */}
+        <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
+          {[
+            { id: "beginner", label: "초급" },
+            { id: "intermediate", label: "중급" },
+            { id: "advanced", label: "고급" },
+            { id: "mix", label: "다양하게" },
+          ].map(opt => (
+            <button key={opt.id} onClick={() => setExprLevel(opt.id)}
+              style={{
+                padding: "6px 14px", borderRadius: "100px",
+                background: exprLevel === opt.id ? "#fff" : "rgba(255,255,255,0.08)",
+                border: `1px solid ${exprLevel === opt.id ? "#fff" : "rgba(255,255,255,0.15)"}`,
+                color: exprLevel === opt.id ? C.text : "rgba(255,255,255,0.85)",
+                fontSize: "12px", fontWeight: exprLevel === opt.id ? "700" : "500",
+                cursor: "pointer", fontFamily: FONT, transition: "all 0.15s"
+              }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         {/* Context input */}
         <input
           value={exprContext}
@@ -1822,62 +2059,13 @@ RETURN ONLY THE JSON OBJECT:`);
       {exprList.length === 0 && !loadingExpr && (
         <div style={{ textAlign: "center", padding: "30px 20px", background: C.bgSoft, borderRadius: "16px", color: C.textMid }}>
           <div style={{ fontSize: "28px", marginBottom: "10px" }}>✨</div>
-          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>상황을 입력하고 표현을 생성해보세요</div>
-          <div style={{ fontSize: "12px", color: C.textLight }}>또는 그냥 생성하면 다양한 표현이 나와요</div>
+          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>레벨을 선택하고 표현을 생성해보세요</div>
+          <div style={{ fontSize: "12px", color: C.textLight }}>상황을 입력하면 더 정확한 표현이 나와요</div>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {exprList.map((expr, i) => {
-          const isSaved = savedIds.has(expr.expression);
-          return (
-            <div key={i} style={{ background: C.bg, borderRadius: "16px", border: `1px solid ${C.border}`, overflow: "hidden", animation: `cardReveal 0.3s ease ${i * 0.05}s both` }}>
-              {/* Level badge + expression */}
-              <div style={{ padding: "16px 16px 12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                  <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px", flex: 1, lineHeight: 1.3 }}>
-                    "{expr.expression}"
-                  </div>
-                  <span style={{ fontSize: "10px", fontWeight: "700", color: levelColor(expr.level), background: levelBg(expr.level), padding: "2px 8px", borderRadius: "100px", marginLeft: "10px", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    {expr.level || "intermediate"}
-                  </span>
-                </div>
-                {expr.korean && (
-                  <div style={{ fontSize: "14px", fontWeight: "600", color: C.textMid, marginBottom: "6px", lineHeight: 1.4 }}>
-                    🇰🇷 {expr.korean}
-                  </div>
-                )}
-                <div style={{ fontSize: "12px", color: C.textLight, lineHeight: 1.6, marginBottom: "6px" }}>
-                  {expr.explanation}
-                </div>
-                {expr.example && (
-                  <div style={{ fontSize: "12px", color: C.textLight, fontStyle: "italic", lineHeight: 1.5 }}>
-                    e.g. "{expr.example}"
-                  </div>
-                )}
-              </div>
-              {/* Actions */}
-              <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: "8px", alignItems: "center", background: C.bgSoft }}>
-                <button onClick={() => speak(expr.expression)}
-                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
-                  🔊 듣기
-                </button>
-                <button onClick={() => speak(expr.example)}
-                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT, display: expr.example ? "block" : "none" }}>
-                  🔊 예문
-                </button>
-                <div style={{ flex: 1 }} />
-                <button onClick={async () => {
-                    if (isSaved) return;
-                    await savePhrase(expr);
-                  }}
-                  style={{ background: isSaved ? C.successBg : C.text, border: `1px solid ${isSaved ? C.successBorder : C.text}`, borderRadius: "100px", padding: "5px 14px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : "#fff", cursor: isSaved ? "default" : "pointer", fontFamily: FONT, transition: "all 0.3s ease" }}>
-                  {isSaved ? "✅ 저장됨" : "⭐ 저장"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {exprList.map((expr, i) => renderPhraseCard(expr, i, "list_"))}
       </div>
 
       {exprList.length > 0 && !loadingExpr && (
@@ -1886,11 +2074,151 @@ RETURN ONLY THE JSON OBJECT:`);
           🔄 새로운 표현 더 보기
         </button>
       )}
+
+      {/* Practice modal */}
+      {practiceTarget && (
+        <PracticeModal
+          phrase={practiceTarget}
+          onClose={() => setPracticeTarget(null)}
+          onPracticed={onPracticed}
+        />
+      )}
     </div>
     );
   }
 
   return null;
+}
+
+// ── Practice Modal ────────────────────────────────────────────────────────────
+// Lightweight overlay for practicing a single phrase from the Expression
+// Generator. Records audio → Whisper transcribes → Groq returns brief Korean
+// pronunciation/accuracy feedback (1-2 sentences per spec).
+function PracticeModal({ phrase, onClose, onPracticed }) {
+  const [transcript, setTranscript] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+
+  const handleDone = async (blob) => {
+    setLoading(true);
+    setErrMsg("");
+    setFeedback("");
+    setTranscript("");
+    try {
+      const said = await transcribe(blob);
+      setTranscript(said);
+      const text = await groqCall(`A Korean adult learner is practicing this English phrase:
+TARGET: "${phrase.expression}"
+THEY SAID: "${said}"
+
+Give brief, focused feedback in Korean (한국어), 1-2 sentences only. Focus on pronunciation accuracy and how close they got to the target. Be warm and specific. If they nailed it, celebrate. If they were off, point to the specific sound or word to work on.
+
+Return ONLY the Korean feedback, no English, no preamble.`);
+      setFeedback(cleanText(text).trim());
+      onPracticed && onPracticed();
+    } catch(e) {
+      setErrMsg("피드백 오류. 다시 시도해 주세요.");
+    }
+    setLoading(false);
+  };
+  const rec = useRecorder(handleDone);
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+      zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center",
+      animation: "fadeIn 0.18s ease",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: C.bg, borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "520px",
+        padding: "20px 20px 28px", maxHeight: "90vh", overflowY: "auto",
+        animation: "fadeInUp 0.22s ease",
+      }}>
+        {/* Drag handle */}
+        <div style={{ width: "40px", height: "4px", background: C.bgMid, borderRadius: "2px", margin: "0 auto 16px" }} />
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textMid, letterSpacing: "1.5px", textTransform: "uppercase" }}>연습하기</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: "22px", color: C.textLight, cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+
+        {/* Target phrase */}
+        <div style={{ background: C.bgSoft, borderRadius: "12px", padding: "16px", marginBottom: "16px" }}>
+          <div style={{ fontSize: "18px", fontWeight: "800", color: C.text, lineHeight: 1.4, marginBottom: "10px" }}>
+            "{phrase.expression}"
+          </div>
+          {phrase.korean && (
+            <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "10px" }}>
+              🇰🇷 {phrase.korean}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={() => speak(phrase.expression)}
+              style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+              🔊 듣기
+            </button>
+            <button onClick={() => speak(phrase.expression, 0.7)}
+              style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", color: C.textMid, cursor: "pointer", fontFamily: FONT }}>
+              🐢 천천히
+            </button>
+          </div>
+        </div>
+
+        {/* Recording controls */}
+        {!rec.isRec && !transcript && !loading && (
+          <button onClick={rec.start}
+            style={{ width: "100%", padding: "14px", borderRadius: "100px", background: C.text, border: "none", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            🎙 녹음 시작
+          </button>
+        )}
+
+        {rec.isRec && (
+          <button onClick={rec.stop} className="rec-pulse"
+            style={{ width: "100%", padding: "14px", borderRadius: "100px", background: C.error, border: "none", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#fff" }} />
+            녹음 중… {rec.time}s — 클릭하여 정지
+          </button>
+        )}
+
+        {loading && (
+          <div style={{ textAlign: "center", padding: "20px" }}>
+            {React.createElement(Spinner)}
+            <div style={{ fontSize: "12px", color: C.textLight, marginTop: "10px" }}>분석 중…</div>
+          </div>
+        )}
+
+        {/* Result */}
+        {transcript && !loading && (
+          <div style={{ marginTop: "16px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.textMid, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>학생 발음</div>
+            <div style={{ background: C.bgSoft, borderRadius: "10px", padding: "12px", fontSize: "13px", color: C.text, marginBottom: "12px", fontStyle: "italic" }}>
+              "{transcript}"
+            </div>
+            {feedback && (
+              <>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: C.gold, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>👨‍🏫 피드백</div>
+                <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "10px", padding: "12px", fontSize: "13px", color: C.text, lineHeight: 1.6, marginBottom: "14px" }}>
+                  {feedback}
+                </div>
+              </>
+            )}
+            <button onClick={rec.start}
+              style={{ width: "100%", padding: "11px", borderRadius: "100px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
+              🔄 다시 연습하기
+            </button>
+          </div>
+        )}
+
+        {errMsg && (
+          <div style={{ marginTop: "14px", padding: "12px", background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "10px", fontSize: "13px", color: C.error }}>
+            {errMsg}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
@@ -2531,7 +2859,7 @@ function formatDay(dateStr) {
 
 // ── Teacher Screen ────────────────────────────────────────────────────────────
 function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
-  const [tab, setTab] = useState("groups");
+  const [tab, setTab] = useState("home");
   const [students, setStudents] = useState([]);
   const [phraseBank, setPhraseBank] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2562,18 +2890,32 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
           </div>
           <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "7px 16px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", transition: "all 0.15s" }}>Log out</button>
         </div>
-        <div style={{ display: "flex", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-          {[["groups", "Groups"], ["add", "Add Phrases"], ["students", "Students"], ["notes", "Notes"], ["myphrases", "Student Phrases"], ["cities", "🏙 City Groups"], ["qod", "💡 QoD Studio"], ["responses", "🎙 QoD Responses"]].map(([t, label]) =>
-            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "13px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
+        {/* Grouped tab bar: Daily (prominent, with emojis) | Weekly | Setup */}
+        <div style={{ display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", msOverflowStyle: "none", gap: "2px" }}>
+          {/* Daily group */}
+          {[["home", "🏠 Home"], ["responses", "🎙 Responses"], ["qod", "💡 QoD Studio"]].map(([t, label]) =>
+            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 14px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textMid, fontSize: "13px", fontWeight: tab === t ? "700" : "500", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
+          )}
+          {/* Separator */}
+          <div style={{ width: "1px", height: "20px", background: C.border, margin: "0 8px" }} />
+          {/* Weekly group */}
+          {[["add", "Add Phrases"], ["students", "Students"]].map(([t, label]) =>
+            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 12px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "12px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
+          )}
+          {/* Separator */}
+          <div style={{ width: "1px", height: "20px", background: C.border, margin: "0 8px" }} />
+          {/* Setup group */}
+          {[["groups", "Groups"], ["myphrases", "Student Phrases"], ["cities", "City Groups"]].map(([t, label]) =>
+            React.createElement("button", { key: t, onClick: () => setTab(t), style: { padding: "10px 12px", background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t ? C.text : C.textLight, fontSize: "12px", fontWeight: tab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", marginBottom: "-1px", letterSpacing: "-0.1px", transition: "color 0.15s" } }, label)
           )}
         </div>
       </div>
       <div style={{ maxWidth: "720px", margin: "0 auto", padding: "24px 16px" }}>
         <Msg text={msg.text} type={msg.type} />
+        {tab === "home" && React.createElement(TeacherHomeTab, { students, setTab, showMsg })}
         {tab === "groups" && React.createElement(GroupsTab, { groups, setGroups, students, setStudents, onPreview, showMsg })}
         {tab === "add" && React.createElement(AddPhrasesTab, { groups, phraseBank, setPhraseBank, showMsg })}
         {tab === "students" && React.createElement(StudentsTab, { students, setStudents, groups, showMsg })}
-        {tab === "notes" && React.createElement(TeacherNotesTab, { groups, students, showMsg })}
         {tab === "myphrases" && React.createElement(TeacherMyPhrasesTab, { students, groups })}
         {tab === "cities" && React.createElement(CityGroupsTab, { groups, students, showMsg })}
         {tab === "qod" && React.createElement(QodStudioTab, { showMsg })}
@@ -2584,120 +2926,228 @@ function TeacherScreen({ groups, setGroups, setScreen, onPreview }) {
   );
 }
 
-// ── Teacher Notes Tab ─────────────────────────────────────────────────────────
-function TeacherNotesTab({ groups, students, showMsg }) {
-  const [selectedGroup, setSelectedGroup] = useState(groups[0]);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [sessionNum, setSessionNum] = useState(1);
-  const [sessionContent, setSessionContent] = useState("");
-  const [studentContent, setStudentContent] = useState("");
-  const [sessionNotes, setSessionNotes] = useState([]);
-  const [saving, setSaving] = useState(false);
+// ── Teacher Home Tab ──────────────────────────────────────────────────────────
+// Engagement pulse: at-a-glance view of student activity. A student is "active"
+// this week if they responded to a QoD OR practiced a phrase in the last 7 days.
+function TeacherHomeTab({ students, setTab, showMsg }) {
+  const [recentResponses, setRecentResponses] = useState([]);
+  const [todayResponseCount, setTodayResponseCount] = useState(0);
+  const [activeStudentIds, setActiveStudentIds] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [showAllQuiet, setShowAllQuiet] = useState(false);
+  const [todayPrompt, setTodayPrompt] = useState(null);
+
+  const today = new Date().toISOString().split("T")[0];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   useEffect(() => {
-    if (!selectedGroup) return;
-    db.get("session_notes", `group_id=eq.${selectedGroup.id}&order=session_number.desc`).then(setSessionNotes).catch(() => {});
-  }, [selectedGroup]);
+    (async () => {
+      try {
+        const [allPrompts, weekResponses, todayResp] = await Promise.all([
+          db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []),
+          db.get("qod_responses", `created_at=gte.${sevenDaysAgo}&select=student_id,created_at`).catch(() => []),
+          db.get("qod_responses", `created_at=gte.${today}&order=created_at.desc&limit=10`).catch(() => []),
+        ]);
+        setTodayPrompt(allPrompts[0] || null);
 
-  useEffect(() => {
-    if (!selectedStudent) return;
-    db.get("student_notes", `student_id=eq.${selectedStudent.id}&order=created_at.desc&limit=1`)
-      .then(rows => setStudentContent(rows[0]?.content || "")).catch(() => {});
-  }, [selectedStudent]);
+        // Active = responded to a QoD in last 7 days OR practiced a phrase in last 7 days
+        const respondedIds = new Set(weekResponses.map(r => r.student_id));
+        const practicedIds = new Set(
+          students.filter(s => s.last_practice && s.last_practice >= sevenDaysAgo).map(s => s.id)
+        );
+        const active = new Set([...respondedIds, ...practicedIds]);
+        setActiveStudentIds(active);
 
-  const saveSessionNote = async () => {
-    if (!sessionContent.trim() || !selectedGroup) return;
-    setSaving(true);
-    try {
-      const existing = sessionNotes.find(n => n.session_number === sessionNum);
-      if (existing) {
-        await db.update("session_notes", `id=eq.${existing.id}`, { content: sessionContent.trim(), updated_at: new Date().toISOString() });
-        setSessionNotes(prev => prev.map(n => n.id === existing.id ? { ...n, content: sessionContent.trim() } : n));
-      } else {
-        const r = await db.insert("session_notes", { group_id: selectedGroup.id, session_number: sessionNum, content: sessionContent.trim() });
-        const note = Array.isArray(r) ? r[0] : r;
-        setSessionNotes(prev => [note, ...prev]);
+        // Today's responses (count + recent feed)
+        setTodayResponseCount(todayResp.length);
+        setRecentResponses(todayResp);
+      } catch(e) {
+        console.error("Home load error:", e);
       }
-      setSessionContent(""); showMsg("✓ Session note saved!");
-    } catch(e) { showMsg("Error: " + e.message, "error"); }
-    setSaving(false);
-  };
+      setLoading(false);
+    })();
+  }, []);
 
-  const saveStudentNote = async () => {
-    if (!studentContent.trim() || !selectedStudent) return;
-    setSaving(true);
-    try {
-      const existing = await db.get("student_notes", `student_id=eq.${selectedStudent.id}`);
-      if (existing.length > 0) {
-        await db.update("student_notes", `student_id=eq.${selectedStudent.id}`, { content: studentContent.trim(), updated_at: new Date().toISOString() });
-      } else {
-        await db.insert("student_notes", { student_id: selectedStudent.id, content: studentContent.trim() });
-      }
-      showMsg("✓ Note saved for " + selectedStudent.name + "!");
-    } catch(e) { showMsg("Error: " + e.message, "error"); }
-    setSaving(false);
-  };
+  // Quiet students = no activity in 7+ days, sorted by longest-quiet first
+  const quietStudents = students
+    .filter(s => !activeStudentIds.has(s.id))
+    .sort((a, b) => {
+      const aLast = a.last_practice || "0000-00-00";
+      const bLast = b.last_practice || "0000-00-00";
+      return aLast.localeCompare(bLast);
+    });
 
-  const groupStudents = students.filter(s => s.group_id === selectedGroup?.id);
+  const visibleQuiet = showAllQuiet ? quietStudents : quietStudents.slice(0, 5);
+  const activeCount = activeStudentIds.size;
+  const totalCount = students.length;
+  const activePct = totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
+
+  const studentName = (id) => students.find(s => s.id === id)?.name || "—";
+
+  if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "60px" } }, React.createElement(Spinner));
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
-        {groups.map(g => React.createElement("button", { key: g.id, onClick: () => { setSelectedGroup(g); setSelectedStudent(null); setSessionContent(""); setStudentContent(""); }, style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? "#fff" : C.textMid, fontSize: "13px", cursor: "pointer", fontFamily: FONT } }, g.name))}
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* ── ENGAGEMENT PULSE ────────────────────────────────────────────── */}
+      <div>
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
+          Engagement Pulse
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+          {/* Active this week */}
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>
+              Active this week
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+              <div style={{ fontSize: "28px", fontWeight: "900", color: C.text, letterSpacing: "-1px" }}>
+                {activeCount}
+              </div>
+              <div style={{ fontSize: "13px", color: C.textMid, fontWeight: "500" }}>
+                / {totalCount}
+              </div>
+            </div>
+            <div style={{ fontSize: "11px", color: activePct >= 70 ? C.success : activePct >= 40 ? C.gold : C.error, fontWeight: "600", marginTop: "4px" }}>
+              {activePct}% engaged
+            </div>
+          </div>
+          {/* Today's responses */}
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>
+              Today's responses
+            </div>
+            <div style={{ fontSize: "28px", fontWeight: "900", color: C.text, letterSpacing: "-1px" }}>
+              {todayResponseCount}
+            </div>
+            <div style={{ fontSize: "11px", color: C.textMid, marginTop: "4px" }}>
+              {todayPrompt ? "voices recorded" : "no prompt today"}
+            </div>
+          </div>
+          {/* Quiet count */}
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>
+              Quiet students
+            </div>
+            <div style={{ fontSize: "28px", fontWeight: "900", color: quietStudents.length > 0 ? C.retry : C.text, letterSpacing: "-1px" }}>
+              {quietStudents.length}
+            </div>
+            <div style={{ fontSize: "11px", color: C.textMid, marginTop: "4px" }}>
+              7+ days inactive
+            </div>
+          </div>
+          {/* Total students */}
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "14px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" }}>
+              Total students
+            </div>
+            <div style={{ fontSize: "28px", fontWeight: "900", color: C.text, letterSpacing: "-1px" }}>
+              {totalCount}
+            </div>
+            <div style={{ fontSize: "11px", color: C.textMid, marginTop: "4px" }}>
+              across all groups
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Card style={{ marginBottom: "16px", borderLeft: `3px solid ${C.gold}` }}>
-        <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>📋 Session Note — visible to all students in {selectedGroup?.name}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-          <span style={{ fontSize: "13px", color: C.textMid }}>Session:</span>
-          <input type="number" min="1" value={sessionNum} onChange={e => { const n = parseInt(e.target.value) || 1; setSessionNum(n); const ex = sessionNotes.find(x => x.session_number === n); setSessionContent(ex?.content || ""); }} style={{ width: "64px", padding: "6px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontWeight: "700", textAlign: "center", fontFamily: FONT, outline: "none" }} />
+      {/* ── QUIET STUDENTS ───────────────────────────────────────────────── */}
+      {quietStudents.length > 0 && (
+        <div>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
+            Needs Attention
+          </div>
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden" }}>
+            {visibleQuiet.map((s, i) => (
+              <div key={s.id} style={{ padding: "12px 14px", borderBottom: i < visibleQuiet.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: C.text }}>{s.name}</div>
+                  <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>
+                    {s.last_practice ? `Last active ${s.last_practice}` : "Never active"}
+                  </div>
+                </div>
+                <div style={{ fontSize: "11px", color: C.retry, fontWeight: "600", background: C.retryBg, padding: "3px 9px", borderRadius: "100px" }}>
+                  Quiet
+                </div>
+              </div>
+            ))}
+            {quietStudents.length > 5 && (
+              <button onClick={() => setShowAllQuiet(s => !s)}
+                style={{ width: "100%", padding: "10px", background: C.bgSoft, border: "none", borderTop: `1px solid ${C.border}`, color: C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
+                {showAllQuiet ? "Show less" : `See all ${quietStudents.length}`}
+              </button>
+            )}
+          </div>
         </div>
-        <textarea value={sessionContent} onChange={e => setSessionContent(e.target.value)} placeholder="Write session notes visible to the whole class…" style={{ width: "100%", minHeight: "100px", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.6 }} />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
-          <Btn onClick={saveSessionNote} disabled={saving || !sessionContent.trim()} variant="gold">{saving ? React.createElement(Spinner) : "Save Note"}</Btn>
+      )}
+
+      {/* ── TODAY'S RESPONSES FEED ───────────────────────────────────────── */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" }}>
+            Today's Responses
+          </div>
+          {recentResponses.length > 0 && (
+            <button onClick={() => setTab("responses")}
+              style={{ background: "transparent", border: "none", fontSize: "11px", color: C.textMid, cursor: "pointer", fontFamily: FONT, fontWeight: "600" }}>
+              View all →
+            </button>
+          )}
         </div>
-        {sessionNotes.length > 0 && (
-          <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: "11px", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>Saved Notes</div>
-            {sessionNotes.map(n => React.createElement("div", { key: n.id, style: { padding: "8px 0", borderBottom: `1px solid ${C.bgSoft}`, cursor: "pointer" }, onClick: () => { setSessionNum(n.session_number); setSessionContent(n.content); } },
-              React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: C.gold, marginBottom: "2px" } }, "Session " + n.session_number),
-              React.createElement("div", { style: { fontSize: "13px", color: C.textMid, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, n.content)
+        {recentResponses.length === 0 ? (
+          <div style={{ background: C.bgSoft, borderRadius: "14px", padding: "30px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: "28px", marginBottom: "8px" }}>🌊</div>
+            <div style={{ fontSize: "13px", fontWeight: "600", color: C.textMid, marginBottom: "4px" }}>No responses yet today</div>
+            <div style={{ fontSize: "11px", color: C.textLight }}>
+              {todayPrompt ? "Students haven't recorded yet" : "Schedule a prompt in QoD Studio"}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {recentResponses.slice(0, 5).map(r => (
+              <button key={r.id} onClick={() => setTab("responses")}
+                style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "12px 14px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", fontFamily: FONT, textAlign: "left", transition: "background 0.15s" }}>
+                <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: C.bgMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "700", flexShrink: 0 }}>
+                  {(r.nickname || studentName(r.student_id) || "?")[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>
+                    {r.nickname || studentName(r.student_id)}
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>
+                    {new Date(r.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+                <div style={{ fontSize: "13px", color: C.textLight }}>→</div>
+              </button>
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
-      <Card style={{ borderLeft: `3px solid ${C.success}` }}>
-        <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px" }}>🔒 Personal Note — visible only to student</div>
-        <select value={selectedStudent?.id || ""} onChange={e => setSelectedStudent(students.find(x => x.id === e.target.value) || null)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", background: C.bg, color: C.text, fontFamily: FONT, outline: "none", marginBottom: "10px" }}>
-          <option value="">Select a student…</option>
-          {groupStudents.map(s => React.createElement("option", { key: s.id, value: s.id }, s.name))}
-        </select>
-        {selectedStudent && (
-          <div>
-            <textarea value={studentContent} onChange={e => setStudentContent(e.target.value)} placeholder={`Personal feedback for ${selectedStudent.name}…`} style={{ width: "100%", minHeight: "100px", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: "6px", fontSize: "14px", fontFamily: FONT, outline: "none", resize: "vertical", lineHeight: 1.6 }} />
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
-              <Btn onClick={saveStudentNote} disabled={saving || !studentContent.trim()} variant="success">{saving ? React.createElement(Spinner) : "Save Note"}</Btn>
-            </div>
-          </div>
-        )}
-        {/* Show existing notes with NoteCard for teacher to see replies */}
-        {selectedStudent && (
-          <TeacherStudentNoteView studentId={selectedStudent.id} />
-        )}
-      </Card>
+      {/* ── QUICK ACTIONS ────────────────────────────────────────────────── */}
+      <div>
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
+          Quick Actions
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+          <button onClick={() => setTab("add")}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 10px", cursor: "pointer", fontFamily: FONT, transition: "background 0.15s" }}>
+            <div style={{ fontSize: "20px", marginBottom: "4px" }}>📝</div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.text }}>Add Phrases</div>
+          </button>
+          <button onClick={() => setTab("qod")}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 10px", cursor: "pointer", fontFamily: FONT, transition: "background 0.15s" }}>
+            <div style={{ fontSize: "20px", marginBottom: "4px" }}>💡</div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.text }}>Update QoD</div>
+          </button>
+          <button onClick={() => setTab("responses")}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 10px", cursor: "pointer", fontFamily: FONT, transition: "background 0.15s" }}>
+            <div style={{ fontSize: "20px", marginBottom: "4px" }}>🎙</div>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.text }}>Responses</div>
+          </button>
+        </div>
+      </div>
     </div>
-  );
-}
-
-function TeacherStudentNoteView({ studentId }) {
-  const [note, setNote] = useState(null);
-  useEffect(() => {
-    db.get("student_notes", `student_id=eq.${studentId}&order=created_at.desc&limit=1`).then(rows => setNote(rows[0] || null)).catch(() => {});
-  }, [studentId]);
-  if (!note) return null;
-  return React.createElement("div", { style: { marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` } },
-    React.createElement(NoteCard, { note, noteType: "student", user: { id: "teacher", name: "Teacher Tom" }, isTeacher: true })
   );
 }
 
@@ -4127,7 +4577,7 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
 
 const REACTION_EMOJIS = ["🔥", "👏", "💪", "😄", "🌊", "⭐"];
 
-function CommunityTab({ user, group, isPreview, onPracticed }) {
+function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = new Set(), refreshUnreadComments = () => {} }) {
   const [qodPrompt, setQodPrompt] = useState(null);
   const [cityGroup, setCityGroup] = useState(null);
   const [responses, setResponses] = useState([]);
@@ -4261,6 +4711,21 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
         .reaction-btn:hover { transform: scale(1.15); }
       `}</style>
 
+      {/* Unread teacher feedback banner */}
+      {unreadCommentIds.size > 0 && (
+        <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "12px", padding: "12px 14px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "10px", animation: "fadeIn 0.25s ease" }}>
+          <div style={{ fontSize: "20px" }}>👨‍🏫</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "13px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>
+              Teacher Toms가 새로운 피드백을 남겼어요
+            </div>
+            <div style={{ fontSize: "11px", color: C.textMid }}>
+              아래 내 답변에서 확인해보세요 ({unreadCommentIds.size}개)
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* QoD Flow Modal */}
       {showQodFlow && (
         <QodAnswerFlow
@@ -4327,6 +4792,7 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
                 onDelete={handleDeleteResponse}
                 userId={user.id}
                 index={i}
+                onCommentSeen={refreshUnreadComments}
               />
             ))}
           </div>
@@ -4337,7 +4803,7 @@ function CommunityTab({ user, group, isPreview, onPracticed }) {
 }
 
 // ── Response Card ─────────────────────────────────────────────────────────────
-function ResponseCard({ response, isMe, onReact, onDelete, userId, index }) {
+function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onCommentSeen }) {
   // Use optimistic reaction data from parent (updated instantly on tap)
   // Fall back to DB fetch only on first load when optimistic data not yet set
   const [dbReactions, setDbReactions] = useState(null);
@@ -4428,6 +4894,59 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index }) {
             </button>
           )
         )}
+      </div>
+
+      {/* Teacher's feedback — shown only on the student's own response */}
+      {isMe && <StudentCommentView responseId={response.id} userId={userId} onCommentSeen={onCommentSeen} />}
+    </div>
+  );
+}
+
+// ── StudentCommentView ───────────────────────────────────────────────────────
+// Fetches the teacher's comment on a response, displays it, and marks it as
+// seen the first time the student views it. Calls onCommentSeen() after
+// marking so the parent badge count refreshes.
+function StudentCommentView({ responseId, userId, onCommentSeen }) {
+  const [comment, setComment] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await db.get("qod_comments", `response_id=eq.${responseId}&limit=1`);
+        if (cancelled) return;
+        const c = rows[0] || null;
+        setComment(c);
+        setLoaded(true);
+        // Mark as seen if not already seen
+        if (c && !c.seen_at) {
+          try {
+            await db.update("qod_comments", `id=eq.${c.id}`, { seen_at: new Date().toISOString() });
+            if (!cancelled && onCommentSeen) onCommentSeen();
+          } catch(e) { /* silent */ }
+        }
+      } catch(e) {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [responseId]);
+
+  if (!loaded || !comment) return null;
+
+  return (
+    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px dashed ${C.border}` }}>
+      <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "10px", padding: "12px" }}>
+        <div style={{ fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "6px" }}>
+          👨‍🏫 Teacher Toms' Feedback
+        </div>
+        {comment.teacher_text && (
+          <div style={{ fontSize: "13px", color: C.text, lineHeight: 1.65, marginBottom: comment.audio_url ? "8px" : "0" }}>
+            {comment.teacher_text}
+          </div>
+        )}
+        {comment.audio_url && React.createElement(RichAudioPlayer, { src: comment.audio_url, label: "Voice feedback" })}
       </div>
     </div>
   );
@@ -4895,6 +5414,55 @@ function QodAnswerFlow({ prompt, user, cityGroup, onPost, onClose }) {
   );
 }
 
+// ── ResponseCommentSection ───────────────────────────────────────────────────
+// Combines TeacherCommentDisplay (read existing) + TeacherCommentBox (write new),
+// keyed so that saving via the box triggers the display to re-fetch.
+function ResponseCommentSection({ responseId }) {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [existingComment, setExistingComment] = useState(null);
+
+  useEffect(() => {
+    db.get("qod_comments", `response_id=eq.${responseId}&limit=1`)
+      .then(r => setExistingComment(r[0] || null))
+      .catch(() => {});
+  }, [responseId, refreshKey]);
+
+  return (
+    <div style={{ marginTop: "10px" }}>
+      {existingComment && (
+        <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "10px", padding: "12px", marginBottom: "8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "2px", textTransform: "uppercase" }}>
+              👨‍🏫 Teacher Toms' Feedback
+            </div>
+            {existingComment.seen_at ? (
+              <span title={`Seen ${new Date(existingComment.seen_at).toLocaleString()}`}
+                style={{ fontSize: "10px", fontWeight: "600", color: C.success, background: C.successBg, padding: "2px 8px", borderRadius: "100px" }}>
+                👁 Seen
+              </span>
+            ) : (
+              <span style={{ fontSize: "10px", fontWeight: "600", color: C.textLight, background: C.bgSoft, padding: "2px 8px", borderRadius: "100px" }}>
+                Unseen
+              </span>
+            )}
+          </div>
+          {existingComment.teacher_text && (
+            <div style={{ fontSize: "13px", color: C.text, lineHeight: 1.65, marginBottom: existingComment.audio_url ? "8px" : "0" }}>
+              {existingComment.teacher_text}
+            </div>
+          )}
+          {existingComment.audio_url && React.createElement(RichAudioPlayer, { src: existingComment.audio_url, label: "Voice feedback" })}
+        </div>
+      )}
+      <TeacherCommentBox
+        responseId={responseId}
+        existingComment={existingComment}
+        onSaved={() => setRefreshKey(k => k + 1)}
+      />
+    </div>
+  );
+}
+
 // ── QoD Responses Tab (Teacher) ───────────────────────────────────────────────
 function QodResponsesTab({ students, showMsg }) {
   const [prompts, setPrompts] = useState([]);
@@ -5028,6 +5596,7 @@ function QodResponsesTab({ students, showMsg }) {
                         style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px", padding: "2px 4px", opacity: 0.5 }}>×</button>
                     </div>
                     {React.createElement(RichAudioPlayer, { src: r.audio_url || "", label: r.nickname + "'s answer", transcript: r.transcript || "" })}
+                    <ResponseCommentSection responseId={r.id} />
                   </Card>
                 );
               })}
@@ -5396,7 +5965,7 @@ function TeacherCommentBox({ responseId, existingComment, onSaved }) {
           else finalAudioUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(audioBlob); });
         } catch(e) {}
       }
-      if (existingComment?.id) await db.update("qod_comments", `id=eq.${existingComment.id}`, { teacher_text: text.trim(), audio_url: finalAudioUrl });
+      if (existingComment?.id) await db.update("qod_comments", `id=eq.${existingComment.id}`, { teacher_text: text.trim(), audio_url: finalAudioUrl, seen_at: null });
       else await db.insert("qod_comments", { response_id: responseId, teacher_text: text.trim(), audio_url: finalAudioUrl });
       onSaved && onSaved({ teacher_text: text.trim(), audio_url: finalAudioUrl });
       setShowBox(false);
