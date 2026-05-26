@@ -5197,10 +5197,8 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
     else if (attempted) { cardBg = C.bg; accentColor = C.text; }
   }
 
-  const tag = phrase.tag ? getTagById(phrase.tag) : null;
-  // Get all tags for this phrase (multi-tag support)
-  const allPhraseTags = getPhraseTags(phrase.id).map(id => getTagById(id)).filter(Boolean);
-  const displayTags = allPhraseTags.length > 0 ? allPhraseTags : (tag ? [tag] : []);
+  // Category tags are intentionally not shown on student phrase cards — they exist
+  // only for teacher-side tagging and the student's library tag-filter chips.
 
   return (
     <div style={{
@@ -5339,15 +5337,6 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
       {/* ── Expandable practice zone ── */}
       <div style={{ maxHeight: open ? "900px" : "0px", overflow: "hidden", transition: open ? "max-height 0.5s cubic-bezier(0.4,0,0.2,1)" : "max-height 0.25s cubic-bezier(0.4,0,0.2,1)" }}>
         <div style={{ borderTop: `1px solid ${C.border}`, background: C.bgSoft, padding: "20px 16px 16px", opacity: open ? 1 : 0, transition: open ? "opacity 0.3s ease 0.1s" : "opacity 0.1s ease" }}>
-          {displayTags.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
-              {displayTags.map(t => (
-                React.createElement("span", { key: t.id, style: { fontSize: "10px", fontWeight: "500", color: C.textLight, background: C.bg, borderRadius: "100px", padding: "2px 9px", border: `1px solid ${C.border}` } },
-                  `${t.emoji} ${t.label}`
-                )
-              ))}
-            </div>
-          )}
           {React.createElement(ErrorBoundary, null,
             React.createElement(PhraseCard, {
               phrase, user, prog, isPreview,
