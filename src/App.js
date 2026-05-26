@@ -4698,6 +4698,22 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
     } catch(e) { console.error("Dismiss error:", e); }
   };
 
+  // Move a personal phrase to the library (in_library=true) — student-initiated, only
+  // after they've passed it. Personal phrases don't roll over with the group, so this is
+  // how they archive them. Writes to the DB first, then moves it in the UI.
+  const moveToLibrary = async (phrase) => {
+    if (!phrase?.sp_id) return;
+    try {
+      await db.update("session_phrases", `id=eq.${phrase.sp_id}`, { in_library: true });
+      setSessions(prev => {
+        const recent = prev.recent || [];
+        const moving = recent.find(p => p.sp_id === phrase.sp_id);
+        if (!moving) return prev;
+        return { recent: recent.filter(p => p.sp_id !== phrase.sp_id), library: [...(prev.library || []), moving] };
+      });
+    } catch(e) { console.error("Move to library failed:", e); }
+  };
+
   // Lock body scroll while the random phrase modal is open. Prevents the
   // perceived "off-center" effect on mobile where the page scrolls behind
   // the modal and the modal appears jammed against the viewport edge.
@@ -4726,7 +4742,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       const library = [];
       sp.forEach(row => {
         if (!row.phrase_bank) return;
-        const enriched = { ...row.phrase_bank, sp_id: row.id };
+        const enriched = { ...row.phrase_bank, sp_id: row.id, isPersonal: !!row.student_id };
         if (row.in_library) library.push(enriched);
         else recent.push(enriched);
       });
@@ -4933,6 +4949,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           onPin={handlePinPhrase}
           pinnedIds={pinnedPhraseIds}
           onDismiss={isPreview ? null : (p) => setDismissTarget(p)}
+          onMoveToLibrary={isPreview ? null : moveToLibrary}
         />
       )}
 
@@ -5062,7 +5079,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
 // ── Phrase Section ────────────────────────────────────────────────────────────
 // Renders one of the two named phrase sections (Most Recent or Library).
 // Replaces the old SessionFeed which was per-session-number.
-function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set(), onDismiss }) {
+function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set(), onDismiss, onMoveToLibrary }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [openId, setOpenId] = useState(null);
   const { passed, total } = sectionProgress;
@@ -5170,6 +5187,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
                 onPin,
                 isPinned: pinnedIds.has(phrase.id) || pinnedIds.has(phrase.english),
                 onDismiss,
+                onGraduate: (phrase.isPersonal && onMoveToLibrary) ? () => onMoveToLibrary(phrase) : null,
               })
             );
           })}
@@ -5236,7 +5254,7 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, flex: 1 }}>
             <span style={{ fontSize: "10px", fontWeight: "500", color: C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
-              {source === "class" ? "📚 Class" : "⭐ Mine"}
+              {phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine")}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }} onClick={e => e.stopPropagation()}>
@@ -5303,6 +5321,13 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
           <button onClick={async () => { if (isSaved) return; await onSave(phrase); haptic.success(); }}
             style={{ background: isSaved ? C.successBg : C.goldBg, border: `1px solid ${isSaved ? "#B8D5C0" : C.goldBorder}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", fontWeight: "700", color: isSaved ? C.success : C.gold, cursor: isSaved ? "default" : "pointer", fontFamily: FONT, whiteSpace: "nowrap", transition: "all 0.2s" }}>
             {isSaved ? T("saved", lang) : T("save_to_list", lang)}
+          </button>
+        )}
+        {/* 🎓 Move to library — personal phrases, once passed (student archives when ready) */}
+        {phrase.isPersonal && onGraduate && passed && !inLibrary && (
+          <button onClick={onGraduate} title="라이브러리로 이동"
+            style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", fontWeight: "600", color: C.textMid, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}>
+            🎓 라이브러리로
           </button>
         )}
         {/* ↩ Back to active — library phrases */}
@@ -5372,7 +5397,7 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
 
 // ── Expandable Row ────────────────────────────────────────────────────────────
 // Practice tab wrapper — uses UnifiedPhraseRow with class source
-function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, onSave, isSaved, onPin, isPinned, onDismiss }) {
+function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, onSave, isSaved, onPin, isPinned, onDismiss, onGraduate }) {
   return React.createElement(UnifiedPhraseRow, {
     phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry,
     sectionAllDone, openId, setOpenId,
@@ -5380,6 +5405,7 @@ function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpda
     onSave, isSaved,
     onPin, isPinned,
     onDismiss,
+    onGraduate,
   });
 }
 
