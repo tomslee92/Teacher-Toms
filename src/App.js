@@ -4620,6 +4620,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
   const [pinnedPhraseIds, setPinnedPhraseIds] = useState(new Set());
   const [activePracticeTags, setActivePracticeTags] = useState(new Set()); // multi-select tag filter
   const [dismissTarget, setDismissTarget] = useState(null); // phrase pending dismiss confirmation
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false); // category filter bottom sheet (library only)
 
   // Load already-saved class phrase IDs so ⭐ Save button shows correct state on class phrases
   useEffect(() => {
@@ -4865,9 +4866,9 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
     return { passed, total: phrases.length };
   };
 
-  // Compute available tags from ALL phrases in both sections (use phrase_tags cache)
-  const allPhrases = [...recentPhrases, ...libraryPhrases];
-  const availableTagIds = [...new Set(allPhrases.flatMap(p => getPhraseTags(p.id).length > 0 ? getPhraseTags(p.id) : (p.tag ? [p.tag] : [])))];
+  // Category tags are a LIBRARY-ONLY filter now (Most Recent Session is always shown
+  // unfiltered — it's the small current set). Available tags come from the library.
+  const availableTagIds = [...new Set(libraryPhrases.flatMap(p => getPhraseTags(p.id).length > 0 ? getPhraseTags(p.id) : (p.tag ? [p.tag] : [])))];
   const availableTags = availableTagIds.map(id => getTagById(id)).filter(Boolean);
 
   // Filter phrases by selected tags — phrase matches if it has ALL selected tags
@@ -4879,8 +4880,9 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
     });
   };
 
-  const filteredRecent = filterByTags(recentPhrases);
+  const filteredRecent = recentPhrases;            // Most Recent Session: never filtered
   const filteredLibrary = filterByTags(libraryPhrases);
+  const activeFilterTag = activePracticeTags.size > 0 ? getTagById([...activePracticeTags][0]) : null;
 
   return (
     <div>
@@ -4904,50 +4906,8 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
         <button onClick={pickRandom} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "8px 16px", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }}>🎲 Random</button>
       </div>
 
-      {/* Tag filter chips — only show if there are tags available */}
-      {availableTags.length > 0 && React.createElement("div", { style: { marginBottom: "16px" } },
-        React.createElement("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" } },
-          // "All" chip
-          React.createElement("button", {
-            onClick: () => setActivePracticeTags(new Set()),
-            style: {
-              padding: "6px 14px", borderRadius: "100px", border: `1px solid ${activePracticeTags.size === 0 ? C.navy : C.border}`,
-              background: activePracticeTags.size === 0 ? C.navy : C.bg,
-              color: activePracticeTags.size === 0 ? "#fff" : C.textMid,
-              fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, flexShrink: 0,
-            }
-          }, "전체"),
-          // One chip per available tag
-          availableTags.map(tag => {
-            const isActive = activePracticeTags.has(tag.id);
-            return React.createElement("button", {
-              key: tag.id,
-              onClick: () => {
-                setActivePracticeTags(prev => {
-                  const next = new Set(prev);
-                  if (next.has(tag.id)) next.delete(tag.id);
-                  else next.add(tag.id);
-                  return next;
-                });
-              },
-              style: {
-                padding: "6px 14px", borderRadius: "100px",
-                border: `1px solid ${isActive ? C.navy : C.border}`,
-                background: isActive ? C.navy : C.bg,
-                color: isActive ? "#fff" : C.textMid,
-                fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0,
-                display: "flex", alignItems: "center", gap: "5px",
-              }
-            },
-              React.createElement("span", null, tag.emoji),
-              React.createElement("span", null, tag.label)
-            );
-          })
-        ),
-        activePracticeTags.size > 0 && React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "8px", paddingLeft: "2px" } },
-          `${[...filteredRecent, ...filteredLibrary].length}개 표현 · ${activePracticeTags.size}개 태그 선택됨`
-        )
-      )}
+      {/* Filter chips moved off the top — they now live as a bottom-sheet filter on the
+          library section below (Most Recent stays unfiltered). */}
 
       {/* Most Recent Session — always visible, expanded */}
       {filteredRecent.length > 0 && (
@@ -4974,6 +4934,21 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           pinnedIds={pinnedPhraseIds}
           onDismiss={isPreview ? null : (p) => setDismissTarget(p)}
         />
+      )}
+
+      {/* Library filter control — button opens the category bottom sheet; active filter
+          shows as a clearable pill. Lives with the library, not at the top of the screen. */}
+      {libraryPhrases.length > 0 && availableTags.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "12px" } },
+        React.createElement("button", {
+          onClick: () => setFilterSheetOpen(true),
+          style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "100px", border: `1px solid ${activeFilterTag ? C.navy : C.border}`, background: C.bg, color: activeFilterTag ? C.navy : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+        }, React.createElement("span", null, "🔽"), React.createElement("span", null, "필터")),
+        activeFilterTag && React.createElement("div", {
+          style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "100px", background: "#EEF2FF", border: `1px solid ${C.navy}33`, color: C.navy, fontSize: "12px", fontWeight: "700" }
+        },
+          React.createElement("span", null, `${activeFilterTag.emoji} ${activeFilterTag.label}`),
+          React.createElement("button", { onClick: () => setActivePracticeTags(new Set()), "aria-label": "필터 해제", style: { background: "transparent", border: "none", color: C.navy, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 } }, "✕")
+        )
       )}
 
       {/* Keep Practicing — library phrases not yet mastered */}
@@ -5024,6 +4999,43 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           })
         );
       })()}
+
+      {/* Category filter bottom sheet — portaled, slides up from the bottom. Single-select:
+          tapping a category applies it to the library and closes; 전체 clears. */}
+      {filterSheetOpen && ReactDOM.createPortal(React.createElement("div", {
+        onClick: () => setFilterSheetOpen(false),
+        style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "flex-end", justifyContent: "center", animation: "fadeIn 0.15s ease-out" }
+      },
+        React.createElement("style", null, "@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}"),
+        React.createElement("div", {
+          onClick: e => e.stopPropagation(),
+          style: { background: "#fff", width: "100%", maxWidth: "480px", maxHeight: "70vh", borderRadius: "24px 24px 0 0", padding: "10px 16px calc(16px + env(safe-area-inset-bottom)) 16px", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", animation: "sheetUp 0.25s ease-out", fontFamily: FONT }
+        },
+          React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: C.border, margin: "4px auto 12px" } }),
+          React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+            React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: C.text } }, "카테고리로 필터"),
+            React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { background: "transparent", border: "none", fontSize: "20px", color: C.textLight, cursor: "pointer", lineHeight: 1, padding: "0 4px" } }, "✕")
+          ),
+          React.createElement("div", { style: { fontSize: "12px", color: C.textLight, marginTop: "2px", marginBottom: "14px" } }, "원하는 카테고리를 선택하세요"),
+          React.createElement("div", { style: { overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", paddingBottom: "4px" } },
+            React.createElement("button", {
+              onClick: () => { setActivePracticeTags(new Set()); setFilterSheetOpen(false); },
+              style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left", padding: "0 14px", minHeight: "50px", borderRadius: "12px", border: `1px solid ${activePracticeTags.size === 0 ? C.navy : C.border}`, background: activePracticeTags.size === 0 ? "#EEF2FF" : C.bg, color: C.text, fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }
+            }, "전체 · 필터 해제"),
+            availableTags.map(tag => {
+              const isActive = activePracticeTags.has(tag.id);
+              return React.createElement("button", {
+                key: tag.id,
+                onClick: () => { setActivePracticeTags(new Set([tag.id])); setFilterSheetOpen(false); },
+                style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left", padding: "0 14px", minHeight: "50px", borderRadius: "12px", border: `1px solid ${isActive ? C.navy : C.border}`, background: isActive ? "#EEF2FF" : C.bg, color: C.text, fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }
+              },
+                React.createElement("span", { style: { fontSize: "18px" } }, tag.emoji),
+                React.createElement("span", null, tag.label)
+              );
+            })
+          )
+        )
+      ), document.body)}
 
       {/* Dismiss confirmation modal — portaled to body so it's always viewport-centered,
           never anchored to a transformed/scrolling ancestor in the Practice tab tree. */}
@@ -8237,6 +8249,8 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   const [editingGroup, setEditingGroup] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
   const [dismissed, setDismissed] = useState([]); // phrases this student has dismissed
+  const [cleanSlating, setCleanSlating] = useState(false);
+  const [cleanSlateConfirm, setCleanSlateConfirm] = useState(false);
 
   const group = groups.find(g => g.id === localStudent.group_id);
 
@@ -8298,6 +8312,24 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
       setDismissed(prev => prev.filter(d => d.phrase_id !== phraseId));
       showMsg("✓ Re-added to queue");
     } catch(e) { showMsg("Error: " + e.message, "error"); }
+  };
+
+  // Clean slate for a new joiner: dismiss every current group phrase for this student
+  // so their queue starts empty (then add personal phrases / re-add specific ones).
+  // Group phrases added AFTER this are not dismissed, so they'll show normally.
+  // Fully reversible — each dismissal can be undone with Re-add below.
+  const cleanSlate = async () => {
+    const ids = [...new Set(sessionPhrases.map(p => p.id).filter(Boolean))];
+    if (ids.length === 0) { setCleanSlateConfirm(false); return; }
+    setCleanSlating(true);
+    try {
+      await db.upsert("phrase_dismissals", ids.map(pid => ({ student_id: student.id, phrase_id: pid })));
+      const dismissedData = await db.get("phrase_dismissals", `student_id=eq.${student.id}&select=phrase_id,dismissed_at,phrase_bank(english,korean)&order=dismissed_at.desc`).catch(() => []);
+      setDismissed(dismissedData);
+      showMsg(`✓ Clean slate — ${ids.length} group phrases dismissed`);
+    } catch(e) { showMsg("Error: " + e.message, "error"); }
+    setCleanSlating(false);
+    setCleanSlateConfirm(false);
   };
 
   // Compute week stats
@@ -8595,8 +8627,25 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
 
         {/* Phrase practice progress */}
         <div>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px" }}>
-            Class Phrases · {group?.name || "—"}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "12px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" }}>
+              Class Phrases · {group?.name || "—"}
+            </div>
+            {sessionPhrases.length > 0 && (
+              cleanSlateConfirm ? (
+                <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
+                  <button onClick={cleanSlate} disabled={cleanSlating}
+                    style={{ fontSize: "11px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT }}>
+                    {cleanSlating ? "…" : `Dismiss all ${sessionPhrases.length}`}
+                  </button>
+                  <button onClick={() => setCleanSlateConfirm(false)}
+                    style={{ fontSize: "11px", color: C.textMid, background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT }}>Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setCleanSlateConfirm(true)} title="Dismiss all group phrases for this student (new-joiner reset)"
+                  style={{ flexShrink: 0, fontSize: "11px", fontWeight: "600", color: C.textMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 12px", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}>🧹 Clean slate</button>
+              )
+            )}
           </div>
           {activeSessionPhrases.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px", color: C.textLight, fontSize: "13px", background: C.bgSoft, borderRadius: "12px" }}>No phrases assigned yet</div>
