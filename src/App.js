@@ -5216,17 +5216,12 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
       {/* ── Main tap target ── */}
       <div onClick={() => setOpen()} style={{ padding: "16px 16px 12px", cursor: "pointer" }}>
 
-        {/* Top row: source + tag + score/status */}
+        {/* Top row: source label + score/status. Tags moved to expanded view for cleaner scan. */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <span style={{ fontSize: "10px", fontWeight: "500", color: C.textLight, letterSpacing: "0.2px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: "10px", fontWeight: "500", color: C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
               {source === "class" ? "📚 Class" : "⭐ Mine"}
             </span>
-            {displayTags.map(t => (
-              React.createElement("span", { key: t.id, style: { fontSize: "10px", fontWeight: "500", color: C.textLight, background: C.bgSoft, borderRadius: "100px", padding: "1px 7px", border: `1px solid ${C.border}` } },
-                `${t.emoji} ${t.label}`
-              )
-            ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }} onClick={e => e.stopPropagation()}>
             {passed && onRetry && sectionAllDone && (
@@ -5301,19 +5296,10 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
             ↩ 다시 연습
           </button>
         )}
-        {/* × Delete — mine phrases only */}
+        {/* × Delete — mine phrases only. Opens centered modal confirm instead of inline. */}
         {source === "mine" && onDelete && !inLibrary && (
-          confirmDelete ? (
-            <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-              <button onClick={() => { onDelete(); setConfirmDelete(false); }}
-                style={{ fontSize: "11px", fontWeight: "700", color: "#fff", background: C.error, border: "none", borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT }}>삭제</button>
-              <button onClick={() => setConfirmDelete(false)}
-                style={{ fontSize: "11px", color: C.textMid, background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT }}>취소</button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmDelete(true)}
-              style={{ width: "26px", height: "26px", borderRadius: "50%", border: `1px solid ${C.border}`, background: "transparent", color: C.textLight, fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, flexShrink: 0, lineHeight: 1 }}>×</button>
-          )
+          <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+            style={{ width: "26px", height: "26px", borderRadius: "50%", border: `1px solid ${C.border}`, background: "transparent", color: C.textLight, fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, flexShrink: 0, lineHeight: 1 }}>×</button>
         )}
         {/* ⋯ Dismiss — removes the phrase from this student's queue (group or personal) */}
         {onDismiss && (
@@ -5322,9 +5308,46 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         )}
       </div>
 
+      {/* Delete confirmation modal — centered, portaled to body so no card ancestor
+          (opacity/transform) can dim or clip it. Impossible to miss. */}
+      {confirmDelete && ReactDOM.createPortal(
+        <div onClick={() => setConfirmDelete(false)}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px", animation: "fadeIn 0.15s ease-out" }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: "20px", padding: "24px 24px 20px", maxWidth: "320px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}>
+            <div style={{ fontSize: "17px", fontWeight: "700", color: C.text, marginBottom: "8px", textAlign: "center" }}>
+              이 표현을 삭제할까요?
+            </div>
+            <div style={{ fontSize: "14px", color: C.textMid, marginBottom: "20px", textAlign: "center", lineHeight: 1.4, padding: "10px 12px", background: C.bgSoft, borderRadius: "10px" }}>
+              "{phrase.english}"
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={() => setConfirmDelete(false)}
+                style={{ flex: 1, fontSize: "14px", fontWeight: "600", color: C.textMid, background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "12px", cursor: "pointer", fontFamily: FONT }}>
+                취소
+              </button>
+              <button onClick={() => { onDelete(); setConfirmDelete(false); }}
+                style={{ flex: 1, fontSize: "14px", fontWeight: "700", color: "#fff", background: C.error, border: "none", borderRadius: "100px", padding: "12px", cursor: "pointer", fontFamily: FONT }}>
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── Expandable practice zone ── */}
       <div style={{ maxHeight: open ? "900px" : "0px", overflow: "hidden", transition: open ? "max-height 0.5s cubic-bezier(0.4,0,0.2,1)" : "max-height 0.25s cubic-bezier(0.4,0,0.2,1)" }}>
         <div style={{ borderTop: `1px solid ${C.border}`, background: C.bgSoft, padding: "20px 16px 16px", opacity: open ? 1 : 0, transition: open ? "opacity 0.3s ease 0.1s" : "opacity 0.1s ease" }}>
+          {displayTags.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
+              {displayTags.map(t => (
+                React.createElement("span", { key: t.id, style: { fontSize: "10px", fontWeight: "500", color: C.textLight, background: C.bg, borderRadius: "100px", padding: "2px 9px", border: `1px solid ${C.border}` } },
+                  `${t.emoji} ${t.label}`
+                )
+              ))}
+            </div>
+          )}
           {React.createElement(ErrorBoundary, null,
             React.createElement(PhraseCard, {
               phrase, user, prog, isPreview,
