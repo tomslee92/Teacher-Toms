@@ -5020,8 +5020,9 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
         );
       })()}
 
-      {/* Dismiss confirmation modal */}
-      {dismissTarget && React.createElement("div", {
+      {/* Dismiss confirmation modal — portaled to body so it's always viewport-centered,
+          never anchored to a transformed/scrolling ancestor in the Practice tab tree. */}
+      {dismissTarget && ReactDOM.createPortal(React.createElement("div", {
         onClick: () => setDismissTarget(null),
         style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "24px" }
       },
@@ -5036,7 +5037,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
             React.createElement("button", { onClick: confirmDismiss, style: { flex: 1, padding: "11px", borderRadius: "100px", border: "none", background: C.error, color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "삭제")
           )
         )
-      )}
+      ), document.body)}
     </div>
   );
 }
