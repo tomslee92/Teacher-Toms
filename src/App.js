@@ -4681,14 +4681,19 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
   // dismissal. On failure the phrase simply reappears on next load.
   const confirmDismiss = async () => {
     const phrase = dismissTarget;
-    if (!phrase) return;
+    if (!phrase || !phrase.id || !user?.id) return;
     setDismissTarget(null);
-    setSessions(prev => ({
-      recent: (prev.recent || []).filter(p => p.id !== phrase.id),
-      library: (prev.library || []).filter(p => p.id !== phrase.id),
-    }));
     try {
-      await db.upsert("phrase_dismissals", { student_id: user.id, phrase_id: phrase.id });
+      // Persist the dismissal and confirm it landed BEFORE hiding the phrase.
+      // Removing optimistically (the old behavior) made a failed write look like a
+      // success — the phrase vanished in-session but came back on reload because
+      // nothing was saved. Now it only disappears once the row actually exists.
+      const res = await db.upsert("phrase_dismissals", { student_id: user.id, phrase_id: phrase.id });
+      if (!Array.isArray(res) || res.length === 0) throw new Error("dismissal did not persist");
+      setSessions(prev => ({
+        recent: (prev.recent || []).filter(p => p.id !== phrase.id),
+        library: (prev.library || []).filter(p => p.id !== phrase.id),
+      }));
     } catch(e) { console.error("Dismiss error:", e); }
   };
 
