@@ -6699,10 +6699,18 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
   };
 
   const deletePhrase = async (id) => {
+    if (!id) return;
     try {
       await db.delete("student_phrases", `id=eq.${id}`);
+      // Verify the row is actually gone before trusting the removal. A delete that
+      // returns OK but matches no rows would otherwise vanish from the UI and then
+      // reappear on the next load. If it's still there, keep it visible (don't lie).
+      const still = await db.get("student_phrases", `id=eq.${id}&select=id`).catch(() => []);
+      if (still.length > 0) throw new Error("delete did not remove the row");
       setPhrases(prev => prev.filter(p => p.id !== id));
-    } catch(e) {}
+    } catch(e) {
+      console.error("deletePhrase failed:", e);
+    }
   };
 
   const handleProgressUpdate = (newProg) => {
