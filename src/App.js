@@ -9727,6 +9727,8 @@ function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showM
   // Scope for adds below: [] = whole group (group phrase), ids = personal phrases
   // scoped to those students. Mutually exclusive (empty array means "whole group").
   const [scopeStudentIds, setScopeStudentIds] = useState([]);
+  const [scopePersonal, setScopePersonal] = useState([]); // existing personal phrases for the selected students
+  const [scopePersonalKey, setScopePersonalKey] = useState(0); // bump to refetch scopePersonal
   const [english, setEnglish] = useState("");
   const [korean, setKorean] = useState("");
   const [context, setContext] = useState("");
@@ -9929,6 +9931,32 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
   // Reset to "whole group" whenever the selected group changes.
   useEffect(() => { setScopeStudentIds([]); }, [selectedGroup?.id]);
 
+  // Load existing personal phrases for the currently-selected students, so the
+  // teacher gets immediate confirmation of what's already assigned. Refetches when
+  // the selection changes or after a personal add (scopePersonalKey bump).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (scopeStudentIds.length === 0) { setScopePersonal([]); return; }
+      try {
+        const rows = await db.get("session_phrases",
+          `student_id=in.(${scopeStudentIds.map(id => `"${id}"`).join(",")})&select=id,student_id,phrase_bank(english,korean),students(name)&order=created_at.desc`
+        );
+        if (!cancelled) setScopePersonal(rows.filter(r => r.phrase_bank));
+      } catch(e) { if (!cancelled) setScopePersonal([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [scopeStudentIds, scopePersonalKey]);
+
+  // Remove a personal phrase (deletes the session_phrases row for that student).
+  const removePersonalPhrase = async (spId) => {
+    try {
+      await db.delete("session_phrases", `id=eq.${spId}`);
+      setScopePersonal(prev => prev.filter(r => r.id !== spId));
+      showMsg("Removed");
+    } catch(e) { showMsg("Error: " + e.message, "error"); }
+  };
+
   // Insert one phrase into the queue per the current scope.
   //  - whole group ([]): a single session_phrases row with group_id (unchanged behavior)
   //  - specific students: one row per student with student_id set, group_id null
@@ -9939,6 +9967,7 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
       await Promise.all(scopeStudentIds.map(sid =>
         db.insert("session_phrases", { student_id: sid, phrase_id: phraseId, session_number: 1, in_library: false })
       ));
+      setScopePersonalKey(k => k + 1); // refresh the confirmation list below the selector
       return null;
     }
     const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phraseId, session_number: 1, in_library: false });
@@ -10117,6 +10146,31 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
         })}
         {groupStudents.length === 0 && React.createElement("span", { style: { fontSize: "11px", color: C.textLight } }, "No students in this group")}
       </div>
+
+      {/* Existing personal phrases for the selected student(s) — immediate confirmation */}
+      {scopeStudentIds.length > 0 && (
+        <div style={{ background: C.bgSoft, borderRadius: "12px", border: `1px solid ${C.border}`, padding: "12px 14px", marginBottom: "14px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textMid, letterSpacing: "0.5px", marginBottom: scopePersonal.length > 0 ? "8px" : "0" }}>
+            Personal phrases for selected {scopeStudentIds.length === 1 ? "student" : "students"} · {scopePersonal.length}
+          </div>
+          {scopePersonal.length === 0 ? (
+            <div style={{ fontSize: "11px", color: C.textLight }}>No personal phrases yet — phrases you add will appear here.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {scopePersonal.map(sp => (
+                <div key={sp.id} style={{ display: "flex", alignItems: "center", gap: "8px", background: C.bg, borderRadius: "8px", border: `1px solid ${C.border}`, padding: "7px 10px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{sp.phrase_bank?.english}"</div>
+                    {scopeStudentIds.length > 1 && sp.students?.name && <div style={{ fontSize: "10px", color: C.textLight, marginTop: "1px" }}>{sp.students.name}</div>}
+                  </div>
+                  <button onClick={() => removePersonalPhrase(sp.id)} title="Remove"
+                    style={{ width: "22px", height: "22px", borderRadius: "50%", border: `1px solid ${C.border}`, background: "transparent", color: C.textLight, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, flexShrink: 0, lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <Card style={{ marginBottom: "14px", borderLeft: `3px solid ${C.gold}` }}>
         <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold, marginBottom: "10px" }}>✨ AI Generate Phrases</div>
