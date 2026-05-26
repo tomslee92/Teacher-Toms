@@ -721,6 +721,27 @@ const db = {
   upsert: (t, d) => sb(t, { method: "POST", body: JSON.stringify(d), headers: { "Prefer": "resolution=merge-duplicates,return=representation" } }),
 };
 
+// ── Phrase queue scope ──────────────────────────────────────────────────────
+// session_phrases holds both group phrases (group_id set, student_id null) and
+// personal phrases (student_id set, group_id null). This builds the PostgREST
+// filter for a student's queue: their group's phrases + their own personal ones.
+// Returns a query fragment (without leading/trailing `&`) to splice into a
+// session_phrases query. Falls back gracefully when group or student is missing.
+function phraseScopeFilter(groupId, studentId) {
+  if (groupId && studentId) return `or=(and(group_id.eq.${groupId},student_id.is.null),student_id.eq.${studentId})`;
+  if (studentId) return `student_id=eq.${studentId}`;
+  if (groupId) return `group_id=eq.${groupId}&student_id=is.null`;
+  return "id=eq.00000000-0000-0000-0000-000000000000"; // matches nothing
+}
+
+// Fetch the set of phrase_ids this student has dismissed (small set; filtered
+// client-side against fetched session_phrases). Returns a Set of phrase_bank ids.
+async function fetchDismissedPhraseIds(studentId) {
+  if (!studentId) return new Set();
+  const rows = await db.get("phrase_dismissals", `student_id=eq.${studentId}&select=phrase_id`).catch(() => []);
+  return new Set(rows.map(r => r.phrase_id).filter(Boolean));
+}
+
 // ── Colors ────────────────────────────────────────────────────────────────────
 // Last active display — uses last_seen (timestamp) if available, falls back to last_practice (date)
 
@@ -4598,6 +4619,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
   const [savedClassPhraseIds, setSavedClassPhraseIds] = useState(new Set());
   const [pinnedPhraseIds, setPinnedPhraseIds] = useState(new Set());
   const [activePracticeTags, setActivePracticeTags] = useState(new Set()); // multi-select tag filter
+  const [dismissTarget, setDismissTarget] = useState(null); // phrase pending dismiss confirmation
 
   // Load already-saved class phrase IDs so ⭐ Save button shows correct state on class phrases
   useEffect(() => {
@@ -4654,6 +4676,22 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
     } catch(e) { console.error("Pin error:", e); }
   };
 
+  // Dismiss a phrase from this student's queue. Works on any phrase (group or
+  // personal). Optimistically removes from the visible list, then records the
+  // dismissal. On failure the phrase simply reappears on next load.
+  const confirmDismiss = async () => {
+    const phrase = dismissTarget;
+    if (!phrase) return;
+    setDismissTarget(null);
+    setSessions(prev => ({
+      recent: (prev.recent || []).filter(p => p.id !== phrase.id),
+      library: (prev.library || []).filter(p => p.id !== phrase.id),
+    }));
+    try {
+      await db.upsert("phrase_dismissals", { student_id: user.id, phrase_id: phrase.id });
+    } catch(e) { console.error("Dismiss error:", e); }
+  };
+
   // Lock body scroll while the random phrase modal is open. Prevents the
   // perceived "off-center" effect on mobile where the page scrolls behind
   // the modal and the modal appears jammed against the viewport edge.
@@ -4672,7 +4710,12 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       // Phrases are now organized by `in_library` (boolean) rather than session_number.
       // in_library = false -> "Most Recent Session" (current week's phrases)
       // in_library = true  -> "Library" (older archived phrases)
-      const sp = await db.get("session_phrases", `group_id=eq.${group.id}&select=*,phrase_bank(*)&order=created_at.asc`);
+      // Include the student's personal phrases (group_id null, student_id set)
+      // alongside group phrases, and drop any the student has dismissed.
+      const scope = phraseScopeFilter(group.id, isPreview ? null : user?.id);
+      const dismissedSet = isPreview ? new Set() : await fetchDismissedPhraseIds(user?.id);
+      const sp = (await db.get("session_phrases", `${scope}&select=*,phrase_bank(*)&order=created_at.asc`))
+        .filter(row => !dismissedSet.has(row.phrase_id));
       const recent = [];
       const library = [];
       sp.forEach(row => {
@@ -4924,6 +4967,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           savedIds={savedClassPhraseIds}
           onPin={handlePinPhrase}
           pinnedIds={pinnedPhraseIds}
+          onDismiss={isPreview ? null : (p) => setDismissTarget(p)}
         />
       )}
 
@@ -4951,6 +4995,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
             savedIds: savedClassPhraseIds,
             onPin: handlePinPhrase,
             pinnedIds: pinnedPhraseIds,
+            onDismiss: isPreview ? null : (p) => setDismissTarget(p),
           }),
           mastered.length > 0 && React.createElement(PhraseSection, {
             sectionKey: "mastered",
@@ -4970,9 +5015,28 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
             savedIds: savedClassPhraseIds,
             onPin: handlePinPhrase,
             pinnedIds: pinnedPhraseIds,
+            onDismiss: isPreview ? null : (p) => setDismissTarget(p),
           })
         );
       })()}
+
+      {/* Dismiss confirmation modal */}
+      {dismissTarget && React.createElement("div", {
+        onClick: () => setDismissTarget(null),
+        style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "24px" }
+      },
+        React.createElement("div", {
+          onClick: e => e.stopPropagation(),
+          style: { background: C.bg, borderRadius: "18px", padding: "24px 22px", maxWidth: "320px", width: "100%", boxShadow: "0 12px 40px rgba(0,0,0,0.2)" }
+        },
+          React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: C.text, lineHeight: 1.5, marginBottom: "6px" } }, "이 표현을 삭제할까요?"),
+          React.createElement("div", { style: { fontSize: "13px", color: C.textMid, lineHeight: 1.5, marginBottom: "18px" } }, "더 이상 보이지 않아요."),
+          React.createElement("div", { style: { display: "flex", gap: "8px" } },
+            React.createElement("button", { onClick: () => setDismissTarget(null), style: { flex: 1, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "취소"),
+            React.createElement("button", { onClick: confirmDismiss, style: { flex: 1, padding: "11px", borderRadius: "100px", border: "none", background: C.error, color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "삭제")
+          )
+        )
+      )}
     </div>
   );
 }
@@ -4980,7 +5044,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
 // ── Phrase Section ────────────────────────────────────────────────────────────
 // Renders one of the two named phrase sections (Most Recent or Library).
 // Replaces the old SessionFeed which was per-session-number.
-function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set() }) {
+function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set(), onDismiss }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [openId, setOpenId] = useState(null);
   const { passed, total } = sectionProgress;
@@ -5087,6 +5151,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
                 isSaved: savedIds.has(phrase.id) || savedIds.has(phrase.english),
                 onPin,
                 isPinned: pinnedIds.has(phrase.id) || pinnedIds.has(phrase.english),
+                onDismiss,
               })
             );
           })}
@@ -5103,7 +5168,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
 // onGraduate: move to library (hidden=true)
 // onUngraduate: move back to active (hidden=false)
 // onDelete: remove from My List entirely
-function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, source = "mine", onSave, isSaved, onGraduate, onUngraduate, onDelete, inLibrary = false, onPin, isPinned = false }) {
+function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, source = "mine", onSave, isSaved, onGraduate, onUngraduate, onDelete, inLibrary = false, onPin, isPinned = false, onDismiss }) {
   const lang = useLang();
   const open = openId === phrase.id;
   const setOpen = () => setOpenId(open ? null : phrase.id);
@@ -5250,6 +5315,11 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
               style={{ width: "26px", height: "26px", borderRadius: "50%", border: `1px solid ${C.border}`, background: "transparent", color: C.textLight, fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, flexShrink: 0, lineHeight: 1 }}>×</button>
           )
         )}
+        {/* ⋯ Dismiss — removes the phrase from this student's queue (group or personal) */}
+        {onDismiss && (
+          <button onClick={() => onDismiss(phrase)} title="삭제" aria-label="삭제"
+            style={{ width: "26px", height: "26px", borderRadius: "50%", border: `1px solid ${C.border}`, background: "transparent", color: C.textLight, fontSize: "15px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, flexShrink: 0, lineHeight: 1, letterSpacing: "1px" }}>⋯</button>
+        )}
       </div>
 
       {/* ── Expandable practice zone ── */}
@@ -5272,13 +5342,14 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
 
 // ── Expandable Row ────────────────────────────────────────────────────────────
 // Practice tab wrapper — uses UnifiedPhraseRow with class source
-function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, onSave, isSaved, onPin, isPinned }) {
+function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, onSave, isSaved, onPin, isPinned, onDismiss }) {
   return React.createElement(UnifiedPhraseRow, {
     phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry,
     sectionAllDone, openId, setOpenId,
     source: "class",
     onSave, isSaved,
     onPin, isPinned,
+    onDismiss,
   });
 }
 
@@ -8129,6 +8200,7 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   const [phraseProgress, setPhraseProgress] = useState([]);
   const [savedPhrases, setSavedPhrases] = useState([]);
   const [sessionPhrases, setSessionPhrases] = useState([]);
+  const [personalPhrases, setPersonalPhrases] = useState([]); // phrases assigned only to this student
   const [loading, setLoading] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(student.name);
@@ -8138,6 +8210,7 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   const [markingDues, setMarkingDues] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
+  const [dismissed, setDismissed] = useState([]); // phrases this student has dismissed
 
   const group = groups.find(g => g.id === localStudent.group_id);
 
@@ -8161,18 +8234,22 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   useEffect(() => {
     (async () => {
       try {
-        const [qod, prog, phrases, session, duesData] = await Promise.all([
+        const [qod, prog, phrases, session, duesData, dismissedData, personalData] = await Promise.all([
           db.get("qod_responses", `student_id=eq.${student.id}&order=created_at.desc&limit=10`).catch(() => []),
           db.get("student_progress", `student_id=eq.${student.id}&order=updated_at.desc`).catch(() => []),
           db.get("student_phrases", `student_id=eq.${student.id}&order=created_at.desc`).catch(() => []),
           localStudent.group_id ? db.get("session_phrases", `group_id=eq.${localStudent.group_id}&select=*,phrase_bank(*)`).catch(() => []) : Promise.resolve([]),
           db.get("student_dues", `student_id=eq.${student.id}&order=due_date.desc&limit=6`).catch(() => []),
+          db.get("phrase_dismissals", `student_id=eq.${student.id}&select=phrase_id,dismissed_at,phrase_bank(english,korean)&order=dismissed_at.desc`).catch(() => []),
+          db.get("session_phrases", `student_id=eq.${student.id}&select=*,phrase_bank(*)&order=created_at.asc`).catch(() => []),
         ]);
         setQodHistory(qod);
         setPhraseProgress(prog);
         setSavedPhrases(phrases);
         setSessionPhrases(session.filter(sp => sp.phrase_bank).map(sp => ({ ...sp.phrase_bank, sp_id: sp.id, in_library: sp.in_library })));
         setDues(duesData);
+        setDismissed(dismissedData);
+        setPersonalPhrases(personalData.filter(sp => sp.phrase_bank).map(sp => ({ ...sp.phrase_bank, sp_id: sp.id, in_library: sp.in_library })));
       } catch(e) {}
       setLoading(false);
     })();
@@ -8186,6 +8263,15 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
       showMsg("✓ Name updated");
     } catch(e) { showMsg("Error saving", "error"); }
     setEditingName(false);
+  };
+
+  // Re-add a dismissed phrase: delete the dismissal row so it returns to the queue.
+  const handleReAddDismissed = async (phraseId) => {
+    try {
+      await db.delete("phrase_dismissals", `student_id=eq.${student.id}&phrase_id=eq.${phraseId}`);
+      setDismissed(prev => prev.filter(d => d.phrase_id !== phraseId));
+      showMsg("✓ Re-added to queue");
+    } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
   // Compute week stats
@@ -8202,6 +8288,12 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   // Map progress to session phrases
   const progMap = {};
   phraseProgress.forEach(p => { progMap[p.phrase_id] = p; });
+
+  // Dismissed phrases live only in the "Dismissed Phrases" section — keep them out
+  // of the active Class/Personal lists so a phrase never appears in two places.
+  const dismissedIds = new Set(dismissed.map(d => d.phrase_id));
+  const activeSessionPhrases = sessionPhrases.filter(p => !dismissedIds.has(p.id));
+  const activePersonalPhrases = personalPhrases.filter(p => !dismissedIds.has(p.id));
 
   if (loading) return (
     <div>
@@ -8480,17 +8572,17 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
           <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px" }}>
             Class Phrases · {group?.name || "—"}
           </div>
-          {sessionPhrases.length === 0 ? (
+          {activeSessionPhrases.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px", color: C.textLight, fontSize: "13px", background: C.bgSoft, borderRadius: "12px" }}>No phrases assigned yet</div>
           ) : (
             <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
-              {sessionPhrases.map((phrase, i) => {
+              {activeSessionPhrases.map((phrase, i) => {
                 const prog = progMap[phrase.id];
                 const passed = prog?.passed;
                 const score = prog?.best_score || 0;
                 const attempts = prog?.attempts || 0;
                 return (
-                  <div key={phrase.id} style={{ padding: "11px 14px", borderBottom: i < sessionPhrases.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div key={phrase.id} style={{ padding: "11px 14px", borderBottom: i < activeSessionPhrases.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: "13px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{phrase.english}"</div>
                       {phrase.korean && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{phrase.korean}</div>}
@@ -8507,6 +8599,40 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Personal phrases — assigned only to this student (teacher-side visibility) */}
+          {activePersonalPhrases.length > 0 && (
+            <div style={{ marginTop: "20px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px" }}>
+                Personal Phrases · {activePersonalPhrases.length}
+              </div>
+              <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                {activePersonalPhrases.map((phrase, i) => {
+                  const prog = progMap[phrase.id];
+                  const passed = prog?.passed;
+                  const score = prog?.best_score || 0;
+                  const attempts = prog?.attempts || 0;
+                  return (
+                    <div key={phrase.id} style={{ padding: "11px 14px", borderBottom: i < activePersonalPhrases.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "13px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{phrase.english}"</div>
+                        {phrase.korean && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{phrase.korean}</div>}
+                      </div>
+                      <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
+                        {passed ? (
+                          <span style={{ fontSize: "10px", fontWeight: "700", background: C.successBg, color: C.success, padding: "2px 8px", borderRadius: "100px", border: "1px solid #B8D5C0" }}>✓ {score}/10</span>
+                        ) : attempts > 0 ? (
+                          <span style={{ fontSize: "10px", fontWeight: "700", background: C.retryBg, color: "#B07020", padding: "2px 8px", borderRadius: "100px", border: "1px solid #E8C090" }}>{score}/10</span>
+                        ) : (
+                          <span style={{ fontSize: "10px", color: C.textLight }}>Not tried</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -8537,6 +8663,28 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
               </div>
             </div>
           )}
+
+          {/* Dismissed phrases — passive visibility; teacher can re-add to the queue */}
+          <div style={{ marginTop: "20px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
+              Dismissed Phrases · {dismissed.length}
+            </div>
+            {dismissed.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "16px", color: C.textLight, fontSize: "13px", background: C.bgSoft, borderRadius: "12px" }}>No dismissed phrases.</div>
+            ) : (
+              <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                {dismissed.map((d, i) => (
+                  <div key={d.phrase_id} style={{ padding: "10px 14px", borderBottom: i < dismissed.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "12px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{d.phrase_bank?.english || "(phrase removed)"}"</div>
+                      <div style={{ fontSize: "10px", color: C.textLight, marginTop: "1px" }}>{(d.dismissed_at || "").slice(0, 10)}</div>
+                    </div>
+                    <button onClick={() => handleReAddDismissed(d.phrase_id)} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 12px", color: C.navy, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>Re-add</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* QOD History + feedback */}
@@ -8651,7 +8799,7 @@ function TeacherSetupTab({ groups, setGroups, students, setStudents, phraseBank,
         <button onClick={() => setSection(null)} style={{ background: "transparent", border: "none", color: C.textMid, fontSize: "13px", cursor: "pointer", fontFamily: FONT, marginBottom: "20px", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}>
           ← Setup
         </button>
-        {section === "add" && React.createElement(AddPhrasesTab, { groups, phraseBank, setPhraseBank, showMsg })}
+        {section === "add" && React.createElement(AddPhrasesTab, { groups, students, phraseBank, setPhraseBank, showMsg })}
         {section === "qod" && React.createElement(QodStudioTab, { showMsg })}
         {section === "flags" && React.createElement(FeedbackFlagsTab, { showMsg })}
         {section === "students" && React.createElement(StudentsTab, { students, setStudents, groups, showMsg })}
@@ -9574,8 +9722,11 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
   );
 }
 
-function AddPhrasesTab({ groups, phraseBank, setPhraseBank, showMsg }) {
+function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showMsg }) {
   const [selectedGroup, setSelectedGroup] = useState(groups[0]);
+  // Scope for adds below: [] = whole group (group phrase), ids = personal phrases
+  // scoped to those students. Mutually exclusive (empty array means "whole group").
+  const [scopeStudentIds, setScopeStudentIds] = useState([]);
   const [english, setEnglish] = useState("");
   const [korean, setKorean] = useState("");
   const [context, setContext] = useState("");
@@ -9773,6 +9924,30 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
     }
   };
 
+  // Students belonging to the currently-selected group (the scope-selector pool).
+  const groupStudents = students.filter(s => s.group_id === selectedGroup?.id);
+  // Reset to "whole group" whenever the selected group changes.
+  useEffect(() => { setScopeStudentIds([]); }, [selectedGroup?.id]);
+
+  // Insert one phrase into the queue per the current scope.
+  //  - whole group ([]): a single session_phrases row with group_id (unchanged behavior)
+  //  - specific students: one row per student with student_id set, group_id null
+  // Returns the group session_phrases row for optimistic list updates, or null for
+  // personal adds (those don't appear in the group's session list).
+  const insertScopedPhrase = async (phraseId) => {
+    if (scopeStudentIds.length > 0) {
+      await Promise.all(scopeStudentIds.map(sid =>
+        db.insert("session_phrases", { student_id: sid, phrase_id: phraseId, session_number: 1, in_library: false })
+      ));
+      return null;
+    }
+    const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phraseId, session_number: 1, in_library: false });
+    return Array.isArray(spR) ? spR[0] : spR;
+  };
+  const scopeLabel = () => scopeStudentIds.length > 0
+    ? `${scopeStudentIds.length} student${scopeStudentIds.length > 1 ? "s" : ""}`
+    : (selectedGroup?.name || "group");
+
   const addPhrase = async () => {
     if (!english.trim()) { showMsg("Please enter an English phrase", "error"); return; }
     if (!selectedGroup) { showMsg("Please select a group first", "error"); return; }
@@ -9807,14 +9982,13 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
         await setPhraseTagsFor(phrase.id, tagsToSave);
       }
       const dup = groupPhrases.find(sp => sp.phrase_id === phrase.id);
-      if (dup) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent"), "warn"); return; }
-      const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: 1, in_library: false });
-      const sp = Array.isArray(spR) ? spR[0] : spR;
-      if (!sp?.id) throw new Error("Failed to add phrase to group");
+      if (dup && scopeStudentIds.length === 0) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent"), "warn"); return; }
+      const groupRow = await insertScopedPhrase(phrase.id);
+      if (groupRow && !groupRow.id) throw new Error("Failed to add phrase to group");
       setPhraseBank(prev => [phrase, ...prev.filter(p => p.id !== phrase.id)]);
-      setGroupPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
+      if (groupRow) setGroupPhrases(prev => [...prev, { ...groupRow, phrase_bank: phrase }]);
       setEnglish(""); setKorean(""); setContext(""); setSelectedTag(null); setSuggestedTag(null); setSelectedTags([]);
-      showMsg("✓ Added: " + phrase.english);
+      showMsg("✓ Added to " + scopeLabel() + ": " + phrase.english);
     } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
@@ -9825,12 +9999,11 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
       let phrase;
       if (existing.length > 0) { phrase = existing[0]; } else { const wordMap = await generateWordMap(p.english, p.korean).catch(() => null); const r = await db.insert("phrase_bank", { english: p.english, korean: p.korean, context: p.context, word_map: wordMap ? JSON.stringify(wordMap) : null }); phrase = Array.isArray(r) ? r[0] : r; }
       const dup = groupPhrases.find(sp => sp.phrase_id === phrase.id);
-      if (dup) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent") + ": " + p.english, "warn"); return; }
-      const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: 1, in_library: false });
-      const sp = Array.isArray(spR) ? spR[0] : spR;
-      setGroupPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
+      if (dup && scopeStudentIds.length === 0) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent") + ": " + p.english, "warn"); return; }
+      const groupRow = await insertScopedPhrase(phrase.id);
+      if (groupRow) setGroupPhrases(prev => [...prev, { ...groupRow, phrase_bank: phrase }]);
       setPhraseBank(prev => [phrase, ...prev.filter(x => x.id !== phrase.id)]);
-      showMsg("✓ Added: " + p.english);
+      showMsg("✓ Added to " + scopeLabel() + ": " + p.english);
     } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
@@ -9933,6 +10106,18 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
         {groups.map(g => React.createElement("button", { key: g.id, onClick: () => setSelectedGroup(g), style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? "#fff" : C.textMid, fontSize: "13px", fontWeight: selectedGroup?.id === g.id ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, g.name))}
       </div>
 
+      {/* Scope selector — whole group (default) vs specific students in the group.
+          Mutually exclusive: empty selection = whole group. Governs every add below. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }}>
+        <span style={{ fontSize: "12px", fontWeight: "600", color: C.textMid, marginRight: "2px" }}>Add phrases to:</span>
+        {React.createElement("button", { onClick: () => setScopeStudentIds([]), style: { padding: "5px 12px", borderRadius: "20px", border: `1px solid ${scopeStudentIds.length === 0 ? C.navy : C.border}`, background: scopeStudentIds.length === 0 ? C.navy : C.bg, color: scopeStudentIds.length === 0 ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, "Whole group")}
+        {groupStudents.map(s => {
+          const on = scopeStudentIds.includes(s.id);
+          return React.createElement("button", { key: s.id, onClick: () => setScopeStudentIds(prev => on ? prev.filter(id => id !== s.id) : [...prev, s.id]), style: { padding: "5px 12px", borderRadius: "20px", border: `1px solid ${on ? C.navy : C.border}`, background: on ? C.navy : C.bg, color: on ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, s.name);
+        })}
+        {groupStudents.length === 0 && React.createElement("span", { style: { fontSize: "11px", color: C.textLight } }, "No students in this group")}
+      </div>
+
       <Card style={{ marginBottom: "14px", borderLeft: `3px solid ${C.gold}` }}>
         <div style={{ fontSize: "13px", fontWeight: "600", color: C.gold, marginBottom: "10px" }}>✨ AI Generate Phrases</div>
         <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
@@ -9963,12 +10148,11 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
         onAdd: async (phrase) => {
           if (!selectedGroup) { showMsg("Select a group first", "warn"); return; }
           const dup = groupPhrases.find(sp => sp.phrase_id === phrase.id);
-          if (dup) { showMsg(`Already in ${dup.in_library ? "Library" : "Most Recent"}: "${phrase.english}"`, "warn"); return; }
+          if (dup && scopeStudentIds.length === 0) { showMsg(`Already in ${dup.in_library ? "Library" : "Most Recent"}: "${phrase.english}"`, "warn"); return; }
           try {
-            const spR = await db.insert("session_phrases", { group_id: selectedGroup.id, phrase_id: phrase.id, session_number: 1, in_library: false });
-            const sp = Array.isArray(spR) ? spR[0] : spR;
-            setGroupPhrases(prev => [...prev, { ...sp, phrase_bank: phrase }]);
-            showMsg("✓ Added: " + phrase.english);
+            const groupRow = await insertScopedPhrase(phrase.id);
+            if (groupRow) setGroupPhrases(prev => [...prev, { ...groupRow, phrase_bank: phrase }]);
+            showMsg("✓ Added to " + scopeLabel() + ": " + phrase.english);
           } catch(e) { showMsg("Error: " + e.message, "error"); }
         }
       })}
@@ -13651,9 +13835,12 @@ function SkipPhraseStep({ user, group, lang, onBack, onDone }) {
   useEffect(() => {
     (async () => {
       try {
+        // Group phrases + this student's personal phrases, minus dismissed ones.
+        const scope = phraseScopeFilter(group?.id, user.id);
+        const dismissedSet = await fetchDismissedPhraseIds(user.id);
         // 1. Try unpassed phrases from most recent session (not in library)
         const sessionPhrases = await db.get("session_phrases",
-          `group_id=eq.${group?.id}&in_library=eq.false&select=*,phrase_bank(*)`
+          `${scope}&in_library=eq.false&select=*,phrase_bank(*)`
         ).catch(() => []);
 
         const passedData = await db.get("student_progress",
@@ -13663,16 +13850,16 @@ function SkipPhraseStep({ user, group, lang, onBack, onDone }) {
 
         // Unpassed from current session
         let candidates = sessionPhrases
-          .filter(sp => sp.phrase_bank && !passedIds.has(sp.phrase_id))
+          .filter(sp => sp.phrase_bank && !passedIds.has(sp.phrase_id) && !dismissedSet.has(sp.phrase_id))
           .map(sp => sp.phrase_bank);
 
         // 2. Fallback: unpassed from library (previous sessions)
         if (candidates.length === 0) {
           const libraryPhrases = await db.get("session_phrases",
-            `group_id=eq.${group?.id}&in_library=eq.true&select=*,phrase_bank(*)`
+            `${scope}&in_library=eq.true&select=*,phrase_bank(*)`
           ).catch(() => []);
           candidates = libraryPhrases
-            .filter(sp => sp.phrase_bank && !passedIds.has(sp.phrase_id))
+            .filter(sp => sp.phrase_bank && !passedIds.has(sp.phrase_id) && !dismissedSet.has(sp.phrase_id))
             .map(sp => sp.phrase_bank);
         }
 
@@ -16087,12 +16274,17 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         setError("그룹 정보를 불러올 수 없어요.");
         return;
       }
+      // Personal phrases (student_id set) join the queue alongside group phrases;
+      // dismissed phrases are filtered out of both current and library pools.
+      const scope = phraseScopeFilter(groupId, user.id);
+      const dismissedSet = await fetchDismissedPhraseIds(user.id);
+      const dropDismissed = rows => rows.filter(row => !dismissedSet.has(row.phrase_id));
       const [sessionPhrasesRaw, progressData, memoryData, allSessionPhrasesRaw, savedPhrasesRaw, attemptHistoryRaw, lastSessionRaw] = await Promise.all([
-        db.get("session_phrases", `group_id=eq.${groupId}&in_library=eq.false&select=*,phrase_bank(*)`).catch(() => []),
+        db.get("session_phrases", `${scope}&in_library=eq.false&select=*,phrase_bank(*)`).then(dropDismissed).catch(() => []),
         db.get("student_progress", `student_id=eq.${user.id}&select=phrase_id,passed,needs_retry`).catch(() => []),
         db.get("wavy_memory", `student_id=eq.${user.id}&select=*&limit=1`).catch(() => []),
         // Past sessions' phrases (in_library=true) → "Keep Practicing" + library pool
-        db.get("session_phrases", `group_id=eq.${groupId}&in_library=eq.true&select=*,phrase_bank(*)`).catch(() => []),
+        db.get("session_phrases", `${scope}&in_library=eq.true&select=*,phrase_bank(*)`).then(dropDismissed).catch(() => []),
         // Student's personally saved phrases
         db.get("student_phrases", `student_id=eq.${user.id}&order=created_at.desc`).catch(() => []),
         // Per-phrase attempt history (EXCLUDING today) — for breakthrough detection
@@ -18580,14 +18772,17 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak, submittedToday, 
           }
         }
 
+        // Personal phrases count alongside group phrases; dismissed ones don't.
+        const scope = phraseScopeFilter(group?.id, user.id);
+        const dismissedSet = await fetchDismissedPhraseIds(user.id);
         // ── Practice count — current session phrases only ──
-        const sessionPhrases = await db.get("session_phrases", `group_id=eq.${group?.id}&in_library=eq.false&select=phrase_id`).catch(() => []);
-        const sessionPhraseIds = sessionPhrases.map(sp => sp.phrase_id).filter(Boolean);
+        const sessionPhrases = await db.get("session_phrases", `${scope}&in_library=eq.false&select=phrase_id`).catch(() => []);
+        const sessionPhraseIds = sessionPhrases.map(sp => sp.phrase_id).filter(id => id && !dismissedSet.has(id));
         const totalPhrases = sessionPhraseIds.length;
 
         // ── Review count — library phrases not yet passed ──
-        const libraryPhrases = await db.get("session_phrases", `group_id=eq.${group?.id}&in_library=eq.true&select=phrase_id`).catch(() => []);
-        const libraryPhraseIds = libraryPhrases.map(sp => sp.phrase_id).filter(Boolean);
+        const libraryPhrases = await db.get("session_phrases", `${scope}&in_library=eq.true&select=phrase_id`).catch(() => []);
+        const libraryPhraseIds = libraryPhrases.map(sp => sp.phrase_id).filter(id => id && !dismissedSet.has(id));
 
         let passed = 0;
         let reviewPassed = 0;
@@ -18914,9 +19109,12 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
         // Tier 2: this week's session phrases, all passed → random 3 for review
         // Tier 3: group library (past sessions), not yet passed
         if (group?.id) {
-          const allSessionPhrases = await db.get("session_phrases",
-            `group_id=eq.${group.id}&select=phrase_id,in_library,phrase_bank(id,english,korean,tag)`
-          ).catch(() => []);
+          // Group phrases + this student's personal phrases, minus dismissed ones.
+          const scope = phraseScopeFilter(group.id, user.id);
+          const dismissedSet = await fetchDismissedPhraseIds(user.id);
+          const allSessionPhrases = (await db.get("session_phrases",
+            `${scope}&select=phrase_id,in_library,phrase_bank(id,english,korean,tag)`
+          ).catch(() => [])).filter(sp => !dismissedSet.has(sp.phrase_id));
           const thisWeek = allSessionPhrases.filter(sp => !sp.in_library && sp.phrase_bank);
           const library = allSessionPhrases.filter(sp => sp.in_library && sp.phrase_bank);
 
