@@ -8658,21 +8658,36 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
               Class Phrases · {group?.name || "—"}
             </div>
             {sessionPhrases.length > 0 && (
-              cleanSlateConfirm ? (
-                <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
-                  <button onClick={cleanSlate} disabled={cleanSlating}
-                    style={{ fontSize: "11px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT }}>
-                    {cleanSlating ? "…" : `Dismiss all ${sessionPhrases.length}`}
-                  </button>
-                  <button onClick={() => setCleanSlateConfirm(false)}
-                    style={{ fontSize: "11px", color: C.textMid, background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT }}>Cancel</button>
-                </div>
-              ) : (
-                <button onClick={() => setCleanSlateConfirm(true)} title="Dismiss all group phrases for this student (new-joiner reset)"
-                  style={{ flexShrink: 0, fontSize: "11px", fontWeight: "600", color: C.textMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 12px", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}>🧹 Clean slate</button>
-              )
+              <button onClick={() => setCleanSlateConfirm(true)} title="Dismiss all group phrases for this student (new-joiner reset)"
+                style={{ flexShrink: 0, fontSize: "11px", fontWeight: "600", color: C.textMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 12px", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}>🧹 Clean slate</button>
             )}
           </div>
+          {/* Clean-slate confirmation modal — portaled, centered, hard to miss
+              (replaces the old inline two-step that was easy to walk away from
+              after the first tap without realizing the action hadn't fired). */}
+          {cleanSlateConfirm && ReactDOM.createPortal(
+            <div onClick={() => !cleanSlating && setCleanSlateConfirm(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px", animation: "fadeIn 0.15s ease-out" }}>
+              <div onClick={e => e.stopPropagation()}
+                style={{ background: "#fff", borderRadius: "20px", padding: "24px 22px 20px", maxWidth: "360px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}>
+                <div style={{ fontSize: "17px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>
+                  Clean slate for {localStudent.name}?
+                </div>
+                <div style={{ fontSize: "13px", color: C.textMid, lineHeight: 1.5, marginBottom: "18px" }}>
+                  Dismisses all {sessionPhrases.length} of {group?.name || "this group"}'s phrases for this student. Reversible anytime — each one gets a Re-add button under "Dismissed Phrases" below. Group phrases added later will still show.
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setCleanSlateConfirm(false)} disabled={cleanSlating}
+                    style={{ flex: 1, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "14px", fontWeight: "700", cursor: cleanSlating ? "default" : "pointer", fontFamily: FONT }}>Cancel</button>
+                  <button onClick={cleanSlate} disabled={cleanSlating}
+                    style={{ flex: 1, padding: "11px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "14px", fontWeight: "700", cursor: cleanSlating ? "default" : "pointer", fontFamily: FONT }}>
+                    {cleanSlating ? "Dismissing…" : `Dismiss all ${sessionPhrases.length}`}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
           {activeSessionPhrases.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px", color: C.textLight, fontSize: "13px", background: C.bgSoft, borderRadius: "12px" }}>No phrases assigned yet</div>
           ) : (
