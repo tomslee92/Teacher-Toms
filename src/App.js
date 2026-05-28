@@ -19361,7 +19361,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
         if (promptRows[0] && !cancelled) {
           const lastResp = responseRows[0]?.created_at;
           const answered = lastResp && lastResp.startsWith(todayStr);
-          setTodayQod({ prompt: promptRows[0].prompt, answered });
+          setTodayQod({ prompt: promptRows[0].prompt, tag: promptRows[0].tag || null, answered });
         }
         // All data settled — fire the cards-ready signal for smooth reveal
         if (!cancelled) setCardsReady(true);
@@ -19566,7 +19566,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
         }
       },
         React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" } },
-          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: todayQod.answered ? "#3D7A52" : "#B85A38", letterSpacing: "1.5px", textTransform: "uppercase" } }, "오늘의 질문"),
+          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: todayQod.answered ? "#3D7A52" : "#B85A38", letterSpacing: "1.5px", textTransform: "uppercase" } }, todayQod.tag === "Thankful Thursday" ? "🙏 THANKFUL THURSDAY" : "오늘의 질문"),
           React.createElement("div", { style: { fontSize: "11px", color: C.textLight, fontWeight: "600" } },
             todayQod.answered ? "✓ 답변 완료" : "답변하기 →"
           )
