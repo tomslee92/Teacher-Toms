@@ -8330,9 +8330,12 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   }, [student.id, localStudent.group_id]);
 
   const saveName = async () => {
-    if (!nameVal.trim() || nameVal === student.name) { setEditingName(false); return; }
+    if (!nameVal.trim() || nameVal === localStudent.name) { setEditingName(false); return; }
     try {
       await db.update("students", `id=eq.${student.id}`, { name: nameVal.trim() });
+      // Refresh local state so the new name shows immediately (the header reads
+      // localStudent.name; without this it stays stale until the screen is re-opened).
+      setLocalStudent(prev => ({ ...prev, name: nameVal.trim() }));
       onRename && onRename(nameVal.trim());
       showMsg("✓ Name updated");
     } catch(e) { showMsg("Error saving", "error"); }
