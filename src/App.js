@@ -750,6 +750,31 @@ async function fetchDismissedPhraseIds(studentId) {
   return new Set(rows.map(r => r.phrase_id).filter(Boolean));
 }
 
+// ── Session-notes audio upload ─────────────────────────────────────────────
+// Same pattern as the QoD teacher comment upload (line ~19795): POST to the
+// public storage bucket, fall back to an inline data-URL if upload fails so the
+// note still saves rather than silently losing the recording.
+async function uploadSessionNoteAudio(blob, label) {
+  const mime = blob.type || "audio/webm";
+  const ext = mime.includes("mp4") ? "mp4" : mime.includes("ogg") ? "ogg" : "webm";
+  const safeLabel = String(label || "x").replace(/[^a-z0-9-]/gi, "").slice(0, 12) || "x";
+  const fn = `note_${safeLabel}_${Date.now()}.${ext}`;
+  try {
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/session-notes-audio/${fn}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": mime.split(";")[0] },
+      body: blob,
+    });
+    if (up.ok) return `${SUPABASE_URL}/storage/v1/object/public/session-notes-audio/${fn}`;
+  } catch(e) { /* fall through to base64 */ }
+  return await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+
 // ── Colors ────────────────────────────────────────────────────────────────────
 // Last active display — uses last_seen (timestamp) if available, falls back to last_practice (date)
 
@@ -7466,6 +7491,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
                 students={students}
                 groups={groups}
                 showMsg={showMsg}
+                teacher={user}
                 onBack={() => setSelectedStudent(null)}
                 onRename={name => {
                   setSelectedStudent(prev => ({ ...prev, name }));
@@ -8267,7 +8293,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
 }
 
 // ── Student Detail View ───────────────────────────────────────────────────────
-function StudentDetailView({ student, students, groups, showMsg, onBack, onRename, onDelete, onUpdateGroup }) {
+function StudentDetailView({ student, students, groups, showMsg, teacher, onBack, onRename, onDelete, onUpdateGroup }) {
   const [qodHistory, setQodHistory] = useState([]);
   const [phraseProgress, setPhraseProgress] = useState([]);
   const [savedPhrases, setSavedPhrases] = useState([]);
@@ -8285,6 +8311,14 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
   const [dismissed, setDismissed] = useState([]); // phrases this student has dismissed
   const [cleanSlating, setCleanSlating] = useState(false);
   const [cleanSlateConfirm, setCleanSlateConfirm] = useState(false);
+  const [pastNotes, setPastNotes] = useState([]); // session_notes for this student (newest first)
+  const refreshPastNotes = useCallback(async () => {
+    try {
+      const rows = await db.get("session_notes", `student_id=eq.${student.id}&select=*&order=session_date.desc,created_at.desc`).catch(() => []);
+      setPastNotes(rows);
+    } catch(e) {}
+  }, [student.id]);
+  useEffect(() => { refreshPastNotes(); }, [refreshPastNotes]);
 
   const group = groups.find(g => g.id === localStudent.group_id);
 
@@ -8564,6 +8598,20 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
               </button>
             </div>
           </div>
+          {/* Session Notes toggle — gates the student-side note surfaces (home card + archive) */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+            <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>📝</span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>Session Notes (Beta)</span>
+              <button onClick={async () => {
+                const newVal = !localStudent.session_notes_enabled;
+                await db.update("students", `id=eq.${localStudent.id}`, { session_notes_enabled: newVal }).catch(() => {});
+                setLocalStudent(prev => ({ ...prev, session_notes_enabled: newVal }));
+              }} style={{ padding: "4px 12px", borderRadius: "100px", border: "none", background: localStudent.session_notes_enabled ? "#22c55e" : "rgba(255,255,255,0.1)", color: "#fff", fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>
+                {localStudent.session_notes_enabled ? "✓ On" : "Off"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -8658,6 +8706,44 @@ function StudentDetailView({ student, students, groups, showMsg, onBack, onRenam
           </div>
         ))}
       </div>
+
+      {/* Session notes — teacher composer + past notes to this student.
+          Framed as "occasional, when worth saying" rather than per-session feedback. */}
+      {teacher && (
+        <div style={{ marginBottom: "28px" }}>
+          <SessionNoteComposer student={localStudent} teacher={teacher} showMsg={showMsg} onSaved={refreshPastNotes} />
+          {pastNotes.length > 0 && (
+            <div style={{ marginTop: "14px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
+                지난 메모 · {pastNotes.length}
+              </div>
+              <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                {pastNotes.map((n, i) => {
+                  const isVoice = n.note_type === "voice" || n.note_type === "both";
+                  const isText = n.note_type === "text" || n.note_type === "both";
+                  const preview = n.text_content || n.structured?.wentWell || (isVoice && !isText ? "음성 메모" : "");
+                  return (
+                    <div key={n.id} style={{ padding: "11px 14px", borderBottom: i < pastNotes.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "2px" }}>{n.session_date} · {isVoice ? (isText ? "🎙 + 글" : "🎙 음성") : "글"}</div>
+                        <div style={{ fontSize: "13px", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
+                        {n.dismissed_at
+                          ? <span style={{ fontSize: "10px", fontWeight: "600", color: C.textLight, background: C.bgSoft, padding: "2px 8px", borderRadius: "100px" }}>보관함</span>
+                          : n.seen_at
+                            ? <span title={`Seen ${new Date(n.seen_at).toLocaleString()}`} style={{ fontSize: "10px", fontWeight: "600", color: C.success, background: C.successBg, padding: "2px 8px", borderRadius: "100px" }}>👁 봤어요</span>
+                            : <span style={{ fontSize: "10px", fontWeight: "600", color: C.gold, background: C.goldBg, padding: "2px 8px", borderRadius: "100px" }}>안 봤어요</span>
+                        }
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Desktop two-col / Mobile single */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", alignItems: "start" }}>
@@ -19235,6 +19321,374 @@ RETURN ONLY THE JSON:`;
   } catch(e) { return null; }
 }
 
+// ── Session-Notes UI primitives ───────────────────────────────────────────────
+// Custom waveform player for voice notes — fixed bars colored by playback
+// progress (reuse RecordButton aesthetic, no need to decode the waveform).
+function NoteWaveformPlayer({ url, duration, accent }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [dur, setDur] = useState(duration || 0);
+  const color = accent || "#1A3A6E";
+
+  useEffect(() => {
+    if (!url) return;
+    const a = new Audio(url);
+    audioRef.current = a;
+    const onLoaded = () => { if (a.duration && isFinite(a.duration)) setDur(Math.round(a.duration)); };
+    const onTime = () => { if (a.duration) setProgress(a.currentTime / a.duration); };
+    const onEnd = () => { setPlaying(false); setProgress(0); };
+    a.addEventListener("loadedmetadata", onLoaded);
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("ended", onEnd);
+    return () => {
+      try { a.pause(); } catch(_) {}
+      a.removeEventListener("loadedmetadata", onLoaded);
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("ended", onEnd);
+      audioRef.current = null;
+    };
+  }, [url]);
+
+  const toggle = () => {
+    const a = audioRef.current; if (!a) return;
+    if (playing) { a.pause(); setPlaying(false); }
+    else { a.play().then(() => setPlaying(true)).catch(() => {}); }
+  };
+
+  // Stable per-note bar heights from a string hash so the bars don't reshuffle.
+  const BAR_COUNT = 36;
+  const seed = (url || "").split("").reduce((a,c) => a + c.charCodeAt(0), 0);
+  const bars = [];
+  for (let i = 0; i < BAR_COUNT; i++) {
+    const r = ((seed + i * 7919) % 1000) / 1000;
+    bars.push(0.28 + r * 0.72);
+  }
+  const fmt = (s) => { if (!s || !isFinite(s)) return "0:00"; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; };
+
+  return React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", background: "#F7F8FA", borderRadius: "14px", border: `1px solid ${C.border}` }
+  },
+    React.createElement("button", {
+      onClick: toggle,
+      "aria-label": playing ? "Pause" : "Play",
+      style: { width: "40px", height: "40px", borderRadius: "50%", border: "none", background: color, color: "#fff", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "transform 150ms ease, background 150ms ease", fontFamily: FONT }
+    }, playing ? "❚❚" : "▶"),
+    React.createElement("div", { style: { flex: 1, display: "flex", alignItems: "center", gap: "2px", height: "32px" } },
+      bars.map((h, i) => {
+        const isPlayed = (i / BAR_COUNT) < progress;
+        return React.createElement("div", {
+          key: i,
+          style: { flex: 1, height: `${Math.round(h * 100)}%`, background: isPlayed ? color : "#D8DDE5", borderRadius: "2px", transition: "background 150ms ease" }
+        });
+      })
+    ),
+    React.createElement("div", { style: { fontSize: "11px", color: C.textMid, fontWeight: "600", minWidth: "34px", textAlign: "right" } }, fmt(dur))
+  );
+}
+
+// Full-screen note display — slide-up sheet, portaled to body so it's centered
+// regardless of any transformed ancestor. Used by the home card open + archive.
+function SessionNoteSheet({ note, onClose, showFirstOpenFraming }) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+  if (!note) return null;
+  const teacherLabel = `${note.teacher_name || "선생님"} 선생님의 메모`;
+  return ReactDOM.createPortal(
+    React.createElement("div", {
+      onClick: onClose,
+      style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "flex-end", justifyContent: "center", animation: "fadeIn 200ms ease-out" }
+    },
+      React.createElement("style", null, "@keyframes noteSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}"),
+      React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: { background: "#fff", width: "100%", maxWidth: "520px", maxHeight: "85vh", borderRadius: "24px 24px 0 0", padding: "10px 22px calc(28px + env(safe-area-inset-bottom)) 22px", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "noteSheetUp 400ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT }
+      },
+        React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: C.border, margin: "4px auto 18px" } }),
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "10px" } },
+          React.createElement("div", null,
+            React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase" } }, teacherLabel),
+            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "3px" } }, note.session_date)
+          ),
+          React.createElement("button", { onClick: onClose, "aria-label": "Close", style: { background: "transparent", border: "none", fontSize: "22px", color: C.textLight, cursor: "pointer", lineHeight: 1, padding: "0 4px" } }, "✕")
+        ),
+        showFirstOpenFraming && React.createElement("div", {
+          style: { fontSize: "12px", color: C.textLight, fontStyle: "italic", marginTop: "4px", marginBottom: "14px", padding: "10px 14px", background: C.bgSoft, borderRadius: "10px", lineHeight: 1.5 }
+        }, "선생님이 가끔 특별한 메모를 남겨요. 매 수업마다는 아니에요."),
+        React.createElement("div", { style: { overflowY: "auto", paddingTop: "8px" } },
+          note.text_content && React.createElement("div", { style: { fontSize: "15px", color: C.text, lineHeight: 1.65, marginBottom: note.audio_url ? "16px" : "0", whiteSpace: "pre-wrap" } }, note.text_content),
+          note.structured && React.createElement(React.Fragment, null,
+            note.structured.wentWell && React.createElement("div", { style: { marginBottom: "14px" } },
+              React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.success, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" } }, "잘한 점"),
+              React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" } }, note.structured.wentWell)
+            ),
+            note.structured.workOn && React.createElement("div", { style: { marginBottom: "14px" } },
+              React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "6px" } }, "연습할 점"),
+              React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" } }, note.structured.workOn)
+            )
+          ),
+          note.audio_url && React.createElement("div", { style: { marginTop: "8px" } },
+            React.createElement(NoteWaveformPlayer, { url: note.audio_url, duration: note.audio_duration })
+          )
+        )
+      )
+    ),
+    document.body
+  );
+}
+
+// Archive — scrollable timeline of all notes for this student. Premium
+// correspondence feel; ONLY existing notes, never empty session placeholders.
+function SessionNoteArchiveSheet({ notes, onClose }) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+  return ReactDOM.createPortal(
+    React.createElement("div", {
+      onClick: onClose,
+      style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "flex-end", justifyContent: "center", animation: "fadeIn 200ms ease-out" }
+    },
+      React.createElement("style", null, "@keyframes archiveSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)} } @keyframes archiveItemIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}"),
+      React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: { background: "#FAFBFC", width: "100%", maxWidth: "560px", height: "92vh", borderRadius: "24px 24px 0 0", padding: "10px 0 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", animation: "archiveSheetUp 420ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT }
+      },
+        React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: C.border, margin: "4px auto 14px" } }),
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 22px 12px", borderBottom: `1px solid ${C.border}` } },
+          React.createElement("div", null,
+            React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px" } }, "보관함"),
+            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "2px" } }, `${notes.length}개의 메모`)
+          ),
+          React.createElement("button", { onClick: onClose, "aria-label": "Close", style: { background: "transparent", border: "none", fontSize: "22px", color: C.textLight, cursor: "pointer", lineHeight: 1, padding: "0 4px" } }, "✕")
+        ),
+        React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "16px 22px calc(24px + env(safe-area-inset-bottom))" } },
+          notes.length === 0
+            ? React.createElement("div", { style: { textAlign: "center", padding: "60px 20px", color: C.textLight, fontSize: "13px", fontStyle: "italic" } }, "아직 받은 메모가 없어요.")
+            : notes.map((n, i) => React.createElement("div", {
+                key: n.id,
+                style: {
+                  background: "#fff", border: `1px solid ${C.border}`, borderRadius: "16px", padding: "16px 18px", marginBottom: "12px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                  animation: `archiveItemIn 320ms cubic-bezier(0.16,1,0.3,1) ${i * 30}ms both`,
+                }
+              },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "10px" } },
+                  React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase" } }, `${n.teacher_name || "선생님"} 선생님의 메모`),
+                  React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, n.session_date)
+                ),
+                n.text_content && React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, marginBottom: n.audio_url || n.structured ? "12px" : "0", whiteSpace: "pre-wrap" } }, n.text_content),
+                n.structured && React.createElement(React.Fragment, null,
+                  n.structured.wentWell && React.createElement("div", { style: { marginBottom: "10px" } },
+                    React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.success, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "4px" } }, "잘한 점"),
+                    React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" } }, n.structured.wentWell)
+                  ),
+                  n.structured.workOn && React.createElement("div", { style: { marginBottom: "10px" } },
+                    React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "4px" } }, "연습할 점"),
+                    React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" } }, n.structured.workOn)
+                  )
+                ),
+                n.audio_url && React.createElement(NoteWaveformPlayer, { url: n.audio_url, duration: n.audio_duration })
+              ))
+        )
+      )
+    ),
+    document.body
+  );
+}
+
+// Teacher composer for leaving an occasional personal note (메모) to a student.
+// Reuses useRecorder + RecordButton + transcribe + the QoD AI-draft pattern.
+// Collapsed by default to honor "occasional, not routine."
+function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [open, setOpen] = useState(false);
+  const [sessionDate, setSessionDate] = useState(today);
+  const [format, setFormat] = useState("free"); // 'free' | 'structured'
+  const [text, setText] = useState("");
+  const [wentWell, setWentWell] = useState("");
+  const [workOn, setWorkOn] = useState("");
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleRecorded = (blob) => {
+    setAudioBlob(blob);
+    const u = URL.createObjectURL(blob);
+    setAudioUrl(u);
+    try {
+      const a = new Audio(u);
+      a.addEventListener("loadedmetadata", () => {
+        if (a.duration && isFinite(a.duration)) setAudioDuration(Math.round(a.duration));
+      });
+    } catch(_) {}
+  };
+  const rec = useRecorder(handleRecorded);
+
+  const reset = () => {
+    setText(""); setWentWell(""); setWorkOn("");
+    setAudioBlob(null); setAudioUrl(null); setAudioDuration(0);
+    setFormat("free"); setSessionDate(today); setOpen(false);
+  };
+
+  const generateDraft = async (roughText) => {
+    if (!roughText || !roughText.trim()) return;
+    setGenerating(true);
+    try {
+      const skill = (student.skill_level || "beginner").toLowerCase();
+      const isAdv = skill === "advanced", isInt = skill === "intermediate";
+      const langInstr = (isAdv || isInt)
+        ? "Write entirely in English — warm and personal, like a teacher who knows this student."
+        : "Write entirely in Korean 해요체 — warm and personal. No 님 honorific on first names.";
+      const wantStructured = format === "structured";
+      const formatInstr = wantStructured
+        ? "Return ONLY a JSON object: {\"wentWell\":\"…\",\"workOn\":\"…\"}. wentWell = one specific thing the student did well this session. workOn = one gentle thing to practice next. No prose outside the JSON."
+        : "Return one short, warm note (under 110 words). Structure: 1) one specific thing they did well this session (concrete, personal), 2) one gentle thing to work on, 3) a warm closing that makes them want to come back. Plain prose, no lists.";
+      const sys = `You are ${teacher.name}, a warm English coach in the WAYVE community. You're leaving a brief, occasional personal note (메모) to a Korean adult student after a notable session — never a routine report. ${langInstr}\n\n${formatInstr}\n\nSound like a real person who cares, not a form letter.`;
+      const usr = `Student: ${student.name} (level: ${skill})\nRough teacher notes (may be a transcript or shorthand): "${roughText.trim()}"\n\nDraft the note now.`;
+      const out = await geminiCallForFeedback(usr, sys);
+      if (wantStructured) {
+        try {
+          const cleaned = out.replace(/^```json\s*|\s*```$/g, "").trim();
+          const parsed = JSON.parse(cleaned);
+          if (parsed.wentWell) setWentWell(parsed.wentWell);
+          if (parsed.workOn) setWorkOn(parsed.workOn);
+        } catch(e) {
+          setFormat("free");
+          setText(out);
+        }
+      } else {
+        setText(out);
+      }
+    } catch(e) { showMsg && showMsg("AI 초안 생성 실패: " + e.message, "error"); }
+    setGenerating(false);
+  };
+
+  const handleAIDraftFromText = () => {
+    const rough = format === "structured" ? `Went well: ${wentWell}. Work on: ${workOn}` : text;
+    generateDraft(rough);
+  };
+  const handleAIDraftFromVoice = async () => {
+    if (!audioBlob) return;
+    setGenerating(true);
+    try {
+      const said = await transcribe(audioBlob);
+      await generateDraft(said);
+    } catch(e) { showMsg && showMsg("음성 변환 실패: " + e.message, "error"); }
+    setGenerating(false);
+  };
+
+  const handleSave = async () => {
+    const hasText = format === "structured" ? (wentWell.trim() || workOn.trim()) : !!text.trim();
+    const hasAudio = !!audioBlob;
+    if (!hasText && !hasAudio) { showMsg && showMsg("메모 내용을 작성하거나 음성을 녹음해주세요", "error"); return; }
+    setSaving(true);
+    try {
+      let url = null, dur = null;
+      if (hasAudio) {
+        url = await uploadSessionNoteAudio(audioBlob, student.id);
+        dur = audioDuration || null;
+      }
+      const noteType = hasText && url ? "both" : (url ? "voice" : "text");
+      await db.insert("session_notes", {
+        student_id: student.id,
+        teacher_id: teacher.id,
+        teacher_name: teacher.name,
+        session_date: sessionDate,
+        note_type: noteType,
+        text_content: format === "free" && hasText ? text.trim() : null,
+        structured: format === "structured" && hasText ? { wentWell: wentWell.trim(), workOn: workOn.trim() } : null,
+        audio_url: url,
+        audio_duration: dur,
+      });
+      reset();
+      showMsg && showMsg("✓ 메모 보냈어요");
+      onSaved && onSaved();
+    } catch(e) { showMsg && showMsg("저장 실패: " + e.message, "error"); }
+    setSaving(false);
+  };
+
+  // Collapsed framing: emphasizes "occasional, when worth saying" — not a per-session form.
+  if (!open) {
+    return React.createElement("div", {
+      style: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }
+    },
+      React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "3px" } }, "📝 메모 남기기"),
+        React.createElement("div", { style: { fontSize: "11px", color: C.textLight, lineHeight: 1.4 } }, "특별한 순간에만 — 매 수업마다 쓸 필요는 없어요.")
+      ),
+      React.createElement("button", {
+        onClick: () => setOpen(true),
+        style: { background: C.navy, border: "none", borderRadius: "100px", padding: "8px 16px", color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }
+      }, "메모 쓰기")
+    );
+  }
+
+  return React.createElement("div", {
+    style: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", fontFamily: FONT }
+  },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
+      React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text } }, `📝 ${student.name} 메모`),
+      React.createElement("button", { onClick: reset, style: { background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT } }, "닫기")
+    ),
+    React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px" } },
+      React.createElement("input", {
+        type: "date", value: sessionDate, onChange: e => setSessionDate(e.target.value),
+        style: { padding: "6px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, fontSize: "12px", fontFamily: FONT, color: C.text }
+      }),
+      React.createElement("div", { style: { display: "flex", border: `1px solid ${C.border}`, borderRadius: "100px", overflow: "hidden" } },
+        React.createElement("button", {
+          onClick: () => setFormat("free"),
+          style: { padding: "5px 12px", border: "none", background: format === "free" ? C.text : "transparent", color: format === "free" ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+        }, "자유 작성"),
+        React.createElement("button", {
+          onClick: () => setFormat("structured"),
+          style: { padding: "5px 12px", border: "none", background: format === "structured" ? C.text : "transparent", color: format === "structured" ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+        }, "구조화")
+      )
+    ),
+    format === "structured"
+      ? React.createElement(React.Fragment, null,
+          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.success, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, "잘한 점"),
+          React.createElement("textarea", { value: wentWell, onChange: e => setWentWell(e.target.value), placeholder: "이번 수업에서 특별히 잘한 점…", rows: 2, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } }),
+          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, "연습할 점"),
+          React.createElement("textarea", { value: workOn, onChange: e => setWorkOn(e.target.value), placeholder: "다음에 연습해볼 점…", rows: 2, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } })
+        )
+      : React.createElement("textarea", { value: text, onChange: e => setText(e.target.value), placeholder: "이 학생에게 남기고 싶은 메모를 자유롭게 적어주세요…", rows: 4, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } }),
+    React.createElement("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" } },
+      React.createElement("button", {
+        onClick: handleAIDraftFromText, disabled: generating || (format === "structured" ? !(wentWell.trim() || workOn.trim()) : !text.trim()),
+        style: { padding: "6px 12px", borderRadius: "100px", border: `1px solid ${C.goldBorder}`, background: C.goldBg, color: C.gold, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, opacity: generating ? 0.5 : 1 }
+      }, generating ? "다듬는 중…" : "✨ AI로 글 다듬기"),
+      audioBlob && React.createElement("button", {
+        onClick: handleAIDraftFromVoice, disabled: generating,
+        style: { padding: "6px 12px", borderRadius: "100px", border: `1px solid ${C.goldBorder}`, background: C.goldBg, color: C.gold, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, opacity: generating ? 0.5 : 1 }
+      }, generating ? "변환 중…" : "🎙→✨ 음성으로 초안")
+    ),
+    React.createElement("div", { style: { background: "#F7F8FA", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "12px" } },
+      React.createElement("div", { style: { fontSize: "11px", color: C.textMid, flexShrink: 0, fontWeight: "600" } }, "🎙 음성 메모"),
+      React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: rec.start, onStop: rec.stop, idleLabel: "녹음", size: "sm" }),
+      audioUrl && React.createElement("div", { style: { flex: 1, fontSize: "11px", color: C.textMid, display: "flex", alignItems: "center", gap: "6px" } },
+        React.createElement("span", null, audioDuration ? `녹음됨 · ${audioDuration}초` : "녹음됨"),
+        React.createElement("button", { onClick: () => { setAudioBlob(null); setAudioUrl(null); setAudioDuration(0); }, style: { background: "transparent", border: "none", color: C.error, fontSize: "11px", cursor: "pointer", fontFamily: FONT } }, "지우기")
+      )
+    ),
+    React.createElement("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" } },
+      React.createElement("button", { onClick: reset, style: { padding: "8px 16px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "취소"),
+      React.createElement("button", {
+        onClick: handleSave, disabled: saving || generating,
+        style: { padding: "8px 18px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "12px", fontWeight: "800", cursor: saving ? "default" : "pointer", fontFamily: FONT, opacity: saving ? 0.6 : 1 }
+      }, saving ? "보내는 중…" : "보내기")
+    )
+  );
+}
+
 // ── HomeGridV2 — Wavi-led home (test only on Toms Lee for now) ────────────────
 // Layout: greeting → Wavi hero card → stats → continue + today's expression → tools
 function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile }) {
@@ -19249,6 +19703,13 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
   // Staggered-reveal: cards below stats appear together after data loads
   // (or after 600ms safety cap), creating a smooth choreographed entrance
   const [cardsReady, setCardsReady] = useState(false);
+  // Session notes — gated by session_notes_enabled (or Toms always-fallback)
+  const notesEnabled = !!(user?.session_notes_enabled || user?.name === "Toms Lee");
+  const [allNotes, setAllNotes] = useState([]); // all notes for this student, newest first
+  const [openNote, setOpenNote] = useState(null); // currently-opened note (sheet)
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [noteDismissing, setNoteDismissing] = useState(false); // animation flag
+  const [notesEntered, setNotesEntered] = useState(false); // entrance animation
   // ── Wavi card expansion transition ──────────────────────────────────────────
   const waviCardRef = useRef(null);
   const [waviExpansion, setWaviExpansion] = useState(null);
@@ -19354,14 +19815,23 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
 
         // ── Today's QoD ──────────────────────────────────────────────────────
         const todayStr = localToday();
-        const [promptRows, responseRows] = await Promise.all([
+        const [promptRows, responseRows, noteRows] = await Promise.all([
           db.get("qod_prompts", `scheduled_date=eq.${todayStr}&limit=1`).catch(() => []),
-          db.get("qod_responses", `student_id=eq.${user.id}&order=created_at.desc&limit=1&select=created_at`).catch(() => [])
+          db.get("qod_responses", `student_id=eq.${user.id}&order=created_at.desc&limit=1&select=created_at`).catch(() => []),
+          // ── Session notes (gated on render) — fetch always so archive opens instantly
+          notesEnabled
+            ? db.get("session_notes", `student_id=eq.${user.id}&select=*&order=session_date.desc,created_at.desc`).catch(() => [])
+            : Promise.resolve([]),
         ]);
         if (promptRows[0] && !cancelled) {
           const lastResp = responseRows[0]?.created_at;
           const answered = lastResp && lastResp.startsWith(todayStr);
           setTodayQod({ prompt: promptRows[0].prompt, tag: promptRows[0].tag || null, answered });
+        }
+        if (!cancelled) {
+          setAllNotes(noteRows || []);
+          // entrance flag — animate the latest note card in once on first load
+          setTimeout(() => { if (!cancelled) setNotesEntered(true); }, 30);
         }
         // All data settled — fire the cards-ready signal for smooth reveal
         if (!cancelled) setCardsReady(true);
@@ -19379,6 +19849,34 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
   else if (hour >= 17 && hour < 21) greeting = "좋은 저녁이에요";        // evening
   else if (hour >= 21)              greeting = "늦은 저녁이네요";        // 9pm–midnight: winding down
   else                              greeting = "늦은 시간이네요";        // 12am–5am: gentle late-night acknowledgment
+
+  // ── Session notes — derived + handlers ─────────────────────────────────────
+  // Surface the most recent NON-dismissed note. Subtle first-open framing only
+  // when no OTHER notes have ever been seen yet (true first contact, ever).
+  const latestNote = allNotes.find(n => !n.dismissed_at) || null;
+  const hasOtherSeen = allNotes.some(n => n.seen_at && (!latestNote || n.id !== latestNote.id));
+  const showFirstOpenFraming = !!latestNote && !hasOtherSeen && !latestNote.seen_at;
+
+  const handleOpenNote = (n) => {
+    setOpenNote(n);
+    if (!n.seen_at && !isPreview) {
+      const now = new Date().toISOString();
+      setAllNotes(prev => prev.map(x => x.id === n.id ? { ...x, seen_at: now } : x));
+      db.update("session_notes", `id=eq.${n.id}`, { seen_at: now }).catch(() => {});
+    }
+  };
+
+  const handleDismissNote = (e, id) => {
+    if (e) e.stopPropagation();
+    setNoteDismissing(true);
+    // Animate out, then commit. Match the 280ms dismiss animation.
+    setTimeout(() => {
+      const now = new Date().toISOString();
+      setAllNotes(prev => prev.map(x => x.id === id ? { ...x, dismissed_at: now } : x));
+      setNoteDismissing(false);
+      if (!isPreview) db.update("session_notes", `id=eq.${id}`, { dismissed_at: now }).catch(() => {});
+    }, 280);
+  };
 
   return React.createElement("div", { style: { paddingBottom: "20px" } },
     React.createElement("style", null, `
@@ -19517,6 +20015,63 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
         transition: "opacity 460ms ease-out, transform 520ms cubic-bezier(0.22, 1, 0.36, 1)",
       }
     },
+      // ── Note keyframes (note card entrance + dismiss) ─────────────────────
+      React.createElement("style", null, "@keyframes noteRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}} @keyframes noteDismiss{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.96)}} @media (prefers-reduced-motion: reduce){[data-anim-note]{animation:none !important;transition:opacity 200ms ease !important;}}"),
+
+      // ── Note card — most recent non-dismissed note from the teacher ───────
+      notesEnabled && latestNote && React.createElement("div", {
+        "data-anim-note": "1",
+        onClick: () => handleOpenNote(latestNote),
+        style: {
+          position: "relative",
+          background: latestNote.seen_at
+            ? "linear-gradient(135deg, #FFFFFF 0%, #F8F9FB 100%)"
+            : "linear-gradient(135deg, #FFF8E7 0%, #FFEFD0 100%)",
+          border: `1px solid ${latestNote.seen_at ? C.border : "#EFD89B"}`,
+          borderRadius: "20px",
+          padding: "18px 20px",
+          marginBottom: "16px",
+          cursor: "pointer",
+          boxShadow: latestNote.seen_at ? "0 1px 3px rgba(0,0,0,0.04)" : "0 6px 18px rgba(232,180,80,0.20)",
+          animation: noteDismissing
+            ? "noteDismiss 280ms cubic-bezier(0.16,1,0.3,1) forwards"
+            : (notesEntered ? `noteRise 460ms cubic-bezier(0.16,1,0.3,1) both` : "none"),
+          transition: "background 220ms ease, border-color 220ms ease, box-shadow 220ms ease",
+        }
+      },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
+          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: latestNote.seen_at ? C.textLight : "#A77820", letterSpacing: "1.5px", textTransform: "uppercase" } },
+            `${latestNote.teacher_name || "선생님"} 선생님의 메모`
+          ),
+          !latestNote.seen_at && React.createElement("div", { style: { fontSize: "16px", lineHeight: 1 } }, "✉️")
+        ),
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: C.text, lineHeight: 1.5, marginBottom: "10px" } },
+          latestNote.note_type === "voice"
+            ? "🎙 음성 메모가 도착했어요"
+            : (() => {
+                const raw = latestNote.text_content || latestNote.structured?.wentWell || "메모가 도착했어요";
+                return raw.length > 90 ? raw.slice(0, 90) + "…" : raw;
+              })()
+        ),
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+          React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, latestNote.session_date),
+          React.createElement("div", { style: { fontSize: "11px", color: C.textMid, fontWeight: "600" } }, latestNote.seen_at ? "다시 보기 →" : "열어보기 →")
+        ),
+        // Dismiss affordance — only after seen
+        latestNote.seen_at && React.createElement("button", {
+          onClick: (e) => handleDismissNote(e, latestNote.id),
+          "aria-label": "보관함으로",
+          title: "보관함으로",
+          style: { position: "absolute", top: "10px", right: "10px", width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: C.textLight, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT }
+        }, "✕")
+      ),
+
+      // ── Archive entry — only show if there's any note history at all ──────
+      notesEnabled && allNotes.length > 0 && React.createElement("button", {
+        onClick: () => setArchiveOpen(true),
+        style: { display: "block", margin: "-4px 0 16px auto", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }
+      }, `🗂 보관함 (${allNotes.length})`),
+
       // ── Stats card ─────────────────────────────────────────────────────────
       React.createElement("div", {
         style: {
@@ -19713,7 +20268,20 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
         from { opacity: 1; }
         to   { opacity: 0; }
       }
-    `)
+    `),
+
+    // ── Session-note open sheet ─────────────────────────────────────────────
+    openNote && React.createElement(SessionNoteSheet, {
+      note: openNote,
+      onClose: () => setOpenNote(null),
+      showFirstOpenFraming: showFirstOpenFraming && openNote.id === latestNote?.id,
+    }),
+
+    // ── Session-note archive sheet ──────────────────────────────────────────
+    archiveOpen && React.createElement(SessionNoteArchiveSheet, {
+      notes: allNotes,
+      onClose: () => setArchiveOpen(false),
+    })
   );
 }
 
