@@ -721,6 +721,14 @@ const db = {
   upsert: (t, d) => sb(t, { method: "POST", body: JSON.stringify(d), headers: { "Prefer": "resolution=merge-duplicates,return=representation" } }),
 };
 
+// Normalize "smart" quotes (curly apostrophes ' ' and curly double quotes " ") to ASCII
+// equivalents. Auto-correct on macOS/iOS frequently substitutes them, which then breaks
+// substring search and ilike dedup against entries stored with the other variant — silently
+// creating duplicate phrase_bank rows. Used by phrase save/search paths in AddPhrasesTab.
+const normalizeQuotes = (s) => (s || "")
+  .replace(/[‘’]/g, "'")
+  .replace(/[“”]/g, '"');
+
 // ── Phrase queue scope ──────────────────────────────────────────────────────
 // session_phrases holds both group phrases (group_id set, student_id null) and
 // personal phrases (student_id set, group_id null). This builds the PostgREST
@@ -9892,11 +9900,13 @@ function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showM
   const handleAddNomination = async (nom) => {
     if (!selectedGroup) return;
     try {
-      // Check if already in phrase bank
-      const existing = await db.get("phrase_bank", `english=eq.${encodeURIComponent(nom.english)}`).catch(() => []);
+      // Apostrophe-tolerant dedup; normalize english on insert so future rows are consistent.
+      const englishClean = normalizeQuotes(nom.english);
+      const dedupPattern = englishClean.replace(/'/g, "_");
+      const existing = await db.get("phrase_bank", `english=ilike.${encodeURIComponent(dedupPattern)}`).catch(() => []);
       let phrase;
       if (existing.length > 0) { phrase = existing[0]; }
-      else { const wordMap = await generateWordMap(nom.english, nom.korean || "").catch(() => null); const r = await db.insert("phrase_bank", { english: nom.english, korean: nom.korean || "", context: nom.context || "", word_map: wordMap ? JSON.stringify(wordMap) : null }); phrase = Array.isArray(r) ? r[0] : r; }
+      else { const wordMap = await generateWordMap(englishClean, nom.korean || "").catch(() => null); const r = await db.insert("phrase_bank", { english: englishClean, korean: nom.korean || "", context: nom.context || "", word_map: wordMap ? JSON.stringify(wordMap) : null }); phrase = Array.isArray(r) ? r[0] : r; }
       // Check for dup in session
       const dup = groupPhrases.find(sp => sp.phrase_bank?.english === nom.english);
       if (dup) { showMsg("Already in session: " + nom.english, "warn"); return; }
@@ -9985,8 +9995,9 @@ function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showM
   const handleEnglishChange = val => {
     setEnglish(val);
     if (val.length > 0) {
-      const q = val.toLowerCase();
-      const m = phraseBank.filter(p => p.english.toLowerCase().includes(q));
+      // Normalize both sides so typing "I'm" (straight) matches stored "I'm" (curly) and v.v.
+      const q = normalizeQuotes(val).toLowerCase();
+      const m = phraseBank.filter(p => normalizeQuotes(p.english).toLowerCase().includes(q));
       setSuggestions(m.slice(0, 8));
       setShowSug(m.length > 0);
     } else {
@@ -9995,10 +10006,22 @@ function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showM
     }
   };
 
-  const selectSuggestion = p => {
+  const selectSuggestion = async p => {
     const dup = groupPhrases.find(sp => sp.phrase_id === p.id);
     if (dup) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent"), "warn"); setShowSug(false); return; }
     setEnglish(p.english); setKorean(p.korean || ""); setContext(p.context || ""); setShowSug(false);
+    // Pre-fill the tag picker with the phrase's existing tags so re-adding a tagged
+    // phrase doesn't force the teacher to re-select tags they already chose.
+    try {
+      const rows = await db.get("phrase_tags", `phrase_id=eq.${p.id}&select=tag_id`).catch(() => []);
+      let tagIds = (rows || []).map(r => r.tag_id).filter(Boolean);
+      if (tagIds.length === 0 && p.tag) tagIds = [p.tag]; // legacy single-tag fallback
+      if (tagIds.length > 0) {
+        setSelectedTags(tagIds);
+        const firstTag = situationTags.find(t => t.id === tagIds[0]);
+        if (firstTag) setSelectedTag(firstTag);
+      }
+    } catch(e) {}
   };
 
   const handleEnglishBlur = async () => {
@@ -10107,8 +10130,12 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
     try {
       const tagsToSave = chosenTags.length > 0 ? chosenTags : [(selectedTag || suggestedTag)?.id].filter(Boolean);
       const primaryTag = tagsToSave[0] || null;
-      // Use ilike for case-insensitive match without double-encoding issues
-      const existing = await db.get("phrase_bank", `english=ilike.${encodeURIComponent(english.trim())}`).catch(() => []);
+      // Normalize curly apostrophes so the stored english is consistent, and swap
+      // apostrophes for `_` (ilike single-char wildcard) in the dedup pattern so we
+      // still match an existing row regardless of which apostrophe style it used.
+      const englishClean = normalizeQuotes(english.trim());
+      const dedupPattern = englishClean.replace(/'/g, "_");
+      const existing = await db.get("phrase_bank", `english=ilike.${encodeURIComponent(dedupPattern)}`).catch(() => []);
       let phrase;
       if (existing.length > 0) {
         phrase = existing[0];
@@ -10117,8 +10144,8 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
           phrase = { ...phrase, korean: korean.trim() || phrase.korean, context: context.trim() || phrase.context, tag: primaryTag };
         }
       } else {
-        const wordMap = await generateWordMap(english.trim(), korean.trim()).catch(() => null);
-        const r = await db.insert("phrase_bank", { english: english.trim(), korean: korean.trim(), context: context.trim(), tag: primaryTag, word_map: wordMap ? JSON.stringify(wordMap) : null });
+        const wordMap = await generateWordMap(englishClean, korean.trim()).catch(() => null);
+        const r = await db.insert("phrase_bank", { english: englishClean, korean: korean.trim(), context: context.trim(), tag: primaryTag, word_map: wordMap ? JSON.stringify(wordMap) : null });
         phrase = Array.isArray(r) ? r[0] : r;
         if (!phrase?.id) throw new Error("Failed to create phrase — check database connection");
       }
@@ -10140,9 +10167,12 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
   const addGeneratedPhrase = async p => {
     if (!selectedGroup) return;
     try {
-      const existing = await db.get("phrase_bank", `english=eq.${encodeURIComponent(p.english)}`);
+      // Apostrophe-tolerant dedup; normalize english on insert so future rows are consistent.
+      const englishClean = normalizeQuotes(p.english);
+      const dedupPattern = englishClean.replace(/'/g, "_");
+      const existing = await db.get("phrase_bank", `english=ilike.${encodeURIComponent(dedupPattern)}`).catch(() => []);
       let phrase;
-      if (existing.length > 0) { phrase = existing[0]; } else { const wordMap = await generateWordMap(p.english, p.korean).catch(() => null); const r = await db.insert("phrase_bank", { english: p.english, korean: p.korean, context: p.context, word_map: wordMap ? JSON.stringify(wordMap) : null }); phrase = Array.isArray(r) ? r[0] : r; }
+      if (existing.length > 0) { phrase = existing[0]; } else { const wordMap = await generateWordMap(englishClean, p.korean).catch(() => null); const r = await db.insert("phrase_bank", { english: englishClean, korean: p.korean, context: p.context, word_map: wordMap ? JSON.stringify(wordMap) : null }); phrase = Array.isArray(r) ? r[0] : r; }
       const dup = groupPhrases.find(sp => sp.phrase_id === phrase.id);
       if (dup && scopeStudentIds.length === 0) { showMsg("Already in " + (dup.in_library ? "Library" : "Most Recent") + ": " + p.english, "warn"); return; }
       const groupRow = await insertScopedPhrase(phrase.id);
