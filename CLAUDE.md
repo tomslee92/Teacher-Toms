@@ -91,14 +91,10 @@ The `pickVariant(poolKey, options)` helper with `lastVariantRef` tracker prevent
 4. Today's QoD card (above week phrases — coral/red if unanswered, green if answered)
 5. Week phrases card (tiered: Tier 1 unpassed-this-week, Tier 2 all-this-week-passed-for-review, Tier 3 group library fallback)
 
-### Home data pre-fetch architecture
-- `homeData` state lives in `AppInner`
-- `fetchHomeData(user, group)` callback runs all 5 queries in parallel (active_time_segments, student_progress, session_phrases+phrase_bank, qod_prompts, qod_responses)
-- Fires on `[user?.id, groups]` change after login — data ready before student reaches home
-- Passed down: AppInner → StudentScreen → HomeGridV2 as `homeData` prop
-- `refreshHomeData` callback also passed down; StudentScreen calls it on mount (catches return-from-Wavi case)
-- HomeGridV2 initializes state from props if available, useEffect on `homeData?.fetchedAt` syncs state when refresh fires
-- Internal fetch effect kept as fallback (only runs if homeData prop missing)
+### Home data fetch architecture
+- **`HomeGridV2` self-fetches its own data** in a single `useEffect` keyed on `[user?.id, isPreview, group?.id]`. There is NO `AppInner.fetchHomeData`/`homeData` prop layer (an earlier design that was removed — ignore older references to it).
+- The effect runs these in parallel: weekly `active_time_segments`, lifetime `student_progress` (phrases mastered), tiered week phrases (`session_phrases`+`phrase_bank`), today's QoD (`qod_prompts`+`qod_responses`), and — gated by `session_notes_enabled` — `session_notes`.
+- `cardsReady` flag gates a choreographed below-the-fold entrance once data settles (or a 600ms safety cap).
 
 ### Active time tracking
 - `active_time_segments` table: `(id, student_id, date, seconds, source, created_at)` with indexes
@@ -109,12 +105,23 @@ The `pickVariant(poolKey, options)` helper with `lastVariantRef` tracker prevent
 - Auto-end Wavi session after 5min backgrounded via `manualExitRef` + `handleExitRef`
 - Teacher dashboard shows weekly active minutes ("N분 / 주")
 
-### student_progress (recently fixed bug)
-Wavi sessions now correctly write `passed: true` to `student_progress` when a phrase is mastered. Previously this was only written to `wavy_phrase_attempts` (analytics table), which caused passed phrases to cycle back next session.
+### student_progress + Wavi resume (fixed 2026-06-01, commit dd5d010)
+Wavi sessions now write `passed: true` to `student_progress` when a phrase is mastered. Previously this was written ONLY to `wavy_phrase_attempts` (analytics), so mastered phrases stayed in the "unpassed" pool — Wavi rebuilt the same first 5 phrases (`unpassed.slice(0,5)`) every session and students never reached phrases 6+. (An earlier version of this doc claimed the fix was in place; it was not — it was actually landed in dd5d010.)
 
-The fix is in `celebrateAndAdvance` — upserts `{passed: true, best_score: max(8, existing), attempts: existing+1, needs_retry: false}` to student_progress.
+The fix is in `celebrateAndAdvance` — fire-and-forget upsert of `{passed: true, best_score: max(8, existing), attempts: existing+1, needs_retry: false}` to student_progress, mirroring the PhraseCard pattern.
+
+Resume cursor: `wavy_memory.last_phrase_idx` already handles mid-session resume (interrupt → `currentIdx`; completed → 0). With masteries now persisted, "0" correctly means "first still-unpassed phrase." When all are passed, init hits the "이번 주에 연습할 표현이 없어요" finished-state.
 
 **Caveat**: Only applies to NEW masteries post-fix. Old Wavi-mastered phrases still count as unpassed unless re-mastered.
+
+### Session Notes (teacher → student) + Student Feedback (student → teacher)
+Two communication features sharing the QoD voice infra (`useRecorder` ~1898, `RecordButton` ~2269, `transcribe` Groq Whisper ~1645, `geminiCallForFeedback` ~92) and the public `session-notes-audio` storage bucket. Both gated independently.
+
+- **Tables**: `session_notes` (teacher→student: text/voice/structured jsonb, `seen_at`/`dismissed_at`) and `student_notes` (student→teacher: `is_anonymous`, `prompt_context`='continuous', `teacher_seen_at`, `reply_session_note_id` → session_notes). Migration: `supabase/migrations/20260601_session_and_student_notes.sql`.
+- **Flags** (students table, default false; Toms always sees via name fallback): `session_notes_enabled` (📝), `student_feedback_enabled` (💬). Toggles live next to 🌊/🏠 in the student detail modal.
+- **Audio paths** in the shared bucket: `teacher-notes/{student_id}/…` (session notes), `student-notes/{student_id}/…` (feedback). `uploadSessionNoteAudio(blob, label, folder)`.
+- **Components**: `SessionNoteComposer` (teacher, AI-drafts from text+voice; reply mode via `replyTo` prop links `reply_session_note_id`), `SessionNoteSheet`/`SessionNoteArchiveSheet` + custom `NoteWaveformPlayer` (~19347), `StudentFeedbackComposer` (student bottom-sheet, prompts/anonymity), `StudentTeacherComms` (profile-menu "선생님과의 소통" = archive + send-a-note), `StudentNotesReceived` (teacher per-student, **attributed-only** — anonymity preserved), `StudentNotesInbox` (global dashboard 💬 tab, anonymous shown as "익명 학생", no reply).
+- **Teacher identity**: `resolveTeacherAccount()` (cached, by TEACHER_NAMES) gives student-addressed feedback a real `teacher_id`. Multi-teacher assignment is intentionally NOT built — `teacher_name` is always read from the row, never hardcoded.
 
 ### Multi-tag system
 - `phrase_tags` junction table for many-to-many phrase ↔ tag relationships
