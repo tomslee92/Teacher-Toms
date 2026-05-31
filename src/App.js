@@ -754,11 +754,15 @@ async function fetchDismissedPhraseIds(studentId) {
 // Same pattern as the QoD teacher comment upload (line ~19795): POST to the
 // public storage bucket, fall back to an inline data-URL if upload fails so the
 // note still saves rather than silently losing the recording.
-async function uploadSessionNoteAudio(blob, label) {
+async function uploadSessionNoteAudio(blob, label, folder) {
   const mime = blob.type || "audio/webm";
   const ext = mime.includes("mp4") ? "mp4" : mime.includes("ogg") ? "ogg" : "webm";
   const safeLabel = String(label || "x").replace(/[^a-z0-9-]/gi, "").slice(0, 12) || "x";
-  const fn = `note_${safeLabel}_${Date.now()}.${ext}`;
+  // Optional folder prefix (e.g. "student-notes/{student_id}") so the two note
+  // features keep separate paths in the shared bucket. Falls back to flat naming.
+  const safeFolder = folder ? String(folder).replace(/[^a-z0-9/_-]/gi, "") : "";
+  const base = `note_${safeLabel}_${Date.now()}.${ext}`;
+  const fn = safeFolder ? `${safeFolder}/${base}` : base;
   try {
     const up = await fetch(`${SUPABASE_URL}/storage/v1/object/session-notes-audio/${fn}`, {
       method: "POST",
@@ -773,6 +777,21 @@ async function uploadSessionNoteAudio(blob, label) {
     r.onerror = rej;
     r.readAsDataURL(blob);
   });
+}
+
+// Resolve the (single, for now) teacher account so student → teacher feedback can
+// be addressed with a real teacher_id. Cached for the session. Multi-teacher
+// assignment is intentionally out of scope; this returns the first teacher account.
+let _teacherAccountCache = null;
+async function resolveTeacherAccount() {
+  if (_teacherAccountCache) return _teacherAccountCache;
+  try {
+    const list = TEACHER_NAMES.map(n => `"${encodeURIComponent(n)}"`).join(",");
+    const rows = await db.get("students", `name=in.(${list})&select=id,name&limit=1`).catch(() => []);
+    if (rows && rows[0]) { _teacherAccountCache = rows[0]; return rows[0]; }
+  } catch(e) {}
+  // Fallback: a stable string id so the NOT NULL column is always populated.
+  return { id: "teacher", name: TEACHER_DISPLAY_NAME };
 }
 
 // ── Colors ────────────────────────────────────────────────────────────────────
@@ -7317,6 +7336,12 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
   const [rateLimitAlerts, setRateLimitAlerts] = useState([]);
   const [alertsDismissed, setAlertsDismissed] = useState(false);
   const [inboxUnread, setInboxUnread] = useState(0);
+  const [notesUnread, setNotesUnread] = useState(0);
+  const [pendingReply, setPendingReply] = useState(null); // student_note being replied to from the global inbox
+
+  const refreshNotesUnread = useCallback(() => {
+    db.get("student_notes", "teacher_seen_at=is.null&select=id").catch(() => []).then(rows => setNotesUnread((rows || []).length));
+  }, []);
 
   const showMsg = useCallback((text, type = "success") => {
     setMsg({ text, type });
@@ -7343,6 +7368,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     fetchRateLimitAlerts();
     // Fetch unread inbox messages count
     db.get("student_messages", "replied=eq.false&order=created_at.desc").catch(() => []).then(msgs => setInboxUnread(msgs.length));
+    refreshNotesUnread();
   }, []);
 
   // Re-check every 2 minutes while teacher is on dashboard
@@ -7370,6 +7396,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     { id: "today", label: "Today", icon: "📋" },
     { id: "students", label: "Students", icon: "👥" },
     { id: "inbox", label: "Inbox", icon: "📬", badge: inboxUnread },
+    { id: "notes", label: "Notes", icon: "💬", badge: notesUnread },
     { id: "ai_tools", label: "AI Tools", icon: "🤖" },
     { id: "setup", label: "Setup", icon: "⚙️" },
   ];
@@ -7502,6 +7529,9 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
                   setSelectedStudent(prev => ({ ...prev, group_id: newGroupId }));
                   setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, group_id: newGroupId } : s));
                 }}
+                pendingReply={pendingReply}
+                onPendingReplyHandled={() => setPendingReply(null)}
+                onNotesSeen={refreshNotesUnread}
               />
             )}
 
@@ -7509,6 +7539,18 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
               React.createElement(TeacherInboxTab, { students, showMsg, onReply: () => {
                 db.get("student_messages", "replied=eq.false&order=created_at.desc").catch(() => []).then(msgs => setInboxUnread(msgs.length));
               }})
+            )}
+
+            {tab === "notes" && (
+              React.createElement(StudentNotesInbox, {
+                students, showMsg,
+                onChanged: refreshNotesUnread,
+                onReplyTo: (note) => {
+                  const stu = students.find(s => s.id === note.student_id);
+                  if (stu) { setSelectedStudent(stu); setPendingReply(note); setTab("students"); }
+                  else { showMsg("Student not found", "error"); }
+                },
+              })
             )}
 
             {tab === "ai_tools" && (
@@ -8293,7 +8335,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
 }
 
 // ── Student Detail View ───────────────────────────────────────────────────────
-function StudentDetailView({ student, students, groups, showMsg, teacher, onBack, onRename, onDelete, onUpdateGroup }) {
+function StudentDetailView({ student, students, groups, showMsg, teacher, onBack, onRename, onDelete, onUpdateGroup, pendingReply, onPendingReplyHandled, onNotesSeen }) {
   const [qodHistory, setQodHistory] = useState([]);
   const [phraseProgress, setPhraseProgress] = useState([]);
   const [savedPhrases, setSavedPhrases] = useState([]);
@@ -8319,6 +8361,11 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
     } catch(e) {}
   }, [student.id]);
   useEffect(() => { refreshPastNotes(); }, [refreshPastNotes]);
+  // Received-feedback reply state. A reply may also arrive from the global inbox
+  // (pendingReply) — open the composer pre-loaded when it does.
+  const [noteReplyTo, setNoteReplyTo] = useState(null);
+  const [receivedRefresh, setReceivedRefresh] = useState(0);
+  useEffect(() => { if (pendingReply) { setNoteReplyTo(pendingReply); if (onPendingReplyHandled) onPendingReplyHandled(); } }, [pendingReply?.id]);
 
   const group = groups.find(g => g.id === localStudent.group_id);
 
@@ -8612,6 +8659,20 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
+          {/* Student Feedback toggle — gates the student-side "선생님께 한마디" channel */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+            <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>💬</span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>Student Feedback (Beta)</span>
+              <button onClick={async () => {
+                const newVal = !localStudent.student_feedback_enabled;
+                await db.update("students", `id=eq.${localStudent.id}`, { student_feedback_enabled: newVal }).catch(() => {});
+                setLocalStudent(prev => ({ ...prev, student_feedback_enabled: newVal }));
+              }} style={{ padding: "4px 12px", borderRadius: "100px", border: "none", background: localStudent.student_feedback_enabled ? "#22c55e" : "rgba(255,255,255,0.1)", color: "#fff", fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>
+                {localStudent.student_feedback_enabled ? "✓ On" : "Off"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -8711,7 +8772,20 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
           Framed as "occasional, when worth saying" rather than per-session feedback. */}
       {teacher && (
         <div style={{ marginBottom: "28px" }}>
-          <SessionNoteComposer student={localStudent} teacher={teacher} showMsg={showMsg} onSaved={refreshPastNotes} />
+          <SessionNoteComposer
+            student={localStudent}
+            teacher={teacher}
+            showMsg={showMsg}
+            onSaved={() => { refreshPastNotes(); setReceivedRefresh(x => x + 1); }}
+            replyTo={noteReplyTo}
+            onReplyHandled={() => setNoteReplyTo(null)}
+          />
+          <StudentNotesReceived
+            student={localStudent}
+            onReplyTo={setNoteReplyTo}
+            refreshSignal={receivedRefresh}
+            onSeen={onNotesSeen}
+          />
           {pastNotes.length > 0 && (
             <div style={{ marginTop: "14px" }}>
               <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
@@ -18790,6 +18864,7 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
       React.createElement("button", { onClick: () => setShowHelp(true), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bgSoft, color: C.textMid, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, marginBottom: "20px" } },
         "❓ ", lang === "zh" ? "帮助 & 자주 묻는 질문" : "도움말 & 자주 묻는 질문"
       ),
+      React.createElement(StudentTeacherComms, { user: localUser }),
       React.createElement("div", { style: { marginBottom: "16px" } },
         React.createElement("label", { style: labelStyle }, lang === "zh" ? "姓名" : "이름"),
         React.createElement("div", { style: { ...inputStyle, background: C.bgSoft, color: C.textMid } }, user?.name)
@@ -19524,7 +19599,7 @@ function SessionNoteArchiveSheet({ notes, onClose }) {
 // Teacher composer for leaving an occasional personal note (메모) to a student.
 // Reuses useRecorder + RecordButton + transcribe + the QoD AI-draft pattern.
 // Collapsed by default to honor "occasional, not routine."
-function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
+function SessionNoteComposer({ student, teacher, showMsg, onSaved, replyTo, onReplyHandled }) {
   const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
   const [sessionDate, setSessionDate] = useState(today);
@@ -19551,10 +19626,17 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
   };
   const rec = useRecorder(handleRecorded);
 
+  // When the teacher hits "답장하기" on a received student note, open the composer
+  // expanded so they can reply right here. The originating note is linked on save.
+  useEffect(() => {
+    if (replyTo) setOpen(true);
+  }, [replyTo?.id]);
+
   const reset = () => {
     setText(""); setWentWell(""); setWorkOn("");
     setAudioBlob(null); setAudioUrl(null); setAudioDuration(0);
     setFormat("free"); setSessionDate(today); setOpen(false);
+    if (onReplyHandled) onReplyHandled();
   };
 
   const generateDraft = async (roughText) => {
@@ -19612,11 +19694,11 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
     try {
       let url = null, dur = null;
       if (hasAudio) {
-        url = await uploadSessionNoteAudio(audioBlob, student.id);
+        url = await uploadSessionNoteAudio(audioBlob, student.id, `teacher-notes/${student.id}`);
         dur = audioDuration || null;
       }
       const noteType = hasText && url ? "both" : (url ? "voice" : "text");
-      await db.insert("session_notes", {
+      const inserted = await db.insert("session_notes", {
         student_id: student.id,
         teacher_id: teacher.id,
         teacher_name: teacher.name,
@@ -19627,8 +19709,14 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
         audio_url: url,
         audio_duration: dur,
       });
+      // If this note is a reply to a student's feedback, close the loop by linking
+      // the new session note back to the originating student_note.
+      const newNoteId = Array.isArray(inserted) && inserted[0] ? inserted[0].id : null;
+      if (replyTo?.id && newNoteId) {
+        await db.update("student_notes", `id=eq.${replyTo.id}`, { reply_session_note_id: newNoteId }).catch(() => {});
+      }
       reset();
-      showMsg && showMsg("✓ 메모 보냈어요");
+      showMsg && showMsg(replyTo ? "✓ 답장을 보냈어요" : "✓ 메모 보냈어요");
       onSaved && onSaved();
     } catch(e) { showMsg && showMsg("저장 실패: " + e.message, "error"); }
     setSaving(false);
@@ -19654,8 +19742,13 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
     style: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", fontFamily: FONT }
   },
     React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
-      React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text } }, `📝 ${student.name} 메모`),
+      React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text } }, replyTo ? `↩ ${student.name}에게 답장` : `📝 ${student.name} 메모`),
       React.createElement("button", { onClick: reset, style: { background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT } }, "닫기")
+    ),
+    replyTo && React.createElement("div", { style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", marginBottom: "12px" } },
+      React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, "답장할 메모"),
+      React.createElement("div", { style: { fontSize: "13px", color: C.textMid, lineHeight: 1.5, fontStyle: "italic" } },
+        replyTo.note_type === "voice" ? "🎙 음성 메모" : `"${(replyTo.text_content || "").slice(0, 120)}"`)
     ),
     React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px" } },
       React.createElement("input", {
@@ -19706,6 +19799,313 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved }) {
         style: { padding: "8px 18px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "12px", fontWeight: "800", cursor: saving ? "default" : "pointer", fontFamily: FONT, opacity: saving ? 0.6 : 1 }
       }, saving ? "보내는 중…" : "보내기")
     )
+  );
+}
+
+// ── Student Feedback (student → teacher) ──────────────────────────────────────
+// Always-available channel for a student to send Toms a note. Text or voice,
+// attributed by default with an anonymous option. Reuses useRecorder/RecordButton
+// and the session-notes-audio bucket. Bottom sheet, Apple-caliber motion.
+const FEEDBACK_PROMPTS = [
+  "지금 가장 바꾸고 싶은 게 있다면?",
+  "어떤 점이 제일 좋아요?",
+  "혹시 마음에 있던 말이 있나요?",
+];
+function StudentFeedbackComposer({ user, onClose, onSent }) {
+  const [text, setText] = useState("");
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isAnon, setIsAnon] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const handleRecorded = (blob) => {
+    setAudioBlob(blob);
+    const u = URL.createObjectURL(blob);
+    setAudioUrl(u);
+    try {
+      const a = new Audio(u);
+      a.addEventListener("loadedmetadata", () => { if (a.duration && isFinite(a.duration)) setAudioDuration(Math.round(a.duration)); });
+    } catch(_) {}
+  };
+  const rec = useRecorder(handleRecorded);
+
+  const handleSend = async () => {
+    const hasText = !!text.trim();
+    const hasAudio = !!audioBlob;
+    if (!hasText && !hasAudio) return;
+    setSending(true);
+    try {
+      const teacher = await resolveTeacherAccount();
+      let url = null, dur = null;
+      if (hasAudio) {
+        url = await uploadSessionNoteAudio(audioBlob, user.id, `student-notes/${user.id}`);
+        dur = audioDuration || null;
+      }
+      const noteType = hasText && url ? "both" : (url ? "voice" : "text");
+      await db.insert("student_notes", {
+        student_id: user.id,                 // always recorded; anonymity honored in teacher UI
+        teacher_id: teacher.id,
+        is_anonymous: isAnon,
+        prompt_context: "continuous",
+        note_type: noteType,
+        text_content: hasText ? text.trim() : null,
+        audio_url: url,
+        audio_duration: dur,
+      });
+      setSent(true);
+      if (onSent) onSent();
+      setTimeout(() => { onClose && onClose(); }, 1400);
+    } catch(e) {
+      setSending(false);
+    }
+  };
+
+  const sheetStyle = { background: "#fff", width: "100%", maxWidth: "520px", maxHeight: "88vh", borderRadius: "24px 24px 0 0", padding: "10px 22px calc(28px + env(safe-area-inset-bottom)) 22px", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "noteSheetUp 400ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT };
+
+  return ReactDOM.createPortal(
+    React.createElement("div", {
+      onClick: () => { if (!sending && !sent) onClose && onClose(); },
+      style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "flex-end", justifyContent: "center", animation: "fadeIn 200ms ease-out" }
+    },
+      React.createElement("style", null, "@keyframes noteSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}} @keyframes sendConfirmIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}} @media (prefers-reduced-motion: reduce){[data-fb-sheet],[data-fb-confirm]{animation:none !important}}"),
+      sent
+        ? React.createElement("div", { "data-fb-confirm": "1", onClick: e => e.stopPropagation(), style: { ...sheetStyle, alignItems: "center", textAlign: "center", padding: "48px 28px calc(56px + env(safe-area-inset-bottom))", animation: "sendConfirmIn 400ms cubic-bezier(0.16,1,0.3,1)" } },
+            React.createElement("div", { style: { fontSize: "34px", marginBottom: "14px" } }, "💛"),
+            React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: C.text, marginBottom: "6px", letterSpacing: "-0.3px" } }, "잘 받았어요. 감사합니다."),
+            React.createElement("div", { style: { fontSize: "13px", color: C.textLight, lineHeight: 1.5 } }, "보내주신 메모는 진심으로 읽고 반영할게요.")
+          )
+        : React.createElement("div", { "data-fb-sheet": "1", onClick: e => e.stopPropagation(), style: sheetStyle },
+            React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: C.border, margin: "4px auto 18px" } }),
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" } },
+              React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px" } }, "선생님께 한마디"),
+              React.createElement("button", { onClick: () => onClose && onClose(), "aria-label": "Close", style: { background: "transparent", border: "none", fontSize: "22px", color: C.textLight, cursor: "pointer", lineHeight: 1, padding: "0 4px" } }, "✕")
+            ),
+            React.createElement("div", { style: { fontSize: "12px", color: C.textLight, marginBottom: "16px", lineHeight: 1.5 } }, "편하게 적어주세요. 어떤 이야기든 좋아요."),
+            React.createElement("div", { style: { overflowY: "auto" } },
+              // Soft prompt suggestions — tap to pre-load
+              React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" } },
+                FEEDBACK_PROMPTS.map((p, i) => React.createElement("button", {
+                  key: i,
+                  onClick: () => setText(t => t ? t : p),
+                  style: { padding: "7px 12px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bgSoft, color: C.textMid, fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: FONT, lineHeight: 1.3, textAlign: "left" }
+                }, p))
+              ),
+              React.createElement("textarea", {
+                value: text, onChange: e => setText(e.target.value),
+                placeholder: "여기에 적어주세요…", rows: 4,
+                style: { width: "100%", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FONT, color: C.text, resize: "vertical", boxSizing: "border-box", marginBottom: "12px", outline: "none" }
+              }),
+              // Voice
+              React.createElement("div", { style: { background: "#F7F8FA", border: `1px solid ${C.border}`, borderRadius: "12px", padding: "12px 14px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "12px" } },
+                React.createElement("div", { style: { fontSize: "12px", color: C.textMid, flexShrink: 0, fontWeight: "600" } }, "🎙 음성"),
+                React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: rec.start, onStop: rec.stop, idleLabel: "녹음", size: "sm" }),
+                audioUrl && React.createElement("div", { style: { flex: 1, fontSize: "11px", color: C.textMid, display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" } },
+                  React.createElement("span", null, audioDuration ? `녹음됨 · ${audioDuration}초` : "녹음됨"),
+                  React.createElement("button", { onClick: () => { setAudioBlob(null); setAudioUrl(null); setAudioDuration(0); }, style: { background: "transparent", border: "none", color: C.error, fontSize: "11px", cursor: "pointer", fontFamily: FONT } }, "지우기")
+                )
+              ),
+              // Anonymity toggle (default OFF)
+              React.createElement("div", { style: { borderRadius: "12px", border: `1px solid ${isAnon ? "#EFD89B" : C.border}`, background: isAnon ? C.goldBg : C.bg, padding: "12px 14px", marginBottom: "16px", transition: "background 200ms ease, border-color 200ms ease" } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" } },
+                  React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: C.text } }, "익명으로 보내기"),
+                  React.createElement("button", {
+                    onClick: () => setIsAnon(v => !v),
+                    "aria-label": "익명 토글",
+                    style: { width: "44px", height: "26px", borderRadius: "100px", border: "none", background: isAnon ? C.gold : C.bgMid, position: "relative", cursor: "pointer", transition: "background 200ms ease", flexShrink: 0 }
+                  },
+                    React.createElement("span", { style: { position: "absolute", top: "3px", left: isAnon ? "21px" : "3px", width: "20px", height: "20px", borderRadius: "50%", background: "#fff", transition: "left 200ms cubic-bezier(0.16,1,0.3,1)", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" } })
+                  )
+                ),
+                isAnon && React.createElement("div", { style: { fontSize: "11px", color: "#A77820", lineHeight: 1.5, marginTop: "10px" } }, "익명으로 보내시면 선생님이 직접 답해드리진 못해요. 하지만 모든 메모는 진심으로 읽고 반영합니다.")
+              )
+            ),
+            React.createElement("button", {
+              onClick: handleSend, disabled: sending || (!text.trim() && !audioBlob),
+              style: { width: "100%", padding: "14px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "14px", fontWeight: "800", cursor: (sending || (!text.trim() && !audioBlob)) ? "default" : "pointer", fontFamily: FONT, opacity: (sending || (!text.trim() && !audioBlob)) ? 0.5 : 1 }
+            }, sending ? "보내는 중…" : "보내기")
+          )
+    ),
+    document.body
+  );
+}
+
+// ── Student profile → "선생님과의 소통" ─────────────────────────────────────────
+// One coherent communication-with-Toms area in the profile menu: the received
+// session-note archive + the send-Toms-a-note composer. Each half gated
+// independently (mirrors home surfaces; Toms always sees both as a fallback).
+function StudentTeacherComms({ user }) {
+  const notesEnabled = !!(user?.session_notes_enabled || user?.name === "Toms Lee");
+  const feedbackEnabled = !!(user?.student_feedback_enabled || user?.name === "Toms Lee");
+  const [notes, setNotes] = useState([]);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!notesEnabled || !user?.id) return;
+    db.get("session_notes", `student_id=eq.${user.id}&select=*&order=session_date.desc,created_at.desc`)
+      .then(rows => setNotes(rows || [])).catch(() => {});
+  }, [user?.id, notesEnabled]);
+
+  if (!notesEnabled && !feedbackEnabled) return null;
+
+  const rowStyle = { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "13px 14px", background: C.bg, border: "none", borderTop: `1px solid ${C.border}`, cursor: "pointer", fontFamily: FONT, textAlign: "left" };
+
+  return React.createElement("div", { style: { marginBottom: "20px" } },
+    React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: C.textMid, marginBottom: "8px" } }, "선생님과의 소통"),
+    React.createElement("div", { style: { borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" } },
+      notesEnabled && React.createElement("button", { onClick: () => setArchiveOpen(true), style: { ...rowStyle, borderTop: "none" } },
+        React.createElement("span", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+          React.createElement("span", { style: { fontSize: "16px" } }, "🗂"),
+          React.createElement("span", { style: { fontSize: "14px", fontWeight: "600", color: C.text } }, "받은 메모 보관함")
+        ),
+        React.createElement("span", { style: { fontSize: "12px", color: C.textLight } }, `${notes.length} ›`)
+      ),
+      feedbackEnabled && React.createElement("button", { onClick: () => setComposerOpen(true), style: rowStyle },
+        React.createElement("span", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+          React.createElement("span", { style: { fontSize: "16px" } }, "💬"),
+          React.createElement("span", null,
+            React.createElement("span", { style: { fontSize: "14px", fontWeight: "600", color: C.text, display: "block" } }, "선생님께 한마디"),
+            React.createElement("span", { style: { fontSize: "11px", color: C.textLight } }, "하고 싶은 이야기를 편하게 보내요")
+          )
+        ),
+        React.createElement("span", { style: { fontSize: "12px", color: C.textLight } }, "›")
+      )
+    ),
+    archiveOpen && React.createElement(SessionNoteArchiveSheet, { notes, onClose: () => setArchiveOpen(false) }),
+    composerOpen && React.createElement(StudentFeedbackComposer, { user, onClose: () => setComposerOpen(false) })
+  );
+}
+
+// ── Teacher: received feedback from ONE student (in student detail modal) ──────
+// Attributed notes only — anonymous notes are intentionally NOT surfaced here,
+// since showing them under a named student would defeat the anonymity promise.
+// Anonymous notes appear only in the global inbox as "익명 학생".
+function StudentNotesReceived({ student, onReplyTo, refreshSignal, onSeen }) {
+  const [notes, setNotes] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!student?.id) return;
+    let cancelled = false;
+    db.get("student_notes", `student_id=eq.${student.id}&is_anonymous=eq.false&order=created_at.desc`)
+      .then(rows => {
+        if (cancelled) return;
+        setNotes(rows || []);
+        setLoaded(true);
+        // Mark unseen as seen (teacher is viewing them now)
+        const unseen = (rows || []).filter(n => !n.teacher_seen_at);
+        if (unseen.length > 0) {
+          const now = new Date().toISOString();
+          unseen.forEach(n => db.update("student_notes", `id=eq.${n.id}`, { teacher_seen_at: now }).catch(() => {}));
+          if (onSeen) onSeen();
+        }
+      }).catch(() => setLoaded(true));
+    return () => { cancelled = true; };
+  }, [student?.id, refreshSignal]);
+
+  if (!loaded || notes.length === 0) return null;
+
+  return React.createElement("div", { style: { marginTop: "18px" } },
+    React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" } }, `받은 메모 · ${notes.length}`),
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+      notes.map(n => React.createElement("div", { key: n.id, style: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "13px 15px" } },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" } },
+          React.createElement("span", { style: { fontSize: "12px", fontWeight: "700", color: C.text } }, student.name),
+          React.createElement("span", { style: { fontSize: "11px", color: C.textLight } }, new Date(n.created_at).toLocaleDateString("ko-KR"))
+        ),
+        n.text_content && React.createElement("div", { style: { fontSize: "13px", color: C.text, lineHeight: 1.6, marginBottom: n.audio_url ? "10px" : "0", whiteSpace: "pre-wrap" } }, n.text_content),
+        n.audio_url && React.createElement("div", { style: { marginBottom: "4px" } }, React.createElement(NoteWaveformPlayer, { url: n.audio_url, duration: n.audio_duration })),
+        React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px", marginTop: "8px" } },
+          n.reply_session_note_id && React.createElement("span", { style: { fontSize: "11px", color: C.success, fontWeight: "600" } }, "✓ 답장함"),
+          React.createElement("button", {
+            onClick: () => onReplyTo && onReplyTo(n),
+            style: { padding: "6px 14px", borderRadius: "100px", border: `1px solid ${C.navy}`, background: C.bg, color: C.navy, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+          }, "답장하기")
+        )
+      ))
+    )
+  );
+}
+
+// ── Teacher: global received-feedback inbox (dashboard tab) ───────────────────
+// All student_notes, newest first. Anonymous notes show as "익명 학생" with no
+// reply. Attributed notes resolve the student name and offer a reply.
+function StudentNotesInbox({ students, showMsg, onChanged, onReplyTo }) {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all"); // all | unseen
+
+  useEffect(() => {
+    let cancelled = false;
+    db.get("student_notes", "select=*&order=created_at.desc&limit=200").then(rows => {
+      if (cancelled) return;
+      setNotes(rows || []);
+      setLoading(false);
+      // Mark unseen as seen on open (keep local snapshot for this render's emphasis)
+      const unseen = (rows || []).filter(n => !n.teacher_seen_at);
+      if (unseen.length > 0) {
+        const now = new Date().toISOString();
+        unseen.forEach(n => db.update("student_notes", `id=eq.${n.id}`, { teacher_seen_at: now }).catch(() => {}));
+        if (onChanged) onChanged();
+      }
+    }).catch(() => setLoading(false));
+    return () => { cancelled = true; };
+  }, []);
+
+  const nameFor = (id) => (students.find(s => s.id === id) || {}).name || "학생";
+  const unseenCount = notes.filter(n => !n.teacher_seen_at).length;
+  const shown = filter === "unseen" ? notes.filter(n => !n.teacher_seen_at) : notes;
+
+  if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner));
+
+  return React.createElement("div", null,
+    React.createElement("div", { style: { marginBottom: "16px" } },
+      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" } }, "받은 메모"),
+      React.createElement("div", { style: { fontSize: "13px", color: C.textMid, marginTop: "2px" } }, `${unseenCount} new · ${notes.length} total`),
+      React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "4px" } }, "학생들이 보낸 메모예요. 익명 메모는 이름 없이 표시되고 답장할 수 없어요.")
+    ),
+    React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "16px" } },
+      [["all", `All (${notes.length})`], ["unseen", `New (${unseenCount})`]].map(([id, label]) =>
+        React.createElement("button", { key: id, onClick: () => setFilter(id),
+          style: { padding: "5px 12px", borderRadius: "100px", border: `1.5px solid ${filter === id ? C.text : C.border}`, background: filter === id ? C.text : "transparent", color: filter === id ? "#fff" : C.textMid, fontSize: "12px", fontWeight: filter === id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
+        }, label)
+      )
+    ),
+    shown.length === 0
+      ? React.createElement("div", { style: { textAlign: "center", padding: "50px 20px", color: C.textLight, fontSize: "13px" } }, "받은 메모가 없어요.")
+      : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+          shown.map(n => {
+            const anon = !!n.is_anonymous;
+            return React.createElement("div", { key: n.id, style: { background: C.bg, border: `1px solid ${n.teacher_seen_at ? C.border : "#EFD89B"}`, borderRadius: "12px", padding: "14px 16px", boxShadow: n.teacher_seen_at ? "none" : "0 2px 8px rgba(232,180,80,0.15)" } },
+              React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px", gap: "10px" } },
+                React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: anon ? C.textMid : C.text, display: "flex", alignItems: "center", gap: "6px" } },
+                  anon ? "🕶 익명 학생" : nameFor(n.student_id),
+                  !n.teacher_seen_at && React.createElement("span", { style: { fontSize: "9px", fontWeight: "800", color: "#fff", background: C.error, borderRadius: "100px", padding: "1px 6px", letterSpacing: "0.5px" } }, "NEW")
+                ),
+                React.createElement("span", { style: { fontSize: "11px", color: C.textLight } }, new Date(n.created_at).toLocaleDateString("ko-KR"))
+              ),
+              n.text_content && React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, marginBottom: n.audio_url ? "10px" : "0", whiteSpace: "pre-wrap" } }, n.text_content),
+              n.audio_url && React.createElement("div", { style: { marginBottom: "4px" } }, React.createElement(NoteWaveformPlayer, { url: n.audio_url, duration: n.audio_duration })),
+              React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px", marginTop: "8px" } },
+                n.reply_session_note_id && React.createElement("span", { style: { fontSize: "11px", color: C.success, fontWeight: "600" } }, "✓ 답장함"),
+                anon
+                  ? React.createElement("span", { style: { fontSize: "11px", color: C.textLight, fontStyle: "italic" } }, "익명 — 답장 불가")
+                  : React.createElement("button", {
+                      onClick: () => onReplyTo && onReplyTo(n),
+                      style: { padding: "6px 14px", borderRadius: "100px", border: `1px solid ${C.navy}`, background: C.bg, color: C.navy, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+                    }, "답장하기")
+              )
+            );
+          })
+        )
   );
 }
 
