@@ -17188,6 +17188,26 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     updatePhraseStatus(phrase.id, "mastered");
     maybeInjectReview(phrase.id);
 
+    // Persist mastery to student_progress so the week's set actually advances across
+    // sessions. Previously this was written only to wavy_phrase_attempts (analytics),
+    // which left the phrase in the "unpassed" pool — so Wavi rebuilt the same first 5
+    // phrases every session and the student never reached phrases 6+. Fire-and-forget;
+    // mirrors the PhraseCard upsert pattern.
+    (async () => {
+      try {
+        const ex = await db.get("student_progress", `student_id=eq.${user.id}&phrase_id=eq.${phrase.id}`).catch(() => []);
+        const row = {
+          passed: true,
+          best_score: Math.max(8, ex[0]?.best_score || 0),
+          attempts: (ex[0]?.attempts || 0) + 1,
+          needs_retry: false,
+          updated_at: new Date().toISOString(),
+        };
+        if (ex.length > 0) await db.update("student_progress", `student_id=eq.${user.id}&phrase_id=eq.${phrase.id}`, row);
+        else await db.insert("student_progress", { student_id: user.id, phrase_id: phrase.id, ...row });
+      } catch(e) { console.warn("[WAVY] persist mastery:", e?.message); }
+    })();
+
     // Record this attempt — fire and forget, doesn't block flow
     const todayAttempts = phraseAttemptCountRef.current[phrase.id] || 1;
     recordPhraseAttempt(user?.id, phrase.id, todayAttempts, true);
