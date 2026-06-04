@@ -149,6 +149,13 @@ async function logRateLimitError(context = "", studentName = "") {
 const TEACHER_PASS = "wayve2026";
 const TEACHER_NAMES = ["Toms Lee", "Toms"]; // Names that see the Teacher View button
 
+// Session Notes (teacher→student) + Student Feedback (student→teacher) are SHELVED
+// (2026-06). The code, tables, and migrations remain intact — flip this to true to
+// restore every entry point (teacher 💬 Notes tab + per-student composer, the student
+// profile-menu channel, the home note card, and the per-student toggles). One switch,
+// fully reversible. See commit 329cd37 for the feature itself.
+const NOTES_FEATURES_ENABLED = false;
+
 // ── Teacher name resolution ───────────────────────────────────────────────────
 // Single source of truth for the default teacher display name.
 // When a group has its own teacher_name set (Supabase groups.teacher_name),
@@ -7396,7 +7403,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     { id: "today", label: "Today", icon: "📋" },
     { id: "students", label: "Students", icon: "👥" },
     { id: "inbox", label: "Inbox", icon: "📬", badge: inboxUnread },
-    { id: "notes", label: "Notes", icon: "💬", badge: notesUnread },
+    ...(NOTES_FEATURES_ENABLED ? [{ id: "notes", label: "Notes", icon: "💬", badge: notesUnread }] : []),
     { id: "ai_tools", label: "AI Tools", icon: "🤖" },
     { id: "setup", label: "Setup", icon: "⚙️" },
   ];
@@ -7541,7 +7548,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
               }})
             )}
 
-            {tab === "notes" && (
+            {tab === "notes" && NOTES_FEATURES_ENABLED && (
               React.createElement(StudentNotesInbox, {
                 students, showMsg,
                 onChanged: refreshNotesUnread,
@@ -8707,7 +8714,9 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
-          {/* Session Notes toggle — gates the student-side note surfaces (home card + archive) */}
+          {/* Session Notes + Student Feedback toggles — shelved (NOTES_FEATURES_ENABLED).
+              Hidden so the modal stays focused; flip the constant to bring them back. */}
+          {NOTES_FEATURES_ENABLED && (<>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
             <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>📝</span>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -8721,7 +8730,6 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
-          {/* Student Feedback toggle — gates the student-side "선생님께 한마디" channel */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
             <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>💬</span>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -8735,6 +8743,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
+          </>)}
         </div>
       </div>
 
@@ -8851,8 +8860,9 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
       </div>
 
       {/* Session notes — teacher composer + past notes to this student.
-          Framed as "occasional, when worth saying" rather than per-session feedback. */}
-      {teacher && (
+          Framed as "occasional, when worth saying" rather than per-session feedback.
+          Shelved via NOTES_FEATURES_ENABLED — flip the constant to restore. */}
+      {teacher && NOTES_FEATURES_ENABLED && (
         <div style={{ marginBottom: "28px" }}>
           <SessionNoteComposer
             student={localStudent}
@@ -20008,8 +20018,8 @@ function StudentFeedbackComposer({ user, onClose, onSent }) {
 // session-note archive + the send-Toms-a-note composer. Each half gated
 // independently (mirrors home surfaces; Toms always sees both as a fallback).
 function StudentTeacherComms({ user }) {
-  const notesEnabled = !!(user?.session_notes_enabled || user?.name === "Toms Lee");
-  const feedbackEnabled = !!(user?.student_feedback_enabled || user?.name === "Toms Lee");
+  const notesEnabled = !!(NOTES_FEATURES_ENABLED && (user?.session_notes_enabled || user?.name === "Toms Lee"));
+  const feedbackEnabled = !!(NOTES_FEATURES_ENABLED && (user?.student_feedback_enabled || user?.name === "Toms Lee"));
   const [notes, setNotes] = useState([]);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -20189,8 +20199,9 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
   // Staggered-reveal: cards below stats appear together after data loads
   // (or after 600ms safety cap), creating a smooth choreographed entrance
   const [cardsReady, setCardsReady] = useState(false);
-  // Session notes — gated by session_notes_enabled (or Toms always-fallback)
-  const notesEnabled = !!(user?.session_notes_enabled || user?.name === "Toms Lee");
+  // Session notes — gated by session_notes_enabled (or Toms always-fallback), and
+  // by the NOTES_FEATURES_ENABLED master switch (shelved 2026-06).
+  const notesEnabled = !!(NOTES_FEATURES_ENABLED && (user?.session_notes_enabled || user?.name === "Toms Lee"));
   const [allNotes, setAllNotes] = useState([]); // all notes for this student, newest first
   const [openNote, setOpenNote] = useState(null); // currently-opened note (sheet)
   const [archiveOpen, setArchiveOpen] = useState(false);
