@@ -8341,6 +8341,8 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
   const [savedPhrases, setSavedPhrases] = useState([]);
   const [sessionPhrases, setSessionPhrases] = useState([]);
   const [personalPhrases, setPersonalPhrases] = useState([]); // phrases assigned only to this student
+  const [weekSegments, setWeekSegments] = useState([]); // active_time_segments rows this week (all sources) — for minutes + sparkline
+  const [showLibrary, setShowLibrary] = useState(false); // collapse past-session (in_library) class phrases by default
   const [loading, setLoading] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(student.name);
@@ -8389,7 +8391,11 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
   useEffect(() => {
     (async () => {
       try {
-        const [qod, prog, phrases, session, duesData, dismissedData, personalData] = await Promise.all([
+        // Monday of the current week (KST, Mon-Sun) — mirrors getWeekActiveSecondsAllStudents
+        const _now = new Date();
+        const _mon = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - ((_now.getDay() + 6) % 7));
+        const _monStr = `${_mon.getFullYear()}-${String(_mon.getMonth()+1).padStart(2,'0')}-${String(_mon.getDate()).padStart(2,'0')}`;
+        const [qod, prog, phrases, session, duesData, dismissedData, personalData, segData] = await Promise.all([
           db.get("qod_responses", `student_id=eq.${student.id}&order=created_at.desc&limit=10`).catch(() => []),
           db.get("student_progress", `student_id=eq.${student.id}&order=updated_at.desc`).catch(() => []),
           db.get("student_phrases", `student_id=eq.${student.id}&order=created_at.desc`).catch(() => []),
@@ -8397,6 +8403,8 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
           db.get("student_dues", `student_id=eq.${student.id}&order=due_date.desc&limit=6`).catch(() => []),
           db.get("phrase_dismissals", `student_id=eq.${student.id}&select=phrase_id,dismissed_at,phrase_bank(english,korean)&order=dismissed_at.desc`).catch(() => []),
           db.get("session_phrases", `student_id=eq.${student.id}&select=*,phrase_bank(*)&order=created_at.asc`).catch(() => []),
+          // All sources (app + wavi) — confirms the time metric is whole-app, not Wavi-only
+          db.get("active_time_segments", `student_id=eq.${student.id}&date=gte.${_monStr}&select=date,seconds`).catch(() => []),
         ]);
         setQodHistory(qod);
         setPhraseProgress(prog);
@@ -8405,6 +8413,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         setDues(duesData);
         setDismissed(dismissedData);
         setPersonalPhrases(personalData.filter(sp => sp.phrase_bank).map(sp => ({ ...sp.phrase_bank, sp_id: sp.id, in_library: sp.in_library })));
+        setWeekSegments(segData);
       } catch(e) {}
       setLoading(false);
     })();
@@ -8470,6 +8479,59 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
   const dismissedIds = new Set(dismissed.map(d => d.phrase_id));
   const activeSessionPhrases = sessionPhrases.filter(p => !dismissedIds.has(p.id));
   const activePersonalPhrases = personalPhrases.filter(p => !dismissedIds.has(p.id));
+
+  // Current session vs. archived: in_library is the same teacher-controlled flag the
+  // student home uses to split "most recent session" from "Library".
+  const currentSessionPhrases = activeSessionPhrases.filter(p => !p.in_library);
+  const libraryPhrases = activeSessionPhrases.filter(p => p.in_library);
+  const curPassed = currentSessionPhrases.filter(p => progMap[p.id]?.passed).length;
+
+  // Sort so what needs attention floats up: Not tried → in progress → passed.
+  const statusRank = (phrase) => {
+    const prog = progMap[phrase.id];
+    if (prog?.passed) return 2;
+    if ((prog?.attempts || 0) > 0) return 1;
+    return 0;
+  };
+  const sortByStatus = (arr) => [...arr].sort((a, b) => statusRank(a) - statusRank(b));
+
+  // Shared phrase-row renderer (current session, library, and personal lists are identical rows)
+  const phraseRows = (list) => list.map((phrase, i) => {
+    const prog = progMap[phrase.id];
+    const passed = prog?.passed;
+    const score = prog?.best_score || 0;
+    const attempts = prog?.attempts || 0;
+    return (
+      <div key={phrase.id} style={{ padding: "11px 14px", borderBottom: i < list.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "13px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{phrase.english}"</div>
+          {phrase.korean && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{phrase.korean}</div>}
+        </div>
+        <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
+          {passed ? (
+            <span style={{ fontSize: "10px", fontWeight: "700", background: C.successBg, color: C.success, padding: "2px 8px", borderRadius: "100px", border: "1px solid #B8D5C0" }}>✓ {score}/10</span>
+          ) : attempts > 0 ? (
+            <span style={{ fontSize: "10px", fontWeight: "700", background: C.retryBg, color: "#B07020", padding: "2px 8px", borderRadius: "100px", border: "1px solid #E8C090" }}>{score}/10</span>
+          ) : (
+            <span style={{ fontSize: "10px", color: C.textLight }}>Not tried</span>
+          )}
+        </div>
+      </div>
+    );
+  });
+
+  // ── This week's active time (all sources: app browsing + solo practice + Wavi) ──
+  const weekActiveMinutes = Math.floor(weekSegments.reduce((s, r) => s + (r.seconds || 0), 0) / 60);
+  const _wkNow = new Date();
+  const _wkMon = new Date(_wkNow.getFullYear(), _wkNow.getMonth(), _wkNow.getDate() - ((_wkNow.getDay() + 6) % 7));
+  const _todayStr = `${_wkNow.getFullYear()}-${String(_wkNow.getMonth()+1).padStart(2,'0')}-${String(_wkNow.getDate()).padStart(2,'0')}`;
+  const dailyMinutes = ["M","T","W","T","F","S","S"].map((label, idx) => {
+    const d = new Date(_wkMon.getFullYear(), _wkMon.getMonth(), _wkMon.getDate() + idx);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const secs = weekSegments.filter(r => r.date === ds).reduce((s, r) => s + (r.seconds || 0), 0);
+    return { label, dateStr: ds, minutes: Math.round(secs / 60), isToday: ds === _todayStr };
+  });
+  const maxDayMin = Math.max(1, ...dailyMinutes.map(d => d.minutes));
 
   if (loading) return (
     <div>
@@ -8768,6 +8830,26 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         ))}
       </div>
 
+      {/* Active time this week — whole-app activity (browsing + solo practice + Wavi),
+          not Wavi-only. Number on the left, per-day consistency sparkline on the right. */}
+      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 16px", marginBottom: "28px", display: "flex", alignItems: "center", gap: "18px", flexWrap: "wrap" }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase" }}>Active this week</div>
+          <div style={{ fontSize: "26px", fontWeight: "800", color: weekActiveMinutes > 0 ? C.text : C.textLight, letterSpacing: "-0.5px", marginTop: "2px" }}>
+            {weekActiveMinutes}<span style={{ fontSize: "13px", fontWeight: "700", color: C.textLight, marginLeft: "2px" }}>min</span>
+          </div>
+          <div style={{ fontSize: "10px", color: C.textLight, marginTop: "1px" }}>Wavi + practice + browsing</div>
+        </div>
+        <div style={{ flex: 1, minWidth: "170px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "6px", height: "56px" }}>
+          {dailyMinutes.map((d, i) => (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", height: "100%", justifyContent: "flex-end" }}>
+              <div title={`${d.minutes} min`} style={{ width: "100%", maxWidth: "16px", height: `${Math.max(3, Math.round((d.minutes / maxDayMin) * 38))}px`, borderRadius: "3px", background: d.minutes > 0 ? (d.isToday ? C.navy : C.success) : C.border, opacity: d.minutes > 0 ? 1 : 0.5 }} />
+              <div style={{ fontSize: "9px", fontWeight: d.isToday ? "800" : "600", color: d.isToday ? C.navy : C.textLight }}>{d.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Session notes — teacher composer + past notes to this student.
           Framed as "occasional, when worth saying" rather than per-session feedback. */}
       {teacher && (
@@ -8859,34 +8941,40 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
             </div>,
             document.body
           )}
-          {activeSessionPhrases.length === 0 ? (
+          {currentSessionPhrases.length === 0 && libraryPhrases.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px", color: C.textLight, fontSize: "13px", background: C.bgSoft, borderRadius: "12px" }}>No phrases assigned yet</div>
           ) : (
-            <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
-              {activeSessionPhrases.map((phrase, i) => {
-                const prog = progMap[phrase.id];
-                const passed = prog?.passed;
-                const score = prog?.best_score || 0;
-                const attempts = prog?.attempts || 0;
-                return (
-                  <div key={phrase.id} style={{ padding: "11px 14px", borderBottom: i < activeSessionPhrases.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "13px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{phrase.english}"</div>
-                      {phrase.korean && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{phrase.korean}</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
-                      {passed ? (
-                        <span style={{ fontSize: "10px", fontWeight: "700", background: C.successBg, color: C.success, padding: "2px 8px", borderRadius: "100px", border: "1px solid #B8D5C0" }}>✓ {score}/10</span>
-                      ) : attempts > 0 ? (
-                        <span style={{ fontSize: "10px", fontWeight: "700", background: C.retryBg, color: "#B07020", padding: "2px 8px", borderRadius: "100px", border: "1px solid #E8C090" }}>{score}/10</span>
-                      ) : (
-                        <span style={{ fontSize: "10px", color: C.textLight }}>Not tried</span>
-                      )}
-                    </div>
+            <>
+              {currentSessionPhrases.length > 0 ? (
+                <>
+                  <div style={{ fontSize: "11px", color: C.textMid, marginBottom: "8px" }}>
+                    This session · <strong style={{ color: curPassed === currentSessionPhrases.length ? C.success : C.text }}>{curPassed}/{currentSessionPhrases.length}</strong> passed
                   </div>
-                );
-              })}
-            </div>
+                  <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
+                    {phraseRows(sortByStatus(currentSessionPhrases))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: "20px", color: C.textLight, fontSize: "12px", background: C.bgSoft, borderRadius: "12px" }}>
+                  No current-session phrases · {libraryPhrases.length} in library
+                </div>
+              )}
+
+              {libraryPhrases.length > 0 && (
+                <div style={{ marginTop: "12px" }}>
+                  <button onClick={() => setShowLibrary(v => !v)}
+                    style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, padding: "4px 2px", display: "flex", alignItems: "center", justifyContent: "space-between", color: C.textLight, fontSize: "11px", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase" }}>
+                    <span>Library · past sessions · {libraryPhrases.length}</span>
+                    <span style={{ fontSize: "12px" }}>{showLibrary ? "▾" : "▸"}</span>
+                  </button>
+                  {showLibrary && (
+                    <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden", marginTop: "8px", opacity: 0.85 }}>
+                      {phraseRows(sortByStatus(libraryPhrases))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {/* Personal phrases — assigned only to this student (teacher-side visibility) */}
@@ -8896,29 +8984,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
                 Personal Phrases · {activePersonalPhrases.length}
               </div>
               <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
-                {activePersonalPhrases.map((phrase, i) => {
-                  const prog = progMap[phrase.id];
-                  const passed = prog?.passed;
-                  const score = prog?.best_score || 0;
-                  const attempts = prog?.attempts || 0;
-                  return (
-                    <div key={phrase.id} style={{ padding: "11px 14px", borderBottom: i < activePersonalPhrases.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", fontStyle: "italic", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{phrase.english}"</div>
-                        {phrase.korean && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{phrase.korean}</div>}
-                      </div>
-                      <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
-                        {passed ? (
-                          <span style={{ fontSize: "10px", fontWeight: "700", background: C.successBg, color: C.success, padding: "2px 8px", borderRadius: "100px", border: "1px solid #B8D5C0" }}>✓ {score}/10</span>
-                        ) : attempts > 0 ? (
-                          <span style={{ fontSize: "10px", fontWeight: "700", background: C.retryBg, color: "#B07020", padding: "2px 8px", borderRadius: "100px", border: "1px solid #E8C090" }}>{score}/10</span>
-                        ) : (
-                          <span style={{ fontSize: "10px", color: C.textLight }}>Not tried</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {phraseRows(sortByStatus(activePersonalPhrases))}
               </div>
             </div>
           )}
