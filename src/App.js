@@ -8911,6 +8911,11 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         </div>
       )}
 
+      {/* Scenario Builder — teacher authors Listen/Shadowing Mode conversations */}
+      {teacher && (
+        <ScenarioBuilder student={localStudent} group={group} teacher={teacher} showMsg={showMsg} />
+      )}
+
       {/* Desktop two-col / Mobile single */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", alignItems: "start" }}>
 
@@ -19711,6 +19716,211 @@ function SessionNoteArchiveSheet({ notes, onClose }) {
 // Teacher composer for leaving an occasional personal note (메모) to a student.
 // Reuses useRecorder + RecordButton + transcribe + the QoD AI-draft pattern.
 // Collapsed by default to honor "occasional, not routine."
+// ── Scenario Builder (teacher) ──────────────────────────────────────────────
+// Authors a Listen/Shadowing Mode scenario for a student or group: title +
+// context + an ordered list of alternating conversation lines (speaker toggle +
+// english + korean). "Generate with AI" drafts a natural exchange as JSON for the
+// teacher to review and edit before saving to scenarios + scenario_lines.
+function ScenarioBuilder({ student, group, teacher, showMsg }) {
+  const [scenarios, setScenarios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [context, setContext] = useState("");
+  const [scope, setScope] = useState("student"); // 'student' | 'group'
+  const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const ors = [`student_id.eq.${student.id}`];
+      if (group?.id) ors.push(`group_id.eq.${group.id}`);
+      const rows = await db.get("scenarios", `or=(${ors.join(",")})&order=created_at.desc`).catch(() => []);
+      setScenarios(Array.isArray(rows) ? rows : []);
+    } catch(e) {}
+    setLoading(false);
+  }, [student.id, group?.id]);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const addLine = (speaker) => setLines(prev => [...prev, { speaker, english: "", korean: "" }]);
+  const updateLine = (i, field, val) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l));
+  const removeLine = (i) => setLines(prev => prev.filter((_, idx) => idx !== i));
+  const toggleSpeaker = (i) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, speaker: l.speaker === "other" ? "student" : "other" } : l));
+  const moveLine = (i, dir) => setLines(prev => {
+    const j = i + dir; if (j < 0 || j >= prev.length) return prev;
+    const c = [...prev]; const t = c[i]; c[i] = c[j]; c[j] = t; return c;
+  });
+
+  const generate = async () => {
+    if (!title.trim()) { showMsg("Add a title first", "error"); return; }
+    setGenerating(true);
+    try {
+      const sys = `You write short, natural English conversation scenarios for a Korean adult learning English (40s-50s working professional).
+Produce a realistic two-person exchange for the given situation.
+Rules:
+- 6 to 10 lines total, ALTERNATING speakers, starting with "other".
+- "speaker" is "other" (the other person in the scene) or "student" (the line our learner will say).
+- "english": natural spoken English — one sentence, occasionally two short ones.
+- "korean": a natural 존댓말 translation that preserves meaning (not word-by-word). No 님 on names.
+Return ONLY valid JSON, no markdown fences, no preamble:
+{"lines":[{"speaker":"other","english":"...","korean":"..."}]}`;
+      const usr = `Title: ${title.trim()}\nContext: ${context.trim() || "(none provided)"}`;
+      const out = await geminiCallForFeedback(usr, sys);
+      const cleaned = out.replace(/^```json\s*|\s*```$/g, "").trim();
+      let parsed;
+      try { parsed = JSON.parse(cleaned); }
+      catch(_) { const m = cleaned.match(/\{[\s\S]*\}/); if (!m) throw new Error("no JSON in response"); parsed = JSON.parse(m[0]); }
+      if (Array.isArray(parsed.lines) && parsed.lines.length) {
+        setLines(parsed.lines.map(l => ({
+          speaker: l.speaker === "student" ? "student" : "other",
+          english: String(l.english || ""),
+          korean: String(l.korean || ""),
+        })));
+        showMsg(`✓ Drafted ${parsed.lines.length} lines — review & edit below`);
+      } else {
+        showMsg("AI returned no usable lines — try again", "error");
+      }
+    } catch(e) {
+      showMsg("AI draft failed: " + (e?.message || "error"), "error");
+    }
+    setGenerating(false);
+  };
+
+  const save = async () => {
+    if (!title.trim()) { showMsg("Add a title", "error"); return; }
+    const valid = lines.filter(l => (l.english || "").trim() || (l.korean || "").trim());
+    if (!valid.length) { showMsg("Add at least one line", "error"); return; }
+    if (scope === "group" && !group?.id) { showMsg("This student has no group", "error"); return; }
+    setSaving(true);
+    try {
+      const inserted = await db.insert("scenarios", {
+        title: title.trim(),
+        context_description: context.trim() || null,
+        student_id: scope === "student" ? student.id : null,
+        group_id: scope === "group" ? group.id : null,
+        created_by: teacher?.name || null,
+        is_active: true,
+      });
+      const scenarioId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
+      if (!scenarioId) throw new Error("no scenario id returned");
+      await db.insert("scenario_lines", valid.map((l, idx) => ({
+        scenario_id: scenarioId,
+        sequence_order: idx,
+        speaker: l.speaker === "student" ? "student" : "other",
+        english_text: (l.english || "").trim() || null,
+        korean_text: (l.korean || "").trim() || null,
+      })));
+      showMsg("✓ Scenario saved");
+      setTitle(""); setContext(""); setLines([]); setScope("student"); setOpen(false);
+      refresh();
+    } catch(e) {
+      showMsg("Save failed: " + (e?.message || "error"), "error");
+    }
+    setSaving(false);
+  };
+
+  const toggleActive = async (sc) => {
+    try {
+      await db.update("scenarios", `id=eq.${sc.id}`, { is_active: !sc.is_active });
+      setScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, is_active: !s.is_active } : s));
+    } catch(e) { showMsg("Error: " + e.message, "error"); }
+  };
+
+  const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, background: "#fff", boxSizing: "border-box" };
+  const miniBtn = { fontSize: "11px", fontWeight: "700", width: "24px", height: "24px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#fff", color: C.textMid, cursor: "pointer", fontFamily: FONT, padding: 0, lineHeight: 1 };
+  const addLineBtn = { flex: 1, padding: "8px", borderRadius: "10px", border: `1px dashed ${C.border}`, background: "transparent", color: C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT };
+
+  return (
+    <div style={{ marginBottom: "28px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" }}>
+          Scenario Builder
+        </div>
+        <button onClick={() => setOpen(o => !o)} style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: FONT }}>
+          {open ? "Close" : "+ New scenario"}
+        </button>
+      </div>
+
+      {!loading && scenarios.length > 0 && (
+        <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: open ? "16px" : "0" }}>
+          {scenarios.map((sc, i) => (
+            <div key={sc.id} style={{ padding: "11px 14px", borderBottom: i < scenarios.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.title}</div>
+                <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{sc.student_id ? "This student" : "Group"}{sc.context_description ? ` · ${sc.context_description}` : ""}</div>
+              </div>
+              <button onClick={() => toggleActive(sc)} title="Toggle active" style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
+                {sc.is_active ? "Active" : "Off"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {!loading && scenarios.length === 0 && !open && (
+        <div style={{ textAlign: "center", padding: "20px", color: C.textLight, fontSize: "13px", background: C.bgSoft, borderRadius: "12px" }}>No scenarios yet</div>
+      )}
+
+      {open && (
+        <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, padding: "16px" }}>
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Scenario title — e.g. Checking in at a golf club abroad" style={{ ...inputStyle, marginBottom: "8px" }} />
+          <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Context — where this happens, who the other person is, the goal" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "11px", color: C.textMid, fontWeight: "600" }}>Applies to:</span>
+            {[{ k: "student", label: "This student" }, { k: "group", label: group?.name ? `Group · ${group.name}` : "Group" }].map(opt => {
+              const disabled = opt.k === "group" && !group?.id;
+              return (
+                <button key={opt.k} disabled={disabled} onClick={() => setScope(opt.k)} style={{ fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${scope === opt.k ? C.navy : C.border}`, background: scope === opt.k ? C.navy : "transparent", color: scope === opt.k ? "#fff" : (disabled ? C.textLight : C.textMid), cursor: disabled ? "default" : "pointer", fontFamily: FONT, opacity: disabled ? 0.5 : 1 }}>
+                  {opt.label}
+                </button>
+              );
+            })}
+            <button onClick={generate} disabled={generating} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: "700", padding: "5px 14px", borderRadius: "100px", border: "none", background: generating ? C.bgSoft : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: generating ? C.textLight : "#fff", cursor: generating ? "default" : "pointer", fontFamily: FONT }}>
+              {generating ? "Generating…" : "✨ Generate with AI"}
+            </button>
+          </div>
+
+          {lines.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
+              {lines.map((l, i) => (
+                <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: "10px", padding: "8px", background: l.speaker === "student" ? "#F5F3FF" : "#fff" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                    <button onClick={() => toggleSpeaker(i)} title="Toggle speaker" style={{ fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: l.speaker === "student" ? "#8b5cf6" : C.textLight, color: "#fff" }}>
+                      {l.speaker === "student" ? "Student" : "Other"}
+                    </button>
+                    <span style={{ fontSize: "10px", color: C.textLight }}>#{i + 1}</span>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+                      <button onClick={() => moveLine(i, -1)} disabled={i === 0} style={{ ...miniBtn, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                      <button onClick={() => moveLine(i, 1)} disabled={i === lines.length - 1} style={{ ...miniBtn, opacity: i === lines.length - 1 ? 0.3 : 1 }}>↓</button>
+                      <button onClick={() => removeLine(i)} style={{ ...miniBtn, color: C.error }}>✕</button>
+                    </div>
+                  </div>
+                  <input value={l.english} onChange={e => updateLine(i, "english", e.target.value)} placeholder="English" style={{ ...inputStyle, marginBottom: "4px", fontSize: "12px" }} />
+                  <input value={l.korean} onChange={e => updateLine(i, "korean", e.target.value)} placeholder="한국어" style={{ ...inputStyle, fontSize: "12px" }} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            <button onClick={() => addLine("other")} style={addLineBtn}>+ Other line</button>
+            <button onClick={() => addLine("student")} style={addLineBtn}>+ Student line</button>
+          </div>
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={() => { setOpen(false); setLines([]); setTitle(""); setContext(""); }} style={{ flex: 1, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ flex: 2, padding: "11px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: saving ? "default" : "pointer", fontFamily: FONT }}>
+              {saving ? "Saving…" : "Save scenario"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SessionNoteComposer({ student, teacher, showMsg, onSaved, replyTo, onReplyHandled }) {
   const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
