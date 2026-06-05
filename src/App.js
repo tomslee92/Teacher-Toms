@@ -18338,6 +18338,19 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   }
 
   // Active session
+
+  // Wavi character — Toms-only rollout first (flip to all wavy_enabled once validated).
+  // Expression derives purely from existing session state, so no lifecycle changes are
+  // needed. The video branch stays dormant until Mode 1 ships + a clip exists.
+  const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
+  const _charPhraseId = phrases[currentIdx]?.id;
+  const waviExpression =
+    (_charPhraseId && phraseStatus[_charPhraseId] === "mastered") ? "encouraging"
+    : wavyState === "speaking" ? "speaking"
+    : wavyState === "listening" ? "listening"
+    : "neutral"; // idle | thinking
+  const characterVideoUrl = null; // set in Mode 1 when a phrase/scenario video exists
+
   return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
     // Paint body + html dark so iOS safe-area-top doesn't show the white app background
     React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
@@ -18364,6 +18377,29 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       React.createElement("div", { style: { height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "100px", overflow: "hidden" } },
         React.createElement("div", { style: { height: "100%", width: `${progressPct}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: "100px", transition: "width 0.4s ease" } })
       )
+    ),
+
+    // Wavi character — cross-fading expression stack (or a video clip when one exists).
+    // All four PNGs are layered; only the active expression is opaque, the rest fade out.
+    showCharacter && React.createElement("div", { style: { position: "relative", zIndex: 2, display: "flex", justifyContent: "center", alignItems: "center", height: "172px", marginTop: "2px", flexShrink: 0 } },
+      characterVideoUrl
+        ? React.createElement("video", { src: characterVideoUrl, autoPlay: true, playsInline: true, style: { height: "172px", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))" } })
+        : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
+            React.createElement("img", {
+              key: exp,
+              src: `/wavi-${exp}.png`,
+              alt: "",
+              "aria-hidden": "true",
+              onError: (e) => { e.target.style.visibility = "hidden"; },
+              style: {
+                position: "absolute", height: "172px", objectFit: "contain",
+                opacity: waviExpression === exp ? 1 : 0,
+                transition: "opacity 0.45s ease",
+                filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))",
+                pointerEvents: "none",
+              },
+            })
+          )
     ),
 
     // Current phrase — shows differently in review mode
