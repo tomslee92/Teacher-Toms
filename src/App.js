@@ -15855,14 +15855,17 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
 // Driving-optimized: no buttons needed during conversation. VAD auto-listens.
 
 const WAVY_VOICE_ID = "XrExE9yKIg1WjnnlVkGX"; // ElevenLabs Matilda — friendly, professional, multilingual
+const SCENARIO_OTHER_VOICE_ID = "UgBBYS2sOqTuMpoF3BR0"; // Second voice — the "other person" in Listen Mode scenarios
 
 // ── Audio cache ───────────────────────────────────────────────────────────────
 const wavyAudioCache = new Map();
 
-// Generate a single audio segment (with caching)
-async function wavyGenerateAudio(text) {
+// Generate a single audio segment (with caching). voiceId defaults to Wavi's voice;
+// scenario "other" lines pass SCENARIO_OTHER_VOICE_ID. The cache key includes the voice
+// so the same text in two voices never collides.
+async function wavyGenerateAudio(text, voiceId = WAVY_VOICE_ID) {
   if (!text || !text.trim()) return null;
-  const cacheKey = text.trim();
+  const cacheKey = `${voiceId}:${text.trim()}`;
   let url = wavyAudioCache.get(cacheKey);
   if (url) return { url, cached: true };
 
@@ -15887,7 +15890,7 @@ async function wavyGenerateAudio(text) {
   };
   if (languageCode) body.language_code = languageCode;
 
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${WAVY_VOICE_ID}`, {
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "xi-api-key": ELEVEN_KEY },
     body: JSON.stringify(body),
@@ -16032,7 +16035,7 @@ function wavyPlayAudio(url, signal, playbackRate = 1.0) {
 
 // Speak a full message — generates ALL audio segments first, then plays them.
 // playbackRate < 1.0 slows playback (used for re-reads after student struggles).
-async function wavySpeak(text, signal, playbackRate = 1.0) {
+async function wavySpeak(text, signal, playbackRate = 1.0, voiceId = WAVY_VOICE_ID) {
   // Pronunciation override: display name is "Wavi" but TTS needs "Wavy" to sound natural.
   // This swap only affects what's sent to ElevenLabs — message bubbles still show "Wavi".
   const spokenText = text.replace(/Wavi/g, "Wavy");
@@ -16043,12 +16046,12 @@ async function wavySpeak(text, signal, playbackRate = 1.0) {
   // Phase 1: Generate ALL audio first (in parallel)
   const urls = new Array(segments.length).fill(null);
   const generatePromises = segments.map((segment, i) =>
-    wavyGenerateAudio(segment)
+    wavyGenerateAudio(segment, voiceId)
       .then(result => { urls[i] = result?.url || null; })
       .catch(e => {
         console.warn(`[WAVY] gen segment ${i + 1} failed:`, segment, e.message);
         return new Promise(r => setTimeout(r, 600))
-          .then(() => wavyGenerateAudio(segment))
+          .then(() => wavyGenerateAudio(segment, voiceId))
           .then(result => { urls[i] = result?.url || null; })
           .catch(e2 => console.warn(`[WAVY] gen segment ${i + 1} retry failed:`, e2.message));
       })
@@ -16070,7 +16073,7 @@ async function wavySpeak(text, signal, playbackRate = 1.0) {
     } catch(e) {
       if (e.message === "aborted") throw e;
       console.warn(`[WAVY] play segment ${i + 1} failed:`, e.message);
-      wavyAudioCache.delete(segments[i].trim());
+      wavyAudioCache.delete(`${voiceId}:${segments[i].trim()}`);
     }
     // Brief natural pause between sentences (slightly longer when speaking slowly)
     await new Promise(r => setTimeout(r, playbackRate < 1.0 ? 300 : 180));
@@ -16597,6 +16600,15 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [wavyState, setWavyState] = useState("idle"); // idle | speaking | listening | thinking
   const [micLevel, setMicLevel] = useState(0); // 0-1 amplitude for visual feedback
 
+  // === Listen Mode (scenario) state ===
+  const [scenario, setScenario] = useState(null);          // { id, title, context_description }
+  const [scenarioLines, setScenarioLines] = useState([]);  // [{ id, sequence_order, speaker, english_text, korean_text }]
+  const [scenarioIdx, setScenarioIdx] = useState(0);       // current line index
+  const [scenarioOffer, setScenarioOffer] = useState(null);// { lineId, kind } when an exposure offer is shown
+
+  // Wavi character rollout — Toms only for now; flip to all wavy_enabled once validated.
+  const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
+
   // === Refs ===
   const listenerRef = useRef(null);
   const abortRef = useRef(null);
@@ -16703,7 +16715,24 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     // Unlock iOS Safari audio playback FIRST — must be done in the user-gesture chain
     wavyUnlockAudio();
     try {
-      // 1. Request mic permission FIRST before doing anything else
+      const groupId = group?.id || user?.group_id;
+
+      // Beginner Listen Mode: if this student has an active scenario, run it instead of
+      // the phrase-practice flow. Listen Mode needs no microphone (shadowing comes later).
+      const isBeginner = (user?.skill_level || "beginner") === "beginner";
+      if (isBeginner) {
+        const sc = await loadActiveScenario(user.id, groupId);
+        if (sc && sc.lines.length) {
+          setScenario(sc.scenario);
+          setScenarioLines(sc.lines);
+          setScenarioIdx(0);
+          setPhase("scenario");
+          setTimeout(() => runScenario(sc.lines, sc.scenario), 400);
+          return;
+        }
+      }
+
+      // 1. Normal phrase flow needs mic permission up front.
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         // Immediately release — we just needed the permission grant
@@ -16713,7 +16742,6 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         return;
       }
 
-      const groupId = group?.id || user?.group_id;
       if (!groupId) {
         setError("그룹 정보를 불러올 수 없어요.");
         return;
@@ -16870,6 +16898,128 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     } while (idx === lastIdx && tries < 5);
     lastVariantRef.current[poolKey] = idx;
     return options[idx];
+  };
+
+  // ── Listen Mode (scenario) engine ───────────────────────────────────────────
+  // A scenario plays as an alternating two-voice conversation. "other" lines use
+  // SCENARIO_OTHER_VOICE_ID, "student" lines use Wavi's own voice so the learner hears
+  // the correct version. No microphone — pure listen (shadowing is a later second pass).
+  const offerResolveRef = useRef(null);
+
+  const loadActiveScenario = async (studentId, groupId) => {
+    try {
+      const ors = [`student_id.eq.${studentId}`];
+      if (groupId) ors.push(`group_id.eq.${groupId}`);
+      const rows = await db.get("scenarios", `or=(${ors.join(",")})&is_active=eq.true&order=created_at.desc&limit=1`).catch(() => []);
+      if (!rows || !rows[0]) return null;
+      const lines = await db.get("scenario_lines", `scenario_id=eq.${rows[0].id}&order=sequence_order.asc`).catch(() => []);
+      if (!lines || !lines.length) return null;
+      return { scenario: rows[0], lines };
+    } catch(e) { return null; }
+  };
+
+  // Speak a scenario line/aside in a given voice; drives the character expression.
+  const scenarioSay = async (text, voiceId = WAVY_VOICE_ID, rate = 1.0) => {
+    if (!text || shouldBail()) return;
+    setWavyState("speaking");
+    try { await wavySpeak(text, abortRef.current?.signal, rate, voiceId); }
+    catch(e) { if (e.message !== "aborted") console.warn("[SCENARIO] speak failed:", e.message); }
+    if (shouldBail()) return;
+    setWavyState("idle");
+  };
+
+  // Increment (or create) the exposure counter for a student-role line. Returns the new count.
+  const bumpExposure = async (studentId, lineId) => {
+    try {
+      const rows = await db.get("phrase_exposures", `student_id=eq.${studentId}&phrase_id=eq.${lineId}&select=id,exposure_count&limit=1`).catch(() => []);
+      if (rows && rows[0]) {
+        const next = (rows[0].exposure_count || 0) + 1;
+        db.update("phrase_exposures", `id=eq.${rows[0].id}`, { exposure_count: next, updated_at: new Date().toISOString() }).catch(() => {});
+        return next;
+      }
+      db.insert("phrase_exposures", { student_id: studentId, phrase_id: lineId, exposure_count: 1 }).catch(() => {});
+      return 1;
+    } catch(e) { return 0; }
+  };
+
+  // Show the graduated "want to try?" offer and await the student's tap. Resolves true/false.
+  const showExposureOffer = (line, kind) => new Promise((resolve) => {
+    offerResolveRef.current = resolve;
+    setScenarioOffer({ lineId: line.id, kind });
+  });
+  const answerOffer = (accepted) => {
+    setScenarioOffer(null);
+    const r = offerResolveRef.current; offerResolveRef.current = null;
+    if (r) r(accepted);
+  };
+
+  const runScenario = async (lines, scenarioObj) => {
+    if (shouldBail()) return;
+    abortRef.current = new AbortController();
+    sessionStartTimeRef.current = Date.now();
+    const firstName = (user?.name || "").trim().split(" ")[0] || "";
+    await scenarioSay(`${firstName ? firstName + ", " : ""}오늘은 같이 상황을 연습해볼게요. 편하게 듣고 따라오시면 돼요.`, WAVY_VOICE_ID);
+    for (let i = 0; i < lines.length; i++) {
+      if (shouldBail()) return;
+      setScenarioIdx(i);
+      const line = lines[i];
+      const isStudent = line.speaker === "student";
+      const voiceId = isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID;
+      await sleep(isStudent ? 450 : 250); // brief absorb pause before each line
+      if (shouldBail()) return;
+      await scenarioSay(line.english_text || "", voiceId);
+      if (shouldBail()) return;
+      // Exposure-driven offers apply to student-role lines only.
+      if (isStudent && line.id) {
+        const count = await bumpExposure(user.id, line.id);
+        if (count >= 3 && count <= 5) { // 1-2 pure listen, 3 warm, 4-5 gentle, 6+ stop
+          await scenarioSay(count === 3 ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?", WAVY_VOICE_ID);
+          if (shouldBail()) return;
+          const accepted = await showExposureOffer(line, count === 3 ? "warm" : "gentle");
+          if (shouldBail()) return;
+          if (accepted) {
+            await scenarioSay("좋아요! 천천히 다시 들려드릴게요. 같이 말해보세요.", WAVY_VOICE_ID);
+            if (shouldBail()) return;
+            await scenarioSay(line.english_text || "", WAVY_VOICE_ID, 0.85); // slowed replay to shadow along
+          }
+        }
+      }
+      await sleep(300);
+    }
+    if (shouldBail()) return;
+    await scenarioSay("오늘 정말 잘하셨어요. 여기까지예요. 수고하셨어요!", WAVY_VOICE_ID);
+    endScenario();
+  };
+
+  const endScenario = () => {
+    try {
+      const durSec = Math.round((Date.now() - (sessionStartTimeRef.current || Date.now())) / 1000);
+      if (durSec > 1) reportWaviSessionTime(user.id, durSec);
+    } catch(_) {}
+    if (onSessionComplete) { try { onSessionComplete(); } catch(_) {} }
+    setPhase("scenario_done");
+  };
+
+  // Clean exit used by the scenario screens (no phrase recap).
+  const exitWavi = () => {
+    sessionEndedRef.current = true;
+    try { abortRef.current?.abort(); } catch(_) {}
+    if (manualExitRef.current && onManualExit) onManualExit();
+    else onClose();
+  };
+
+  // Shared character renderer (cross-fading expression stack, or a video clip).
+  const renderWaviCharacter = (expression, videoUrl) => {
+    if (!showCharacter) return null;
+    return React.createElement("div", { style: { position: "relative", zIndex: 2, display: "flex", justifyContent: "center", alignItems: "center", height: "172px", marginTop: "2px", flexShrink: 0 } },
+      videoUrl
+        ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true, style: { height: "172px", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))" } })
+        : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
+            React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true",
+              onError: (e) => { e.target.style.visibility = "hidden"; },
+              style: { position: "absolute", height: "172px", objectFit: "contain", opacity: expression === exp ? 1 : 0, transition: "opacity 0.45s ease", filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))", pointerEvents: "none" } })
+          )
+    );
   };
 
   // Pool: opening line for the FIRST phrase of a session
@@ -18342,12 +18492,64 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     );
   }
 
+  // ── Listen Mode (scenario) render ───────────────────────────────────────────
+  if (phase === "scenario") {
+    const line = scenarioLines[scenarioIdx] || null;
+    const isStudent = line && line.speaker === "student";
+    const scExpr = wavyState === "speaking" ? "speaking" : wavyState === "listening" ? "listening" : "neutral";
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
+      React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
+      // Top bar
+      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px", position: "relative", zIndex: 2 } },
+        React.createElement("button", { onClick: exitWavi, style: { background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, padding: "8px 14px", borderRadius: "100px" } }, "← 나가기"),
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: "#fff", display: "flex", alignItems: "center", gap: "5px", letterSpacing: "-0.2px" } },
+          React.createElement("span", { style: { fontSize: "16px" } }, "🌊"),
+          React.createElement("span", null, "Wavi")
+        ),
+        React.createElement("div", { style: { fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", background: "rgba(255,255,255,0.07)", padding: "4px 10px", borderRadius: "100px" } }, `${scenarioIdx + 1} / ${scenarioLines.length}`)
+      ),
+      // Scenario title
+      scenario && React.createElement("div", { style: { textAlign: "center", padding: "2px 20px 0", position: "relative", zIndex: 2, fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "600" } }, scenario.title),
+      // Character
+      renderWaviCharacter(scExpr, null),
+      // Current line
+      line && React.createElement("div", { style: { padding: "16px 24px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px", color: isStudent ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.4)" } }, isStudent ? "나 (이렇게 말해요)" : "상대방"),
+        React.createElement("div", { style: { fontSize: "23px", fontWeight: "800", color: isStudent ? "#c4b5fd" : "#fff", lineHeight: 1.4, marginBottom: "10px" } }, `"${line.english_text || ""}"`),
+        line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 } }, line.korean_text),
+        React.createElement("button", { onClick: () => scenarioSay(line.english_text || "", isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
+          style: { marginTop: "18px", alignSelf: "center", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 18px", borderRadius: "100px" } }, "▶ 다시 듣기")
+      ),
+      // Exposure offer buttons (loop awaits the answer)
+      scenarioOffer && React.createElement("div", { style: { padding: "16px 20px 36px", position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
+        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", marginBottom: "4px", textAlign: "center" } }, scenarioOffer.kind === "warm" ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?"),
+        React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%", maxWidth: "360px" } },
+          React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "아직 괜찮아요"),
+          React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "좋아요, 해볼게요")
+        )
+      ),
+      // Quiet status when not offering
+      !scenarioOffer && React.createElement("div", { style: { padding: "0 20px 36px", position: "relative", zIndex: 2, textAlign: "center", fontSize: "12px", color: "rgba(255,255,255,0.4)" } }, wavyState === "speaking" ? "듣는 중…" : "")
+    );
+  }
+
+  // ── Listen Mode complete ────────────────────────────────────────────────────
+  if (phase === "scenario_done") {
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
+      React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", position: "relative", zIndex: 2, gap: "16px" } },
+        renderWaviCharacter("encouraging", null),
+        React.createElement("div", { style: { fontSize: "20px", fontWeight: "800", color: "#fff", textAlign: "center" } }, "수고하셨어요!"),
+        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.6)", textAlign: "center", lineHeight: 1.5 } }, "오늘 상황 연습을 잘 마쳤어요."),
+        React.createElement("button", { onClick: exitWavi, style: { marginTop: "8px", width: "100%", maxWidth: "360px", padding: "16px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "none", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, borderRadius: "100px" } }, manualExitRef.current ? "앱으로 돌아가기" : "Wavi 홈으로")
+      )
+    );
+  }
+
   // Active session
 
-  // Wavi character — Toms-only rollout first (flip to all wavy_enabled once validated).
-  // Expression derives purely from existing session state, so no lifecycle changes are
-  // needed. The video branch stays dormant until Mode 1 ships + a clip exists.
-  const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
+  // Wavi character expression — derives purely from existing session state, so no
+  // lifecycle changes are needed. The video branch stays dormant until Mode 1 ships.
   const _charPhraseId = phrases[currentIdx]?.id;
   const waviExpression =
     (_charPhraseId && phraseStatus[_charPhraseId] === "mastered") ? "encouraging"
@@ -18384,28 +18586,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       )
     ),
 
-    // Wavi character — cross-fading expression stack (or a video clip when one exists).
-    // All four PNGs are layered; only the active expression is opaque, the rest fade out.
-    showCharacter && React.createElement("div", { style: { position: "relative", zIndex: 2, display: "flex", justifyContent: "center", alignItems: "center", height: "172px", marginTop: "2px", flexShrink: 0 } },
-      characterVideoUrl
-        ? React.createElement("video", { src: characterVideoUrl, autoPlay: true, playsInline: true, style: { height: "172px", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))" } })
-        : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
-            React.createElement("img", {
-              key: exp,
-              src: `/wavi-${exp}.png`,
-              alt: "",
-              "aria-hidden": "true",
-              onError: (e) => { e.target.style.visibility = "hidden"; },
-              style: {
-                position: "absolute", height: "172px", objectFit: "contain",
-                opacity: waviExpression === exp ? 1 : 0,
-                transition: "opacity 0.45s ease",
-                filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))",
-                pointerEvents: "none",
-              },
-            })
-          )
-    ),
+    // Wavi character — cross-fading expression stack (Toms-only rollout for now).
+    renderWaviCharacter(waviExpression, characterVideoUrl),
 
     // Current phrase — shows differently in review mode
     currentPhrase && React.createElement("div", { style: { padding: "20px 24px 12px", position: "relative", zIndex: 2, textAlign: "center" } },
