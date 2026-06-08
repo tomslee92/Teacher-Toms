@@ -114,7 +114,9 @@ Resume cursor: `wavy_memory.last_phrase_idx` already handles mid-session resume 
 
 **Caveat**: Only applies to NEW masteries post-fix. Old Wavi-mastered phrases still count as unpassed unless re-mastered.
 
-### Session Notes (teacher → student) + Student Feedback (student → teacher)
+### Session Notes (teacher → student) + Student Feedback (student → teacher) — SHELVED 2026-06
+**Both features are currently shelved** behind a single master switch `NOTES_FEATURES_ENABLED` (constant just after `TEACHER_NAMES`, ~line 157, currently `false`). The code, components, tables, and migration all remain intact — flip the constant to `true` to restore every entry point (teacher 💬 Notes tab, per-student composer + toggles, the student profile-menu channel, the home note card). Toms decided they weren't helpful right now (restraint-over-abundance). Do NOT treat the dormant code as a bug to delete. The per-student `session_notes_enabled`/`student_feedback_enabled` flags still exist but are inert while the master switch is off.
+
 Two communication features sharing the QoD voice infra (`useRecorder` ~1898, `RecordButton` ~2269, `transcribe` Groq Whisper ~1645, `geminiCallForFeedback` ~92) and the public `session-notes-audio` storage bucket. Both gated independently.
 
 - **Tables**: `session_notes` (teacher→student: text/voice/structured jsonb, `seen_at`/`dismissed_at`) and `student_notes` (student→teacher: `is_anonymous`, `prompt_context`='continuous', `teacher_seen_at`, `reply_session_note_id` → session_notes). Migration: `supabase/migrations/20260601_session_and_student_notes.sql`.
@@ -122,6 +124,21 @@ Two communication features sharing the QoD voice infra (`useRecorder` ~1898, `Re
 - **Audio paths** in the shared bucket: `teacher-notes/{student_id}/…` (session notes), `student-notes/{student_id}/…` (feedback). `uploadSessionNoteAudio(blob, label, folder)`.
 - **Components**: `SessionNoteComposer` (teacher, AI-drafts from text+voice; reply mode via `replyTo` prop links `reply_session_note_id`), `SessionNoteSheet`/`SessionNoteArchiveSheet` + custom `NoteWaveformPlayer` (~19347), `StudentFeedbackComposer` (student bottom-sheet, prompts/anonymity), `StudentTeacherComms` (profile-menu "선생님과의 소통" = archive + send-a-note), `StudentNotesReceived` (teacher per-student, **attributed-only** — anonymity preserved), `StudentNotesInbox` (global dashboard 💬 tab, anonymous shown as "익명 학생", no reply).
 - **Teacher identity**: `resolveTeacherAccount()` (cached, by TEACHER_NAMES) gives student-addressed feedback a real `teacher_id`. Multi-teacher assignment is intentionally NOT built — `teacher_name` is always read from the row, never hardcoded.
+
+### Wavi Character + Listen/Shadowing Mode — scenarios (added 2026-06, commits 20b7d53→93b149d)
+A scenario-based conversation mode for **beginner** students, plus a character image on `WavyScreen`. Migration: `supabase/migrations/20260606_wavi_scenarios_and_character.sql` (adds `phrase_bank.wavi_video_url`; tables `scenarios`, `scenario_lines`, `phrase_exposures`). All gated by the existing `wavy_enabled`.
+
+**Character** (`renderWaviCharacter(expression, videoUrl)` in WavyScreen): 4 PNGs in `public/` (`wavi-neutral/speaking/listening/encouraging.png`), cross-faded via opacity transitions. Expression derives purely from existing session state (`wavyState` + `phraseStatus`), so no lifecycle changes. **Rollout gate is Toms-only**: `const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms"` (near the WavyScreen state block) — change this to roll out to all `wavy_enabled` students. Used by both the normal session and the scenario screens.
+
+**Pre-rendered video is a DORMANT STUB.** The `wavi_video_url` columns and the `<video>` branch in `renderWaviCharacter` exist, but `characterVideoUrl` is always `null` — video is never actually played yet. Wiring it requires coordinating the clip's own audio against the ElevenLabs TTS so they don't double-play; pointless until real clips exist in the `wavi-videos/` bucket. Today's working path is always static image + ElevenLabs audio (the intended fallback).
+
+**Listen Mode** (beginner entry): in `init()`, before the mic request, beginners (`skill_level === "beginner"` — the column that stores teacher-set level, set via the dropdown in the student detail modal) with an active scenario auto-enter Listen Mode via `loadActiveScenario`; otherwise fall back to the normal phrase flow. No mic. `runScenario` plays alternating lines — "other" lines use the new `SCENARIO_OTHER_VOICE_ID` (`UgBBYS2sOqTuMpoF3BR0`), "student" lines use `WAVY_VOICE_ID` so the learner hears the correct version. `wavyGenerateAudio`/`wavySpeak` now take a `voiceId` param (default `WAVY_VOICE_ID`); the audio cache key includes the voice. New phases: `"scenario"` (player) + `"scenario_done"` (completion).
+
+**Exposure prompts** (`phrase_exposures`, keyed by the student-role `scenario_lines.id` in the `phrase_id` column): graduated Korean offers on student-role lines — 1-2 pure listen, 3 warm ("직접 한번 말해볼래요?"), 4-5 gentle ("한번 따라 말해볼까요?"), 6+ silent. Accepting replays the line slowed (0.85x) to shadow along.
+
+**Shadowing Mode** (second pass): at Listen Mode end Wavi offers "이번엔 직접 말해볼래요?" → `runShadowing` replays with the mic open on student lines (`captureShadowLine` reuses `WavyVoiceListener`, `noSpeechTimeoutMs: 5000`). **No scoring — the audio blob is discarded.** 5s silence auto-advances; expression flips to listening then a brief `scShadowPraise` encouraging flash. Mic permission requested once at shadow start.
+
+**Teacher Scenario Builder** (`ScenarioBuilder`, in the student detail modal before the phrase grid): title + context + scope (this student / their group) + ordered lines (speaker toggle, EN/KR, reorder). "Generate with AI" uses `geminiCallForFeedback` (custom system prompt → JSON; chosen over `groqCall`, which hardcodes a fixed persona unsuited to JSON — Gemini also gives more natural 존댓말). Saves `scenarios` + `scenario_lines`; self-fetches existing with an Active toggle.
 
 ### Multi-tag system
 - `phrase_tags` junction table for many-to-many phrase ↔ tag relationships
