@@ -17091,14 +17091,32 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // Shared character renderer (cross-fading expression stack, or a video clip).
   const renderWaviCharacter = (expression, videoUrl) => {
     if (!showCharacter) return null;
-    return React.createElement("div", { style: { position: "relative", zIndex: 2, display: "flex", justifyContent: "center", alignItems: "center", height: "172px", marginTop: "2px", flexShrink: 0 } },
+    const H = 188;
+    // Absolute children are centered with top/left 50% + translate (flex justify doesn't
+    // apply to absolutely-positioned elements — that was the off-center bug).
+    return React.createElement("div", { style: { position: "relative", zIndex: 2, height: `${H}px`, marginTop: "4px", flexShrink: 0 } },
+      React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "248px", height: "248px", borderRadius: "50%", background: expression === "listening" ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent 70%)" : expression === "encouraging" ? "radial-gradient(circle, rgba(139,92,246,0.22), transparent 70%)" : "radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%)", transition: "background 0.45s ease", pointerEvents: "none" } }),
       videoUrl
-        ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true, style: { height: "172px", objectFit: "contain", filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))" } })
+        ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true, style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: `${H}px`, objectFit: "contain", borderRadius: "20px", filter: "drop-shadow(0 14px 32px rgba(0,0,0,0.5))" } })
         : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
             React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true",
               onError: (e) => { e.target.style.visibility = "hidden"; },
-              style: { position: "absolute", height: "172px", objectFit: "contain", opacity: expression === exp ? 1 : 0, transition: "opacity 0.45s ease", filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.45))", pointerEvents: "none" } })
+              style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: `${H}px`, objectFit: "contain", opacity: expression === exp ? 1 : 0, transition: "opacity 0.45s ease", filter: "drop-shadow(0 14px 32px rgba(0,0,0,0.5))", pointerEvents: "none" } })
           )
+    );
+  };
+
+  // The "other person" in a scenario gets a distinct avatar so the two speakers read as
+  // two people — Wavi only voices the other side, she isn't that character.
+  const renderOtherAvatar = (speaking) => {
+    if (!showCharacter) return null;
+    return React.createElement("div", { style: { position: "relative", zIndex: 2, height: "188px", marginTop: "4px", flexShrink: 0 } },
+      React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", borderRadius: "50%", background: `radial-gradient(circle, rgba(56,189,248,${speaking ? 0.18 : 0.10}), transparent 70%)`, transition: "background 0.45s ease", pointerEvents: "none" } }),
+      React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: `translate(-50%, -50%) scale(${speaking ? 1.05 : 1})`, transition: "transform 0.35s ease", width: "132px", height: "132px", borderRadius: "50%", background: "linear-gradient(145deg, #3b4a63, #1e293b)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 14px 32px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" } },
+        React.createElement("svg", { width: "62", height: "62", viewBox: "0 0 24 24", fill: "rgba(255,255,255,0.88)" },
+          React.createElement("path", { d: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" })
+        )
+      )
     );
   };
 
@@ -18590,15 +18608,19 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       ),
       // Scenario title
       scenario && React.createElement("div", { style: { textAlign: "center", padding: "2px 20px 0", position: "relative", zIndex: 2, fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "600" } }, scenario.title),
-      // Character
-      renderWaviCharacter(scExpr, null),
+      // Avatar — the other person gets a distinct avatar; Wavi voices/guides the student line
+      (isStudent ? renderWaviCharacter(scExpr, null) : renderOtherAvatar(wavyState === "speaking")),
       // Current line
       line && React.createElement("div", { style: { padding: "16px 24px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px", color: isStudent ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.4)" } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나 (이렇게 말해요)") : "상대방"),
         React.createElement("div", { style: { fontSize: "23px", fontWeight: "800", color: isStudent ? "#c4b5fd" : "#fff", lineHeight: 1.4, marginBottom: "10px" } }, `"${fillName(line.english_text)}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 } }, fillName(line.korean_text)),
-        !(shadowMode && wavyState === "listening") && React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
-          style: { marginTop: "18px", alignSelf: "center", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 18px", borderRadius: "100px" } }, "▶ 다시 듣기")
+        !(shadowMode && wavyState === "listening") && React.createElement("div", { style: { marginTop: "20px", display: "flex", gap: "10px", justifyContent: "center" } },
+          React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
+            style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 20px", borderRadius: "100px" } }, "▶ 다시 듣기"),
+          React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID, 0.7),
+            style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 20px", borderRadius: "100px" } }, "🐢 천천히")
+        )
       ),
       // Exposure offer buttons (loop awaits the answer)
       scenarioOffer && React.createElement("div", { style: { padding: "16px 20px 36px", position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
@@ -18609,7 +18631,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         )
       ),
       // Quiet status when not offering (mic prompt during shadowing)
-      !scenarioOffer && React.createElement("div", { style: { padding: "0 20px 36px", position: "relative", zIndex: 2, textAlign: "center", fontSize: "13px", fontWeight: "600", color: shadowMode && wavyState === "listening" ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.4)" } }, shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : wavyState === "speaking" ? "듣는 중…" : "")
+      !scenarioOffer && React.createElement("div", { style: { padding: "0 20px 36px", position: "relative", zIndex: 2, textAlign: "center", fontSize: "13px", fontWeight: "700", color: scShadowPraise ? "rgba(167,139,250,0.95)" : shadowMode && wavyState === "listening" ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.4)" } }, scShadowPraise ? "✓ 좋아요!" : shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : wavyState === "speaking" ? "듣는 중…" : "")
     );
   }
 
