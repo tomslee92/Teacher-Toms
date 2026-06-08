@@ -156,6 +156,12 @@ const TEACHER_NAMES = ["Toms Lee", "Toms"]; // Names that see the Teacher View b
 // fully reversible. See commit 329cd37 for the feature itself.
 const NOTES_FEATURES_ENABLED = false;
 
+// Curated scenarios (Listen/Shadowing Mode) — student-facing rollout switch, INDEPENDENT
+// of the V2 home flag (all students have V2, so V2 is not a safe gate). false = Toms only
+// (the student home card is hidden for everyone else); flip to true to roll out to all
+// students. The teacher-side Scenario Builder is unaffected (teacher dashboard only).
+const SCENARIOS_STUDENT_ENABLED = false;
+
 // ── Teacher name resolution ───────────────────────────────────────────────────
 // Single source of truth for the default teacher display name.
 // When a group has its own teacher_name set (Supabase groups.teacher_name),
@@ -20689,6 +20695,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const lang = useLang();
   const [weekMinutes, setWeekMinutes] = useState(null);
   const [scenarios, setScenarios] = useState([]); // curated Listen Mode sessions available to this student
+  // Toms-only while testing; flip SCENARIOS_STUDENT_ENABLED to roll out to all students.
+  const scenariosVisible = SCENARIOS_STUDENT_ENABLED || user?.name === "Toms Lee" || user?.name === "Toms";
   const [phrasesMastered, setPhrasesMastered] = useState(null);
   // Week phrases card: tiered surfacing of 3 phrases to practice
   const [weekPhrases, setWeekPhrases] = useState(null); // { phrases: [], total, tier: 1|2|3, passedSet }
@@ -20765,10 +20773,13 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         if (!cancelled) setPhrasesMastered(passedSet.size);
 
         // ── Curated scenarios available to this student (global library + targeted) ──
-        const sOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
-        if (group?.id) sOrs.push(`group_id.eq.${group.id}`);
-        const scenarioRows = await db.get("scenarios", `or=(${sOrs.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
-        if (!cancelled) setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
+        // Gated to Toms while testing — skip the fetch entirely for other students.
+        if (scenariosVisible) {
+          const sOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
+          if (group?.id) sOrs.push(`group_id.eq.${group.id}`);
+          const scenarioRows = await db.get("scenarios", `or=(${sOrs.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
+          if (!cancelled) setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
+        }
 
         // ── Week phrases tiered selection ────────────────────────────────────
         // Tier 1: this week's session phrases, not yet passed
@@ -21021,7 +21032,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       React.createElement("style", null, "@keyframes noteRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}} @keyframes noteDismiss{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.96)}} @media (prefers-reduced-motion: reduce){[data-anim-note]{animation:none !important;transition:opacity 200ms ease !important;}}"),
 
       // ── Curated sessions — teacher-built scenarios for Listen Mode ────────
-      scenarios.length > 0 && React.createElement("div", { style: { marginBottom: "16px" } },
+      scenariosVisible && scenarios.length > 0 && React.createElement("div", { style: { marginBottom: "16px" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" } }, "추천 세션"),
         React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
           scenarios.map(sc => React.createElement("button", {
