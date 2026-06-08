@@ -4063,6 +4063,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   _tokenUser = user; _tokenGroup = group;
   const [tab, setTab] = useState(initialTab);
   const [showWavy, setShowWavy] = useState(false);
+  const [scenarioToLaunch, setScenarioToLaunch] = useState(null); // curated scenario chosen from the home card
   const [showProfile, setShowProfile] = useState(false);
   const [profileUser, setProfileUser] = useState(user);
   const lang = profileUser?.language || "ko";
@@ -4461,6 +4462,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
                 },
                 streak,
                 onOpenProfile: () => setShowProfile(true),
+                onStartScenario: (sc) => { setScenarioToLaunch(sc); setShowWavy(true); },
               })
             ) : (
               <>
@@ -4509,8 +4511,9 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       user: profileUser,
       group,
       lang,
-      onClose: () => setShowWavy(false),
-      onManualExit: () => setShowWavy(false),
+      initialScenarioId: scenarioToLaunch?.id || null,
+      onClose: () => { setShowWavy(false); setScenarioToLaunch(null); },
+      onManualExit: () => { setShowWavy(false); setScenarioToLaunch(null); },
     })}
 
     {showProfile && React.createElement(ProfileModal, { user: profileUser, showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep, onClose: () => {
@@ -16523,7 +16526,7 @@ function composeHomeGreeting(firstName, lastSession, hour) {
 
 
 // ── WavyScreen component ─────────────────────────────────────────────────────
-function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSessionComplete, onManualExit }) {
+function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSessionComplete, onManualExit, initialScenarioId }) {
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || "친구";
 
   // Resolve {{name}}, {{job}}, {{hometown}}, etc. on a phrase using the student's profile.
@@ -16719,11 +16722,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     try {
       const groupId = group?.id || user?.group_id;
 
-      // Beginner Listen Mode: if this student has an active scenario, run it instead of
-      // the phrase-practice flow. Listen Mode needs no microphone (shadowing comes later).
-      const isBeginner = (user?.skill_level || "beginner") === "beginner";
-      if (isBeginner) {
-        const sc = await loadActiveScenario(user.id, groupId);
+      // Curated scenario chosen from the home "추천 세션" card → Listen Mode (no mic).
+      if (initialScenarioId) {
+        const sc = await loadScenarioById(initialScenarioId);
         if (sc && sc.lines.length) {
           setScenario(sc.scenario);
           setScenarioLines(sc.lines);
@@ -16908,13 +16909,11 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // the correct version. No microphone — pure listen (shadowing is a later second pass).
   const offerResolveRef = useRef(null);
 
-  const loadActiveScenario = async (studentId, groupId) => {
+  const loadScenarioById = async (id) => {
     try {
-      const ors = [`student_id.eq.${studentId}`];
-      if (groupId) ors.push(`group_id.eq.${groupId}`);
-      const rows = await db.get("scenarios", `or=(${ors.join(",")})&is_active=eq.true&order=created_at.desc&limit=1`).catch(() => []);
+      const rows = await db.get("scenarios", `id=eq.${id}&limit=1`).catch(() => []);
       if (!rows || !rows[0]) return null;
-      const lines = await db.get("scenario_lines", `scenario_id=eq.${rows[0].id}&order=sequence_order.asc`).catch(() => []);
+      const lines = await db.get("scenario_lines", `scenario_id=eq.${id}&order=sequence_order.asc`).catch(() => []);
       if (!lines || !lines.length) return null;
       return { scenario: rows[0], lines };
     } catch(e) { return null; }
@@ -19980,7 +19979,7 @@ function ScenarioBuilder({ student, group, teacher, showMsg }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
-  const [scope, setScope] = useState("student"); // 'student' | 'group'
+  const [scope, setScope] = useState("all"); // 'all' (everyone) | 'student' | 'group'
   const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -20102,7 +20101,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
             <div key={sc.id} style={{ padding: "11px 14px", borderBottom: i < scenarios.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.title}</div>
-                <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{sc.student_id ? "This student" : "Group"}{sc.context_description ? ` · ${sc.context_description}` : ""}</div>
+                <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{sc.student_id ? "This student" : sc.group_id ? "Group" : "Everyone"}{sc.context_description ? ` · ${sc.context_description}` : ""}</div>
               </div>
               <button onClick={() => toggleActive(sc)} title="Toggle active" style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
                 {sc.is_active ? "Active" : "Off"}
@@ -20122,7 +20121,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "11px", color: C.textMid, fontWeight: "600" }}>Applies to:</span>
-            {[{ k: "student", label: "This student" }, { k: "group", label: group?.name ? `Group · ${group.name}` : "Group" }].map(opt => {
+            {[{ k: "all", label: "Everyone" }, { k: "student", label: "This student" }, { k: "group", label: group?.name ? `Group · ${group.name}` : "Group" }].map(opt => {
               const disabled = opt.k === "group" && !group?.id;
               return (
                 <button key={opt.k} disabled={disabled} onClick={() => setScope(opt.k)} style={{ fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${scope === opt.k ? C.navy : C.border}`, background: scope === opt.k ? C.navy : "transparent", color: scope === opt.k ? "#fff" : (disabled ? C.textLight : C.textMid), cursor: disabled ? "default" : "pointer", fontFamily: FONT, opacity: disabled ? 0.5 : 1 }}>
@@ -20686,9 +20685,10 @@ function StudentNotesInbox({ students, showMsg, onChanged, onReplyTo }) {
 
 // ── HomeGridV2 — Wavi-led home (test only on Toms Lee for now) ────────────────
 // Layout: greeting → Wavi hero card → stats → continue + today's expression → tools
-function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile }) {
+function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile, onStartScenario }) {
   const lang = useLang();
   const [weekMinutes, setWeekMinutes] = useState(null);
+  const [scenarios, setScenarios] = useState([]); // curated Listen Mode sessions available to this student
   const [phrasesMastered, setPhrasesMastered] = useState(null);
   // Week phrases card: tiered surfacing of 3 phrases to practice
   const [weekPhrases, setWeekPhrases] = useState(null); // { phrases: [], total, tier: 1|2|3, passedSet }
@@ -20763,6 +20763,12 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
         ).catch(() => []);
         const passedSet = new Set(progAll.filter(p => p.passed).map(p => p.phrase_id));
         if (!cancelled) setPhrasesMastered(passedSet.size);
+
+        // ── Curated scenarios available to this student (global library + targeted) ──
+        const sOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
+        if (group?.id) sOrs.push(`group_id.eq.${group.id}`);
+        const scenarioRows = await db.get("scenarios", `or=(${sOrs.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
+        if (!cancelled) setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
 
         // ── Week phrases tiered selection ────────────────────────────────────
         // Tier 1: this week's session phrases, not yet passed
@@ -21013,6 +21019,23 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile 
     },
       // ── Note keyframes (note card entrance + dismiss) ─────────────────────
       React.createElement("style", null, "@keyframes noteRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}} @keyframes noteDismiss{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.96)}} @media (prefers-reduced-motion: reduce){[data-anim-note]{animation:none !important;transition:opacity 200ms ease !important;}}"),
+
+      // ── Curated sessions — teacher-built scenarios for Listen Mode ────────
+      scenarios.length > 0 && React.createElement("div", { style: { marginBottom: "16px" } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" } }, "추천 세션"),
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+          scenarios.map(sc => React.createElement("button", {
+            key: sc.id,
+            onClick: () => onStartScenario && onStartScenario(sc),
+            style: { textAlign: "left", width: "100%", background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", border: "none", borderRadius: "18px", padding: "16px 18px", cursor: "pointer", fontFamily: FONT, boxShadow: "0 6px 18px rgba(49,46,129,0.25)", display: "flex", alignItems: "center", gap: "12px" } },
+            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: "#fff", marginBottom: sc.context_description ? "3px" : 0 } }, sc.title),
+              sc.context_description && React.createElement("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, sc.context_description)
+            ),
+            React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: "#c7d2fe", flexShrink: 0 } }, "듣기 →")
+          ))
+        )
+      ),
 
       // ── Note card — most recent non-dismissed note from the teacher ───────
       notesEnabled && latestNote && React.createElement("div", {
