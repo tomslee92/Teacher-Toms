@@ -51,3 +51,8 @@ CREATE TABLE IF NOT EXISTS phrase_exposures (
   UNIQUE (student_id, phrase_id)
 );
 CREATE INDEX IF NOT EXISTS idx_phrase_exposures_student ON phrase_exposures(student_id);
+
+-- Grant the app role (anon key) access. Tables created via the SQL editor do NOT
+-- auto-grant to anon/authenticated the way the Table Editor UI does, so without this
+-- every read/write fails with "permission denied for table ..." (SQLSTATE 42501).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.scenarios, public.scenario_lines, public.phrase_exposures TO anon, authenticated;

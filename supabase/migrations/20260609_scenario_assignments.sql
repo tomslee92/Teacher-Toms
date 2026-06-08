@@ -20,3 +20,6 @@ INSERT INTO scenario_assignments (scenario_id, student_id, group_id)
 SELECT s.id, s.student_id, s.group_id
 FROM scenarios s
 WHERE NOT EXISTS (SELECT 1 FROM scenario_assignments a WHERE a.scenario_id = s.id);
+
+-- Grant the app role (anon key) access — SQL-editor tables don't auto-grant (see 20260606).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.scenario_assignments TO anon, authenticated;
