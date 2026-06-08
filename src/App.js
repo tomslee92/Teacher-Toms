@@ -16970,6 +16970,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     sessionStartTimeRef.current = Date.now();
     const firstName = (user?.name || "").trim().split(" ")[0] || "";
     await scenarioSay(`${firstName ? firstName + ", " : ""}오늘은 같이 상황을 연습해볼게요. 편하게 듣고 따라오시면 돼요.`, WAVY_VOICE_ID);
+    const listenCounts = []; // exposure count per student line this pass → min = total full listens
     for (let i = 0; i < lines.length; i++) {
       if (shouldBail()) return;
       setScenarioIdx(i);
@@ -16983,6 +16984,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       // Exposure-driven offers apply to student-role lines only.
       if (isStudent && line.id) {
         const count = await bumpExposure(user.id, line.id);
+        listenCounts.push(count);
         if (count >= 3 && count <= 5) { // 1-2 pure listen, 3 warm, 4-5 gentle, 6+ stop
           await scenarioSay(count === 3 ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?", WAVY_VOICE_ID);
           if (shouldBail()) return;
@@ -16998,12 +17000,21 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       await sleep(300);
     }
     if (shouldBail()) return;
-    await scenarioSay("잘 들으셨어요! 이번엔 직접 말해볼래요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
-    if (shouldBail()) return;
-    const wantShadow = await showExposureOffer({ id: "shadow" }, "shadow");
-    if (shouldBail()) return;
-    if (wantShadow) { await runShadowing(lines); }
-    else { await scenarioSay("좋아요, 오늘은 여기까지예요. 수고하셨어요!", WAVY_VOICE_ID); endScenario(); }
+    // Offer Shadowing only after the student has heard the whole scenario 3+ times
+    // (full-listen count = the min exposure across the scenario's student-role lines).
+    const fullListens = listenCounts.length ? Math.min(...listenCounts) : 0;
+    if (fullListens >= 3) {
+      await scenarioSay("잘 들으셨어요! 이번엔 직접 말해볼래요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
+      if (shouldBail()) return;
+      const wantShadow = await showExposureOffer({ id: "shadow" }, "shadow");
+      if (shouldBail()) return;
+      if (wantShadow) { await runShadowing(lines); return; }
+      await scenarioSay("좋아요, 오늘은 여기까지예요. 수고하셨어요!", WAVY_VOICE_ID);
+      endScenario();
+    } else {
+      await scenarioSay("오늘도 잘 들으셨어요. 수고하셨어요!", WAVY_VOICE_ID);
+      endScenario();
+    }
   };
 
   // ── Shadowing Mode (second pass) ────────────────────────────────────────────
