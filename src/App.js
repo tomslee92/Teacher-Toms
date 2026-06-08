@@ -19997,6 +19997,7 @@ function ScenarioBuilder({ student, group, students, groups, teacher, showMsg })
   const [saveError, setSaveError] = useState("");
   const [assignFor, setAssignFor] = useState(null); // scenario id whose assign panel is open
   const [assignRows, setAssignRows] = useState([]);  // scenario_assignments rows for that scenario
+  const [editingId, setEditingId] = useState(null);  // scenario id being edited (null = creating new)
 
   // The builder shows the whole scenario library (shared across students); assignments
   // (not scenarios.student_id) now decide who each scenario reaches.
@@ -20083,23 +20084,43 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     setGenerating(false);
   };
 
+  // Load an existing scenario back into the composer for editing.
+  const startEdit = async (sc) => {
+    const lns = await db.get("scenario_lines", `scenario_id=eq.${sc.id}&order=sequence_order.asc`).catch(() => []);
+    setEditingId(sc.id);
+    setTitle(sc.title || "");
+    setContext(sc.context_description || "");
+    setLines((lns || []).map(l => ({ speaker: l.speaker === "student" ? "student" : "other", english: l.english_text || "", korean: l.korean_text || "" })));
+    setJustSaved(false); setSaveError(""); setAssignFor(null);
+    setOpen(true);
+  };
+
+  const closeComposer = () => { setOpen(false); setEditingId(null); setLines([]); setTitle(""); setContext(""); setScope("all"); };
+
   const save = async () => {
     if (!title.trim()) { showMsg("Add a title", "error"); return; }
     const valid = lines.filter(l => (l.english || "").trim() || (l.korean || "").trim());
     if (!valid.length) { showMsg("Add at least one line", "error"); return; }
-    if (scope === "group" && !group?.id) { showMsg("This student has no group", "error"); return; }
+    if (!editingId && scope === "group" && !group?.id) { showMsg("This student has no group", "error"); return; }
     setSaving(true);
     try {
-      const inserted = await db.insert("scenarios", {
-        title: title.trim(),
-        context_description: context.trim() || null,
-        student_id: scope === "student" ? student.id : null,
-        group_id: scope === "group" ? group.id : null,
-        created_by: teacher?.name || null,
-        is_active: true,
-      });
-      const scenarioId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
-      if (!scenarioId) throw new Error("no scenario id returned");
+      let scenarioId = editingId;
+      if (editingId) {
+        // Edit: update fields, then replace all lines (assignments are managed separately).
+        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null });
+        await db.delete("scenario_lines", `scenario_id=eq.${editingId}`);
+      } else {
+        const inserted = await db.insert("scenarios", {
+          title: title.trim(),
+          context_description: context.trim() || null,
+          student_id: scope === "student" ? student.id : null,
+          group_id: scope === "group" ? group.id : null,
+          created_by: teacher?.name || null,
+          is_active: true,
+        });
+        scenarioId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
+        if (!scenarioId) throw new Error("no scenario id returned");
+      }
       await db.insert("scenario_lines", valid.map((l, idx) => ({
         scenario_id: scenarioId,
         sequence_order: idx,
@@ -20107,16 +20128,19 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         english_text: (l.english || "").trim() || null,
         korean_text: (l.korean || "").trim() || null,
       })));
-      // Seed one assignment row mirroring the chosen initial target; more can be added
-      // later via the per-scenario "Assign" control.
-      await db.insert("scenario_assignments", {
-        scenario_id: scenarioId,
-        student_id: scope === "student" ? student.id : null,
-        group_id: scope === "group" ? group.id : null,
-      }).catch(() => {});
-      showMsg("✓ Scenario saved");
+      if (!editingId) {
+        // Seed one assignment row mirroring the chosen initial target; more can be added
+        // later via the per-scenario "Assign" control.
+        await db.insert("scenario_assignments", {
+          scenario_id: scenarioId,
+          student_id: scope === "student" ? student.id : null,
+          group_id: scope === "group" ? group.id : null,
+        }).catch(() => {});
+      }
+      showMsg(editingId ? "✓ Scenario updated" : "✓ Scenario saved");
       setSaveError("");
       setJustSaved(true);
+      setEditingId(null);
       setTitle(""); setContext(""); setLines([]); setScope("all"); setOpen(false);
       refresh();
     } catch(e) {
@@ -20144,7 +20168,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" }}>
           Scenario Builder
         </div>
-        <button onClick={() => { setOpen(o => !o); setJustSaved(false); setSaveError(""); }} style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: FONT }}>
+        <button onClick={() => { if (open) { closeComposer(); } else { setEditingId(null); setTitle(""); setContext(""); setLines([]); setScope("all"); setOpen(true); } setJustSaved(false); setSaveError(""); }} style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: FONT }}>
           {open ? "Close" : "+ New scenario"}
         </button>
       </div>
@@ -20165,6 +20189,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
                   <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.title}</div>
                   {sc.context_description && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.context_description}</div>}
                 </div>
+                <button onClick={() => startEdit(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${editingId === sc.id ? C.navy : C.border}`, background: editingId === sc.id ? C.navy : "transparent", color: editingId === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Edit</button>
                 <button onClick={() => openAssign(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${assignFor === sc.id ? C.navy : C.border}`, background: assignFor === sc.id ? C.navy : "transparent", color: assignFor === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Assign</button>
                 <button onClick={() => toggleActive(sc)} title="Toggle active" style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
                   {sc.is_active ? "Active" : "Off"}
@@ -20196,6 +20221,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
 
       {open && (
         <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, padding: "16px" }}>
+          {editingId && (
+            <div style={{ fontSize: "11px", fontWeight: "700", color: C.navy, marginBottom: "8px", letterSpacing: "0.5px" }}>✎ Editing scenario</div>
+          )}
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Scenario title — e.g. Checking in at a golf club abroad" style={{ ...inputStyle, marginBottom: "8px" }} />
           <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Context — where this happens, who the other person is, the goal" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
 
@@ -20245,9 +20273,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
           </div>
 
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={() => { setOpen(false); setLines([]); setTitle(""); setContext(""); }} style={{ flex: 1, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>Cancel</button>
+            <button onClick={closeComposer} style={{ flex: 1, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>Cancel</button>
             <button onClick={save} disabled={saving} style={{ flex: 2, padding: "11px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: saving ? "default" : "pointer", fontFamily: FONT }}>
-              {saving ? "Saving…" : "Save scenario"}
+              {saving ? "Saving…" : editingId ? "Save changes" : "Save scenario"}
             </button>
           </div>
         </div>
