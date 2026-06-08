@@ -16915,6 +16915,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // the correct version. No microphone — pure listen (shadowing is a later second pass).
   const offerResolveRef = useRef(null);
 
+  // Replace the {name} token in scenario lines with the logged-in student's first name.
+  // Case-insensitive; applied to both spoken text and on-screen display.
+  const fillName = (t) => (t || "").replace(/\{name\}/gi, ((user?.name || "").trim().split(/\s+/)[0]) || "");
+
   const loadScenarioById = async (id) => {
     try {
       const rows = await db.get("scenarios", `id=eq.${id}&limit=1`).catch(() => []);
@@ -16974,7 +16978,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       const voiceId = isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID;
       await sleep(isStudent ? 450 : 250); // brief absorb pause before each line
       if (shouldBail()) return;
-      await scenarioSay(line.english_text || "", voiceId);
+      await scenarioSay(fillName(line.english_text), voiceId);
       if (shouldBail()) return;
       // Exposure-driven offers apply to student-role lines only.
       if (isStudent && line.id) {
@@ -16987,7 +16991,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           if (accepted) {
             await scenarioSay("좋아요! 천천히 다시 들려드릴게요. 같이 말해보세요.", WAVY_VOICE_ID);
             if (shouldBail()) return;
-            await scenarioSay(line.english_text || "", WAVY_VOICE_ID, 0.85); // slowed replay to shadow along
+            await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID, 0.85); // slowed replay to shadow along
           }
         }
       }
@@ -17056,7 +17060,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           await scenarioSay("괜찮아요, 다음으로 가볼게요.", WAVY_VOICE_ID);
         }
       } else {
-        await scenarioSay(line.english_text || "", SCENARIO_OTHER_VOICE_ID);
+        await scenarioSay(fillName(line.english_text), SCENARIO_OTHER_VOICE_ID);
       }
       if (shouldBail()) return;
       await sleep(200);
@@ -18591,9 +18595,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       // Current line
       line && React.createElement("div", { style: { padding: "16px 24px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px", color: isStudent ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.4)" } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나 (이렇게 말해요)") : "상대방"),
-        React.createElement("div", { style: { fontSize: "23px", fontWeight: "800", color: isStudent ? "#c4b5fd" : "#fff", lineHeight: 1.4, marginBottom: "10px" } }, `"${line.english_text || ""}"`),
-        line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 } }, line.korean_text),
-        !(shadowMode && wavyState === "listening") && React.createElement("button", { onClick: () => scenarioSay(line.english_text || "", isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
+        React.createElement("div", { style: { fontSize: "23px", fontWeight: "800", color: isStudent ? "#c4b5fd" : "#fff", lineHeight: 1.4, marginBottom: "10px" } }, `"${fillName(line.english_text)}"`),
+        line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 } }, fillName(line.korean_text)),
+        !(shadowMode && wavyState === "listening") && React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
           style: { marginTop: "18px", alignSelf: "center", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 18px", borderRadius: "100px" } }, "▶ 다시 듣기")
       ),
       // Exposure offer buttons (loop awaits the answer)
@@ -19989,11 +19993,15 @@ function ScenarioBuilder({ student, group, teacher, showMsg }) {
   const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const ors = [`student_id.eq.${student.id}`];
+      // Show this student's, this group's, AND global ("Everyone") scenarios — otherwise
+      // a scenario saved with the default Everyone scope wouldn't appear in the list.
+      const ors = [`student_id.eq.${student.id}`, "and(student_id.is.null,group_id.is.null)"];
       if (group?.id) ors.push(`group_id.eq.${group.id}`);
       const rows = await db.get("scenarios", `or=(${ors.join(",")})&order=created_at.desc`).catch(() => []);
       setScenarios(Array.isArray(rows) ? rows : []);
@@ -20071,10 +20079,14 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         korean_text: (l.korean || "").trim() || null,
       })));
       showMsg("✓ Scenario saved");
-      setTitle(""); setContext(""); setLines([]); setScope("student"); setOpen(false);
+      setSaveError("");
+      setJustSaved(true);
+      setTitle(""); setContext(""); setLines([]); setScope("all"); setOpen(false);
       refresh();
     } catch(e) {
-      showMsg("Save failed: " + (e?.message || "error"), "error");
+      const msg = e?.message || "error";
+      setSaveError(msg);
+      showMsg("Save failed: " + msg, "error");
     }
     setSaving(false);
   };
@@ -20096,10 +20108,17 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" }}>
           Scenario Builder
         </div>
-        <button onClick={() => setOpen(o => !o)} style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: FONT }}>
+        <button onClick={() => { setOpen(o => !o); setJustSaved(false); setSaveError(""); }} style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: C.navy, border: "none", borderRadius: "100px", padding: "6px 14px", cursor: "pointer", fontFamily: FONT }}>
           {open ? "Close" : "+ New scenario"}
         </button>
       </div>
+
+      {justSaved && (
+        <div style={{ background: C.successBg, color: C.success, border: "1px solid #B8D5C0", borderRadius: "12px", padding: "10px 14px", marginBottom: "12px", fontSize: "13px", fontWeight: "700" }}>✓ Scenario saved — it's in the list below.</div>
+      )}
+      {saveError && (
+        <div style={{ background: "#FEF2F2", color: C.error, border: "1px solid #FCA5A5", borderRadius: "12px", padding: "10px 14px", marginBottom: "12px", fontSize: "13px", fontWeight: "700" }}>Save failed: {saveError}</div>
+      )}
 
       {!loading && scenarios.length > 0 && (
         <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: open ? "16px" : "0" }}>
@@ -20162,6 +20181,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
             </div>
           )}
 
+          <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "8px", lineHeight: 1.4 }}>
+            Tip: type <span style={{ fontWeight: "700", color: C.textMid }}>{"{name}"}</span> in any line to insert the student's name (e.g. "Hi, I'm {"{name}"}.").
+          </div>
           <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
             <button onClick={() => addLine("other")} style={addLineBtn}>+ Other line</button>
             <button onClick={() => addLine("student")} style={addLineBtn}>+ Student line</button>
