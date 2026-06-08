@@ -8923,7 +8923,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
       {/* Scenario Builder — teacher authors Listen/Shadowing Mode conversations.
           StudentDetailView only ever renders inside the teacher dashboard, so this is
           rendered unconditionally (the `teacher` prop is only used for created_by). */}
-      <ScenarioBuilder student={localStudent} group={group} teacher={teacher} showMsg={showMsg} />
+      <ScenarioBuilder student={localStudent} group={group} students={students} groups={groups} teacher={teacher} showMsg={showMsg} />
 
       {/* Desktop two-col / Mobile single */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", alignItems: "start" }}>
@@ -19983,32 +19983,61 @@ function SessionNoteArchiveSheet({ notes, onClose }) {
 // context + an ordered list of alternating conversation lines (speaker toggle +
 // english + korean). "Generate with AI" drafts a natural exchange as JSON for the
 // teacher to review and edit before saving to scenarios + scenario_lines.
-function ScenarioBuilder({ student, group, teacher, showMsg }) {
+function ScenarioBuilder({ student, group, students, groups, teacher, showMsg }) {
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
-  const [scope, setScope] = useState("all"); // 'all' (everyone) | 'student' | 'group'
+  const [scope, setScope] = useState("all"); // 'all' (everyone) | 'student' | 'group' — the INITIAL target
   const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [assignFor, setAssignFor] = useState(null); // scenario id whose assign panel is open
+  const [assignRows, setAssignRows] = useState([]);  // scenario_assignments rows for that scenario
 
+  // The builder shows the whole scenario library (shared across students); assignments
+  // (not scenarios.student_id) now decide who each scenario reaches.
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Show this student's, this group's, AND global ("Everyone") scenarios — otherwise
-      // a scenario saved with the default Everyone scope wouldn't appear in the list.
-      const ors = [`student_id.eq.${student.id}`, "and(student_id.is.null,group_id.is.null)"];
-      if (group?.id) ors.push(`group_id.eq.${group.id}`);
-      const rows = await db.get("scenarios", `or=(${ors.join(",")})&order=created_at.desc`).catch(() => []);
+      const rows = await db.get("scenarios", "order=created_at.desc").catch(() => []);
       setScenarios(Array.isArray(rows) ? rows : []);
     } catch(e) {}
     setLoading(false);
-  }, [student.id, group?.id]);
+  }, []);
   useEffect(() => { refresh(); }, [refresh]);
+
+  // ── Assignment management (one scenario → many students/groups/everyone) ──
+  const openAssign = async (sc) => {
+    if (assignFor === sc.id) { setAssignFor(null); setAssignRows([]); return; }
+    setAssignFor(sc.id);
+    const rows = await db.get("scenario_assignments", `scenario_id=eq.${sc.id}&select=id,student_id,group_id`).catch(() => []);
+    setAssignRows(Array.isArray(rows) ? rows : []);
+  };
+  const isAssigned = (kind, id) => {
+    if (kind === "everyone") return assignRows.some(a => !a.student_id && !a.group_id);
+    if (kind === "student") return assignRows.some(a => a.student_id === id);
+    return assignRows.some(a => a.group_id === id);
+  };
+  const toggleTarget = async (scId, kind, id) => {
+    let ex;
+    if (kind === "everyone") ex = assignRows.find(a => !a.student_id && !a.group_id);
+    else if (kind === "student") ex = assignRows.find(a => a.student_id === id);
+    else ex = assignRows.find(a => a.group_id === id);
+    if (ex) {
+      await db.delete("scenario_assignments", `id=eq.${ex.id}`).catch(() => {});
+      setAssignRows(prev => prev.filter(a => a.id !== ex.id));
+      return;
+    }
+    const payload = { scenario_id: scId, student_id: kind === "student" ? id : null, group_id: kind === "group" ? id : null };
+    const ins = await db.insert("scenario_assignments", payload).catch(() => null);
+    const row = Array.isArray(ins) ? ins[0] : ins;
+    if (row) setAssignRows(prev => [...prev, row]);
+    else showMsg("Assign failed", "error");
+  };
 
   const addLine = (speaker) => setLines(prev => [...prev, { speaker, english: "", korean: "" }]);
   const updateLine = (i, field, val) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l));
@@ -20078,6 +20107,13 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         english_text: (l.english || "").trim() || null,
         korean_text: (l.korean || "").trim() || null,
       })));
+      // Seed one assignment row mirroring the chosen initial target; more can be added
+      // later via the per-scenario "Assign" control.
+      await db.insert("scenario_assignments", {
+        scenario_id: scenarioId,
+        student_id: scope === "student" ? student.id : null,
+        group_id: scope === "group" ? group.id : null,
+      }).catch(() => {});
       showMsg("✓ Scenario saved");
       setSaveError("");
       setJustSaved(true);
@@ -20123,14 +20159,33 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       {!loading && scenarios.length > 0 && (
         <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: open ? "16px" : "0" }}>
           {scenarios.map((sc, i) => (
-            <div key={sc.id} style={{ padding: "11px 14px", borderBottom: i < scenarios.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.title}</div>
-                <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px" }}>{sc.student_id ? "This student" : sc.group_id ? "Group" : "Everyone"}{sc.context_description ? ` · ${sc.context_description}` : ""}</div>
+            <div key={sc.id} style={{ borderBottom: i < scenarios.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ padding: "11px 14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.title}</div>
+                  {sc.context_description && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.context_description}</div>}
+                </div>
+                <button onClick={() => openAssign(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${assignFor === sc.id ? C.navy : C.border}`, background: assignFor === sc.id ? C.navy : "transparent", color: assignFor === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Assign</button>
+                <button onClick={() => toggleActive(sc)} title="Toggle active" style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
+                  {sc.is_active ? "Active" : "Off"}
+                </button>
               </div>
-              <button onClick={() => toggleActive(sc)} title="Toggle active" style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
-                {sc.is_active ? "Active" : "Off"}
-              </button>
+              {assignFor === sc.id && (
+                <div style={{ padding: "0 14px 12px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  <div style={{ width: "100%", fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "2px" }}>Available to</div>
+                  {[{ kind: "everyone", id: null, label: "Everyone" }]
+                    .concat((groups || []).map(g => ({ kind: "group", id: g.id, label: `Group · ${g.name}` })))
+                    .concat((students || []).map(s => ({ kind: "student", id: s.id, label: s.name })))
+                    .map(t => {
+                      const on = isAssigned(t.kind, t.id);
+                      return (
+                        <button key={`${t.kind}-${t.id}`} onClick={() => toggleTarget(sc.id, t.kind, t.id)} style={{ fontSize: "11px", fontWeight: "700", padding: "4px 10px", borderRadius: "100px", border: `1px solid ${on ? C.navy : C.border}`, background: on ? C.navy : "transparent", color: on ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>
+                          {on ? "✓ " : ""}{t.label}
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -20794,12 +20849,17 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         const passedSet = new Set(progAll.filter(p => p.passed).map(p => p.phrase_id));
         if (!cancelled) setPhrasesMastered(passedSet.size);
 
-        // ── Curated scenarios available to this student (global library + targeted) ──
+        // ── Curated scenarios available to this student — via scenario_assignments ──
         // Gated to Toms while testing — skip the fetch entirely for other students.
         if (scenariosVisible) {
-          const sOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
-          if (group?.id) sOrs.push(`group_id.eq.${group.id}`);
-          const scenarioRows = await db.get("scenarios", `or=(${sOrs.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
+          const aOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
+          if (group?.id) aOrs.push(`group_id.eq.${group.id}`);
+          const assigns = await db.get("scenario_assignments", `or=(${aOrs.join(",")})&select=scenario_id`).catch(() => []);
+          const ids = [...new Set((assigns || []).map(a => a.scenario_id))];
+          let scenarioRows = [];
+          if (ids.length) {
+            scenarioRows = await db.get("scenarios", `id=in.(${ids.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
+          }
           if (!cancelled) setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
         }
 
