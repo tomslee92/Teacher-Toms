@@ -8920,10 +8920,10 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         </div>
       )}
 
-      {/* Scenario Builder — teacher authors Listen/Shadowing Mode conversations */}
-      {teacher && (
-        <ScenarioBuilder student={localStudent} group={group} teacher={teacher} showMsg={showMsg} />
-      )}
+      {/* Scenario Builder — teacher authors Listen/Shadowing Mode conversations.
+          StudentDetailView only ever renders inside the teacher dashboard, so this is
+          rendered unconditionally (the `teacher` prop is only used for created_by). */}
+      <ScenarioBuilder student={localStudent} group={group} teacher={teacher} showMsg={showMsg} />
 
       {/* Desktop two-col / Mobile single */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", alignItems: "start" }}>
