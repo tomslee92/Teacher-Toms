@@ -16604,7 +16604,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [scenario, setScenario] = useState(null);          // { id, title, context_description }
   const [scenarioLines, setScenarioLines] = useState([]);  // [{ id, sequence_order, speaker, english_text, korean_text }]
   const [scenarioIdx, setScenarioIdx] = useState(0);       // current line index
-  const [scenarioOffer, setScenarioOffer] = useState(null);// { lineId, kind } when an exposure offer is shown
+  const [scenarioOffer, setScenarioOffer] = useState(null);// { lineId, kind } when an exposure/shadow offer is shown
+  const [shadowMode, setShadowMode] = useState(false);     // true during the Shadowing second pass (mic on)
+  const [scShadowPraise, setScShadowPraise] = useState(false); // brief "encouraging" flash after the student speaks
 
   // Wavi character rollout — Toms only for now; flip to all wavy_enabled once validated.
   const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
@@ -16987,7 +16989,76 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       await sleep(300);
     }
     if (shouldBail()) return;
-    await scenarioSay("오늘 정말 잘하셨어요. 여기까지예요. 수고하셨어요!", WAVY_VOICE_ID);
+    await scenarioSay("잘 들으셨어요! 이번엔 직접 말해볼래요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
+    if (shouldBail()) return;
+    const wantShadow = await showExposureOffer({ id: "shadow" }, "shadow");
+    if (shouldBail()) return;
+    if (wantShadow) { await runShadowing(lines); }
+    else { await scenarioSay("좋아요, 오늘은 여기까지예요. 수고하셨어요!", WAVY_VOICE_ID); endScenario(); }
+  };
+
+  // ── Shadowing Mode (second pass) ────────────────────────────────────────────
+  // Same flow replays; the student speaks their own lines into the mic. No scoring,
+  // no judgment — like rehearsing a scene. 5s of silence and Wavi gently moves on.
+  const captureShadowLine = () => new Promise((resolve) => {
+    let settled = false;
+    const done = (spoke) => { if (settled) return; settled = true; setMicLevel(0); setWavyState("idle"); resolve(spoke); };
+    let listener;
+    try {
+      listener = new WavyVoiceListener({ silenceDurationMs: 1200, speechMinDurationMs: 400, noSpeechTimeoutMs: 5000, maxRecordingMs: 12000 });
+    } catch(e) { return resolve(false); }
+    listenerRef.current = listener;
+    setWavyState("listening");
+    listener.start({
+      onResult: () => done(true),    // they spoke — blob intentionally discarded (no scoring)
+      onTimeout: () => done(false),  // 5s silence / no mic — move on
+      onAmplitude: (lvl) => setMicLevel(lvl),
+    });
+  });
+
+  const runShadowing = async (lines) => {
+    if (shouldBail()) return;
+    // Shadowing needs the microphone — ask once up front (Listen Mode never requested it).
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach(t => t.stop());
+    } catch(e) {
+      await scenarioSay("마이크 권한이 필요해요. 설정에서 허용한 뒤 다시 해볼까요?", WAVY_VOICE_ID);
+      endScenario();
+      return;
+    }
+    if (shouldBail()) return;
+    setShadowMode(true);
+    setScenarioIdx(0);
+    await scenarioSay("좋아요! 나의 차례가 오면 직접 말해보세요. 천천히 해도 괜찮아요.", WAVY_VOICE_ID);
+    for (let i = 0; i < lines.length; i++) {
+      if (shouldBail()) return;
+      setScenarioIdx(i);
+      const line = lines[i];
+      const isStudent = line.speaker === "student";
+      await sleep(250);
+      if (shouldBail()) return;
+      if (isStudent) {
+        await sleep(300); // brief pause — line stays on screen, then mic opens
+        if (shouldBail()) return;
+        const spoke = await captureShadowLine();
+        if (shouldBail()) return;
+        if (spoke) {
+          setScShadowPraise(true);
+          await sleep(900);
+          setScShadowPraise(false);
+        } else {
+          await scenarioSay("괜찮아요, 다음으로 가볼게요.", WAVY_VOICE_ID);
+        }
+      } else {
+        await scenarioSay(line.english_text || "", SCENARIO_OTHER_VOICE_ID);
+      }
+      if (shouldBail()) return;
+      await sleep(200);
+    }
+    if (shouldBail()) return;
+    setShadowMode(false);
+    await scenarioSay("정말 잘하셨어요! 한 장면을 끝까지 해냈어요. 수고하셨어요!", WAVY_VOICE_ID);
     endScenario();
   };
 
@@ -18496,7 +18567,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   if (phase === "scenario") {
     const line = scenarioLines[scenarioIdx] || null;
     const isStudent = line && line.speaker === "student";
-    const scExpr = wavyState === "speaking" ? "speaking" : wavyState === "listening" ? "listening" : "neutral";
+    const scExpr = scShadowPraise ? "encouraging" : wavyState === "speaking" ? "speaking" : wavyState === "listening" ? "listening" : "neutral";
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
       React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
       // Top bar
@@ -18514,22 +18585,22 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       renderWaviCharacter(scExpr, null),
       // Current line
       line && React.createElement("div", { style: { padding: "16px 24px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px", color: isStudent ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.4)" } }, isStudent ? "나 (이렇게 말해요)" : "상대방"),
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px", color: isStudent ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.4)" } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나 (이렇게 말해요)") : "상대방"),
         React.createElement("div", { style: { fontSize: "23px", fontWeight: "800", color: isStudent ? "#c4b5fd" : "#fff", lineHeight: 1.4, marginBottom: "10px" } }, `"${line.english_text || ""}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 } }, line.korean_text),
-        React.createElement("button", { onClick: () => scenarioSay(line.english_text || "", isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
+        !(shadowMode && wavyState === "listening") && React.createElement("button", { onClick: () => scenarioSay(line.english_text || "", isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
           style: { marginTop: "18px", alignSelf: "center", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.8)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 18px", borderRadius: "100px" } }, "▶ 다시 듣기")
       ),
       // Exposure offer buttons (loop awaits the answer)
       scenarioOffer && React.createElement("div", { style: { padding: "16px 20px 36px", position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", marginBottom: "4px", textAlign: "center" } }, scenarioOffer.kind === "warm" ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?"),
+        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", marginBottom: "4px", textAlign: "center" } }, scenarioOffer.kind === "shadow" ? "이번엔 직접 말해볼래요?" : scenarioOffer.kind === "warm" ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?"),
         React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%", maxWidth: "360px" } },
-          React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "아직 괜찮아요"),
-          React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "좋아요, 해볼게요")
+          React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "아직 괜찮아요"),
+          React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "네, 해볼게요" : "좋아요, 해볼게요")
         )
       ),
-      // Quiet status when not offering
-      !scenarioOffer && React.createElement("div", { style: { padding: "0 20px 36px", position: "relative", zIndex: 2, textAlign: "center", fontSize: "12px", color: "rgba(255,255,255,0.4)" } }, wavyState === "speaking" ? "듣는 중…" : "")
+      // Quiet status when not offering (mic prompt during shadowing)
+      !scenarioOffer && React.createElement("div", { style: { padding: "0 20px 36px", position: "relative", zIndex: 2, textAlign: "center", fontSize: "13px", fontWeight: "600", color: shadowMode && wavyState === "listening" ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.4)" } }, shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : wavyState === "speaking" ? "듣는 중…" : "")
     );
   }
 
