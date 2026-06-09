@@ -20055,6 +20055,7 @@ function ScenarioBuilder({ student, group, students, groups, teacher, showMsg })
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
+  const [category, setCategory] = useState(""); // optional theme grouping, e.g. "GOLF"
   const [scope, setScope] = useState("all"); // 'all' (everyone) | 'student' | 'group' — the INITIAL target
   const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
   const [generating, setGenerating] = useState(false);
@@ -20157,12 +20158,13 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     setEditingId(sc.id);
     setTitle(sc.title || "");
     setContext(sc.context_description || "");
+    setCategory(sc.category || "");
     setLines((lns || []).map(l => ({ speaker: l.speaker === "student" ? "student" : "other", english: l.english_text || "", korean: l.korean_text || "", video: l.wavi_video_url || "" })));
     setJustSaved(false); setSaveError(""); setAssignFor(null);
     setOpen(true);
   };
 
-  const closeComposer = () => { setOpen(false); setEditingId(null); setLines([]); setTitle(""); setContext(""); setScope("all"); };
+  const closeComposer = () => { setOpen(false); setEditingId(null); setLines([]); setTitle(""); setContext(""); setCategory(""); setScope("all"); };
 
   const save = async () => {
     if (!title.trim()) { showMsg("Add a title", "error"); return; }
@@ -20174,12 +20176,13 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       let scenarioId = editingId;
       if (editingId) {
         // Edit: update fields, then replace all lines (assignments are managed separately).
-        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null });
+        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null, category: category.trim() || null });
         await db.delete("scenario_lines", `scenario_id=eq.${editingId}`);
       } else {
         const inserted = await db.insert("scenarios", {
           title: title.trim(),
           context_description: context.trim() || null,
+          category: category.trim() || null,
           student_id: scope === "student" ? student.id : null,
           group_id: scope === "group" ? group.id : null,
           created_by: teacher?.name || null,
@@ -20229,6 +20232,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, background: "#fff", boxSizing: "border-box" };
   const miniBtn = { fontSize: "11px", fontWeight: "700", width: "24px", height: "24px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#fff", color: C.textMid, cursor: "pointer", fontFamily: FONT, padding: 0, lineHeight: 1 };
   const addLineBtn = { flex: 1, padding: "8px", borderRadius: "10px", border: `1px dashed ${C.border}`, background: "transparent", color: C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT };
+  const existingCategories = [...new Set(scenarios.map(s => (s.category || "").trim()).filter(Boolean))];
 
   return (
     <div style={{ marginBottom: "28px" }}>
@@ -20255,7 +20259,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
               <div style={{ padding: "11px 14px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.title}</div>
-                  {sc.context_description && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.context_description}</div>}
+                  {(sc.category || sc.context_description) && <div style={{ fontSize: "11px", color: C.textLight, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sc.category ? <span style={{ fontWeight: "700", color: C.textMid }}>{sc.category}</span> : null}{sc.category && sc.context_description ? " · " : ""}{sc.context_description || ""}</div>}
                 </div>
                 <button onClick={() => startEdit(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${editingId === sc.id ? C.navy : C.border}`, background: editingId === sc.id ? C.navy : "transparent", color: editingId === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Edit</button>
                 <button onClick={() => openAssign(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${assignFor === sc.id ? C.navy : C.border}`, background: assignFor === sc.id ? C.navy : "transparent", color: assignFor === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Assign</button>
@@ -20292,7 +20296,15 @@ Return ONLY valid JSON, no markdown fences, no preamble:
           {editingId && (
             <div style={{ fontSize: "11px", fontWeight: "700", color: C.navy, marginBottom: "8px", letterSpacing: "0.5px" }}>✎ Editing scenario</div>
           )}
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Scenario title — e.g. Checking in at a golf club abroad" style={{ ...inputStyle, marginBottom: "8px" }} />
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Situation title — e.g. Checking in at the golf club" style={{ ...inputStyle, marginBottom: "8px" }} />
+          <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Category (optional) — e.g. GOLF" style={{ ...inputStyle, marginBottom: existingCategories.length ? "6px" : "8px" }} />
+          {existingCategories.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+              {existingCategories.map(c => (
+                <button key={c} onClick={() => setCategory(c)} style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${category === c ? C.navy : C.border}`, background: category === c ? C.navy : "transparent", color: category === c ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>{c}</button>
+              ))}
+            </div>
+          )}
           <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Context — where this happens, who the other person is, the goal" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
@@ -21213,8 +21225,16 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       // ── Curated sessions — teacher-built scenarios for Listen Mode ────────
       scenariosVisible && scenarios.length > 0 && React.createElement("div", { style: { marginBottom: "16px" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" } }, "추천 세션"),
-        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
-          scenarios.map(sc => React.createElement("button", {
+        (() => {
+          // Group scenarios under their category header (uncategorized render with no header).
+          const order = [];
+          const byCat = new Map();
+          scenarios.forEach(sc => {
+            const cat = (sc.category || "").trim();
+            if (!byCat.has(cat)) { byCat.set(cat, []); order.push(cat); }
+            byCat.get(cat).push(sc);
+          });
+          const renderCard = (sc) => React.createElement("button", {
             key: sc.id,
             onClick: () => onStartScenario && onStartScenario(sc),
             style: { textAlign: "left", width: "100%", background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", border: "none", borderRadius: "18px", padding: "16px 18px", cursor: "pointer", fontFamily: FONT, boxShadow: "0 6px 18px rgba(49,46,129,0.25)", display: "flex", alignItems: "center", gap: "12px" } },
@@ -21223,8 +21243,12 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
               sc.context_description && React.createElement("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, sc.context_description)
             ),
             React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: "#c7d2fe", flexShrink: 0 } }, "듣기 →")
-          ))
-        )
+          );
+          return order.map((cat, gi) => React.createElement("div", { key: cat || "_uncat", style: { marginBottom: gi < order.length - 1 ? "16px" : 0 } },
+            cat && React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: C.text, marginBottom: "8px", letterSpacing: "-0.2px" } }, cat),
+            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } }, byCat.get(cat).map(renderCard))
+          ));
+        })()
       ),
 
       // ── Note card — most recent non-dismissed note from the teacher ───────
