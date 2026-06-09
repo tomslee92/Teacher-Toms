@@ -16616,6 +16616,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [scenarioOffer, setScenarioOffer] = useState(null);// { lineId, kind } when an exposure/shadow offer is shown
   const [shadowMode, setShadowMode] = useState(false);     // true during the Shadowing second pass (mic on)
   const [scShadowPraise, setScShadowPraise] = useState(false); // brief "encouraging" flash after the student speaks
+  const [scenarioVideoUrl, setScenarioVideoUrl] = useState(null); // current line's pre-rendered clip (plays instead of avatar+TTS)
 
   // Wavi character rollout — Toms only for now; flip to all wavy_enabled once validated.
   const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
@@ -16914,6 +16915,18 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // SCENARIO_OTHER_VOICE_ID, "student" lines use Wavi's own voice so the learner hears
   // the correct version. No microphone — pure listen (shadowing is a later second pass).
   const offerResolveRef = useRef(null);
+  const videoDoneRef = useRef(null); // resolver for the currently-playing line video
+
+  // Play a pre-rendered line clip (carries its own audio, so no TTS). Resolves when the
+  // video ends, errors, or a 30s safety cap fires — so the loop can never hang on it.
+  const playLineVideo = (url) => new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; videoDoneRef.current = null; resolve(); };
+    videoDoneRef.current = finish;
+    setWavyState("speaking");
+    setScenarioVideoUrl(url);
+    setTimeout(finish, 30000);
+  });
 
   // Replace the {name} token in scenario lines with the logged-in student's first name.
   // Case-insensitive; applied to both spoken text and on-screen display.
@@ -16979,7 +16992,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       const voiceId = isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID;
       await sleep(isStudent ? 450 : 250); // brief absorb pause before each line
       if (shouldBail()) return;
-      await scenarioSay(fillName(line.english_text), voiceId);
+      if (line.wavi_video_url) { await playLineVideo(line.wavi_video_url); setScenarioVideoUrl(null); setWavyState("idle"); }
+      else await scenarioSay(fillName(line.english_text), voiceId);
       if (shouldBail()) return;
       // Exposure-driven offers apply to student-role lines only.
       if (isStudent && line.id) {
@@ -17070,6 +17084,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         } else {
           await scenarioSay("괜찮아요, 다음으로 가볼게요.", WAVY_VOICE_ID);
         }
+      } else if (line.wavi_video_url) {
+        await playLineVideo(line.wavi_video_url); setScenarioVideoUrl(null); setWavyState("idle");
       } else {
         await scenarioSay(fillName(line.english_text), SCENARIO_OTHER_VOICE_ID);
       }
@@ -17095,6 +17111,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const exitWavi = () => {
     sessionEndedRef.current = true;
     try { abortRef.current?.abort(); } catch(_) {}
+    if (videoDoneRef.current) { const r = videoDoneRef.current; videoDoneRef.current = null; r(); }
     if (manualExitRef.current && onManualExit) onManualExit();
     else onClose();
   };
@@ -17108,7 +17125,11 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     return React.createElement("div", { style: { position: "relative", zIndex: 2, height: `${H}px`, marginTop: "4px", flexShrink: 0 } },
       React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "248px", height: "248px", borderRadius: "50%", background: expression === "listening" ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent 70%)" : expression === "encouraging" ? "radial-gradient(circle, rgba(139,92,246,0.22), transparent 70%)" : "radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%)", transition: "background 0.45s ease", pointerEvents: "none" } }),
       videoUrl
-        ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true, style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: `${H}px`, objectFit: "contain", borderRadius: "20px", filter: "drop-shadow(0 14px 32px rgba(0,0,0,0.5))" } })
+        ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true,
+            onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
+            onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+            onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+            style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: `${H}px`, objectFit: "contain", borderRadius: "20px", filter: "drop-shadow(0 14px 32px rgba(0,0,0,0.5))" } })
         : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
             React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true",
               onError: (e) => { e.target.style.visibility = "hidden"; },
@@ -18619,14 +18640,17 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       ),
       // Scenario title
       scenario && React.createElement("div", { style: { textAlign: "center", padding: "2px 20px 0", position: "relative", zIndex: 2, fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "600" } }, scenario.title),
-      // Avatar — the other person gets a distinct avatar; Wavi voices/guides the student line
-      (isStudent ? renderWaviCharacter(scExpr, null) : renderOtherAvatar(wavyState === "speaking")),
+      // Avatar — a playing clip takes over; else the other person gets a distinct avatar and
+      // Wavi voices/guides the student line.
+      (scenarioVideoUrl
+        ? renderWaviCharacter(scExpr, scenarioVideoUrl)
+        : (isStudent ? renderWaviCharacter(scExpr, null) : renderOtherAvatar(wavyState === "speaking"))),
       // Current line
       line && React.createElement("div", { style: { padding: "16px 24px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px", color: isStudent ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.4)" } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나 (이렇게 말해요)") : "상대방"),
         React.createElement("div", { style: { fontSize: "23px", fontWeight: "800", color: isStudent ? "#c4b5fd" : "#fff", lineHeight: 1.4, marginBottom: "10px" } }, `"${fillName(line.english_text)}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5 } }, fillName(line.korean_text)),
-        !(shadowMode && wavyState === "listening") && React.createElement("div", { style: { marginTop: "20px", display: "flex", gap: "10px", justifyContent: "center" } },
+        !(shadowMode && wavyState === "listening") && !scenarioVideoUrl && React.createElement("div", { style: { marginTop: "20px", display: "flex", gap: "10px", justifyContent: "center" } },
           React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
             style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 20px", borderRadius: "100px" } }, "▶ 다시 듣기"),
           React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID, 0.7),
@@ -20073,7 +20097,7 @@ function ScenarioBuilder({ student, group, students, groups, teacher, showMsg })
     else showMsg("Assign failed", "error");
   };
 
-  const addLine = (speaker) => setLines(prev => [...prev, { speaker, english: "", korean: "" }]);
+  const addLine = (speaker) => setLines(prev => [...prev, { speaker, english: "", korean: "", video: "" }]);
   const updateLine = (i, field, val) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l));
   const removeLine = (i) => setLines(prev => prev.filter((_, idx) => idx !== i));
   const toggleSpeaker = (i) => setLines(prev => prev.map((l, idx) => idx === i ? { ...l, speaker: l.speaker === "other" ? "student" : "other" } : l));
@@ -20106,6 +20130,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
           speaker: l.speaker === "student" ? "student" : "other",
           english: String(l.english || ""),
           korean: String(l.korean || ""),
+          video: "",
         })));
         showMsg(`✓ Drafted ${parsed.lines.length} lines — review & edit below`);
       } else {
@@ -20123,7 +20148,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     setEditingId(sc.id);
     setTitle(sc.title || "");
     setContext(sc.context_description || "");
-    setLines((lns || []).map(l => ({ speaker: l.speaker === "student" ? "student" : "other", english: l.english_text || "", korean: l.korean_text || "" })));
+    setLines((lns || []).map(l => ({ speaker: l.speaker === "student" ? "student" : "other", english: l.english_text || "", korean: l.korean_text || "", video: l.wavi_video_url || "" })));
     setJustSaved(false); setSaveError(""); setAssignFor(null);
     setOpen(true);
   };
@@ -20160,6 +20185,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         speaker: l.speaker === "student" ? "student" : "other",
         english_text: (l.english || "").trim() || null,
         korean_text: (l.korean || "").trim() || null,
+        wavi_video_url: (l.video || "").trim() || null,
       })));
       if (!editingId) {
         // Seed one assignment row mirroring the chosen initial target; more can be added
@@ -20292,6 +20318,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
                   </div>
                   <input value={l.english} onChange={e => updateLine(i, "english", e.target.value)} placeholder="English" style={{ ...inputStyle, marginBottom: "4px", fontSize: "12px" }} />
                   <input value={l.korean} onChange={e => updateLine(i, "korean", e.target.value)} placeholder="한국어" style={{ ...inputStyle, fontSize: "12px" }} />
+                  <input value={l.video || ""} onChange={e => updateLine(i, "video", e.target.value)} placeholder="Video URL (optional) — Wavi plays this clip instead of the avatar + voice" style={{ ...inputStyle, fontSize: "11px", marginTop: "4px", color: C.textMid }} />
                 </div>
               ))}
             </div>
