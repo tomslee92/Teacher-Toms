@@ -20881,6 +20881,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const lang = useLang();
   const [weekMinutes, setWeekMinutes] = useState(null);
   const [scenarios, setScenarios] = useState([]); // curated Listen Mode sessions available to this student
+  const [collapsedCats, setCollapsedCats] = useState({}); // category name → true when collapsed on the home card
   // Toms-only while testing; flip SCENARIOS_STUDENT_ENABLED to roll out to all students.
   const scenariosVisible = SCENARIOS_STUDENT_ENABLED || user?.name === "Toms Lee" || user?.name === "Toms";
   const [phrasesMastered, setPhrasesMastered] = useState(null);
@@ -21244,10 +21245,18 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
             ),
             React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: "#c7d2fe", flexShrink: 0 } }, "듣기 →")
           );
-          return order.map((cat, gi) => React.createElement("div", { key: cat || "_uncat", style: { marginBottom: gi < order.length - 1 ? "16px" : 0 } },
-            cat && React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: C.text, marginBottom: "8px", letterSpacing: "-0.2px" } }, cat),
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } }, byCat.get(cat).map(renderCard))
-          ));
+          return order.map((cat, gi) => {
+            const collapsed = !!cat && !!collapsedCats[cat];
+            return React.createElement("div", { key: cat || "_uncat", style: { marginBottom: gi < order.length - 1 ? "16px" : 0 } },
+              cat && React.createElement("button", {
+                onClick: () => setCollapsedCats(p => ({ ...p, [cat]: !p[cat] })),
+                style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, padding: "2px 0", marginBottom: collapsed ? 0 : "8px" } },
+                React.createElement("span", { style: { fontSize: "14px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" } }, `${cat} · ${byCat.get(cat).length}`),
+                React.createElement("span", { style: { fontSize: "13px", color: C.textLight, fontWeight: "700" } }, collapsed ? "▸" : "▾")
+              ),
+              (!cat || !collapsed) && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } }, byCat.get(cat).map(renderCard))
+            );
+          });
         })()
       ),
 
