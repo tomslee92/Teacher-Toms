@@ -18744,20 +18744,21 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           [0, 1, 2, 3, 4].map(i => React.createElement("div", { key: i, style: { width: "5px", height: "34px", borderRadius: "100px", background: "rgba(125,211,252,0.95)", transformOrigin: "center", transform: "scaleY(0.3)", opacity: wavyState === "speaking" ? 1 : 0.35, animation: wavyState === "speaking" ? `scBar 0.9s ease-in-out ${i * 0.1}s infinite` : "none", transition: "opacity 0.3s ease" } }))
         )
       ),
-      // Focal point — a playing clip if a line has one, else a premium audio indicator (no character)
-      !scenarioIntroText && React.createElement("div", { style: { position: "relative", zIndex: 2, height: "150px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "10px" } },
-        scenarioVideoUrl
-          ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
-              onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
-              onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-              onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-              style: { height: "150px", objectFit: "contain", borderRadius: "20px", boxShadow: "0 16px 44px rgba(0,0,0,0.5)" } })
-          : React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "56px" } },
-              [0, 1, 2, 3, 4].map(i => React.createElement("div", { key: i, style: { width: "6px", height: "48px", borderRadius: "100px", background: scAccent, transformOrigin: "center", transform: "scaleY(0.3)", opacity: wavyState === "speaking" ? 1 : 0.35, animation: wavyState === "speaking" ? `scBar 0.9s ease-in-out ${i * 0.1}s infinite` : "none", transition: "opacity 0.3s ease" } }))
-            )
-      ),
-      // Current line — one focal line, smooth fade on each advance
-      !scenarioIntroText && line && React.createElement("div", { key: scenarioIdx, style: { padding: "20px 28px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", animation: "scFade 0.45s ease both" } },
+      // Centered conversation area — the audio indicator + current line + controls form ONE
+      // vertically-centered group, so the whole thing sits in the middle of the screen.
+      !scenarioIntroText && line && React.createElement("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 2, padding: "0 28px" } },
+        React.createElement("div", { style: { height: "108px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginBottom: "6px" } },
+          scenarioVideoUrl
+            ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
+                onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
+                onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+                onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+                style: { height: "108px", objectFit: "contain", borderRadius: "20px", boxShadow: "0 16px 44px rgba(0,0,0,0.5)" } })
+            : React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "48px" } },
+                [0, 1, 2, 3, 4].map(i => React.createElement("div", { key: i, style: { width: "6px", height: "44px", borderRadius: "100px", background: scAccent, transformOrigin: "center", transform: "scaleY(0.3)", opacity: wavyState === "speaking" ? 1 : 0.35, animation: wavyState === "speaking" ? `scBar 0.9s ease-in-out ${i * 0.1}s infinite` : "none", transition: "opacity 0.3s ease" } }))
+              )
+        ),
+        React.createElement("div", { key: scenarioIdx, style: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", animation: "scFade 0.45s ease both" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "16px", color: scAccent } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나") : "상대방"),
         React.createElement("div", { style: { fontSize: "26px", fontWeight: "800", color: "#fff", lineHeight: 1.35, marginBottom: "12px", letterSpacing: "-0.3px" } }, `"${fillName(line.english_text)}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 } }, fillName(line.korean_text)),
@@ -18777,6 +18778,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         nextLine && React.createElement("div", { style: { marginTop: "30px", opacity: 0.42, display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" } },
           React.createElement("div", { style: { fontSize: "9px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: nextIsStudent ? "#c4b5fd" : "rgba(125,211,252,0.9)" } }, nextIsStudent ? "다음 · 나" : "다음 · 상대방"),
           React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: "rgba(255,255,255,0.72)", lineHeight: 1.3, textAlign: "center" } }, `"${fillName(nextLine.english_text)}"`)
+        )
         )
       ),
       // Exposure offer buttons (loop awaits the answer)
