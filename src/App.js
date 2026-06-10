@@ -758,6 +758,34 @@ function phraseScopeFilter(groupId, studentId) {
   return "id=eq.00000000-0000-0000-0000-000000000000"; // matches nothing
 }
 
+// When a student joins/moves a group, make their phrases follow them and don't inherit the
+// new group's back-catalog: (1) copy the OLD group's phrases into the student's personal
+// list, (2) clean-slate (dismiss) the NEW group's existing phrases — so they start clean and
+// only see phrases added to the new group AFTER they joined. Personal phrases already follow.
+// Best-effort + idempotent (dedupes against existing personal phrases / dismissals).
+async function migrateStudentPhrasesOnGroupChange(studentId, oldGroupId, newGroupId) {
+  if (!studentId) return;
+  try {
+    if (oldGroupId) {
+      const oldPhrases = await db.get("session_phrases", `group_id=eq.${oldGroupId}&student_id=is.null&select=phrase_id,in_library`).catch(() => []);
+      const personal = await db.get("session_phrases", `student_id=eq.${studentId}&select=phrase_id`).catch(() => []);
+      const have = new Set(personal.map(r => r.phrase_id));
+      const toCopy = oldPhrases.filter(r => r.phrase_id && !have.has(r.phrase_id));
+      if (toCopy.length) await db.insert("session_phrases", toCopy.map(r => ({ student_id: studentId, phrase_id: r.phrase_id, in_library: !!r.in_library }))).catch(() => {});
+    }
+    if (newGroupId) {
+      const newPhrases = await db.get("session_phrases", `group_id=eq.${newGroupId}&student_id=is.null&select=phrase_id`).catch(() => []);
+      const personalNow = await db.get("session_phrases", `student_id=eq.${studentId}&select=phrase_id`).catch(() => []);
+      const personalSet = new Set(personalNow.map(r => r.phrase_id));
+      const dismissals = await db.get("phrase_dismissals", `student_id=eq.${studentId}&select=phrase_id`).catch(() => []);
+      const dismissed = new Set(dismissals.map(r => r.phrase_id));
+      // Don't dismiss phrases the student now owns personally (e.g. carried over and also in the new group).
+      const toDismiss = newPhrases.filter(r => r.phrase_id && !dismissed.has(r.phrase_id) && !personalSet.has(r.phrase_id));
+      if (toDismiss.length) await db.upsert("phrase_dismissals", toDismiss.map(r => ({ student_id: studentId, phrase_id: r.phrase_id }))).catch(() => {});
+    }
+  } catch(e) { console.warn("[group-change] phrase migration failed:", e?.message); }
+}
+
 // Fetch the set of phrase_ids this student has dismissed (small set; filtered
 // client-side against fetched session_phrases). Returns a Set of phrase_bank ids.
 async function fetchDismissedPhraseIds(studentId) {
@@ -8168,6 +8196,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
     try {
       const r = await db.insert("students", { name: newName.trim(), group_id: newGroupId, streak: 0, longest_streak: 0, gender: newGender });
       const s = Array.isArray(r) ? r[0] : r;
+      if (s?.id) await migrateStudentPhrasesOnGroupChange(s.id, null, newGroupId); // start clean in the group
       setStudents(prev => [...prev, s]);
       setNewName("");
       setNewGender("unset");
@@ -8393,8 +8422,10 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
   const saveGroup = async (newGroupId) => {
     if (newGroupId === localStudent.group_id) { setEditingGroup(false); return; }
     setSavingGroup(true);
+    const oldGroupId = localStudent.group_id;
     try {
       await db.update("students", `id=eq.${student.id}`, { group_id: newGroupId || null });
+      await migrateStudentPhrasesOnGroupChange(student.id, oldGroupId, newGroupId || null);
       setLocalStudent(prev => ({ ...prev, group_id: newGroupId || null }));
       onUpdateGroup && onUpdateGroup(newGroupId || null);
       const newGroup = groups.find(g => g.id === newGroupId);
@@ -9865,7 +9896,13 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
 
   const confirmDelete = async (group, targetId) => {
     try {
-      if (targetId) { await db.update("students", `group_id=eq.${group.id}`, { group_id: targetId }); setStudents(prev => prev.map(s => s.group_id === group.id ? { ...s, group_id: targetId } : s)); }
+      if (targetId) {
+        const affected = students.filter(s => s.group_id === group.id);
+        await db.update("students", `group_id=eq.${group.id}`, { group_id: targetId });
+        setStudents(prev => prev.map(s => s.group_id === group.id ? { ...s, group_id: targetId } : s));
+        // Carry each reassigned student's phrases to personal BEFORE the group's phrases are deleted below.
+        for (const s of affected) { await migrateStudentPhrasesOnGroupChange(s.id, group.id, targetId); }
+      }
       else { await db.delete("students", `group_id=eq.${group.id}`); setStudents(prev => prev.filter(s => s.group_id !== group.id)); }
       await db.delete("session_phrases", `group_id=eq.${group.id}`);
       await db.delete("groups", `id=eq.${group.id}`);
@@ -11930,12 +11967,14 @@ function StudentsTab({ students, setStudents, groups, showMsg }) {
     try {
       const r = await db.insert("students", { name: newName.trim(), group_id: newGroupId, streak: 0, longest_streak: 0 });
       const s = Array.isArray(r) ? r[0] : r;
+      if (s?.id) await migrateStudentPhrasesOnGroupChange(s.id, null, newGroupId); // start clean in the group
       setStudents(prev => [...prev, s]); setNewName(""); showMsg("✓ " + s.name + " registered!");
     } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
   const updateGroup = async (id, groupId) => {
-    try { await db.update("students", `id=eq.${id}`, { group_id: groupId }); setStudents(prev => prev.map(s => s.id === id ? { ...s, group_id: groupId } : s)); showMsg("✓ Group updated — history retained"); }
+    const oldGroupId = students.find(s => s.id === id)?.group_id;
+    try { await db.update("students", `id=eq.${id}`, { group_id: groupId }); await migrateStudentPhrasesOnGroupChange(id, oldGroupId, groupId); setStudents(prev => prev.map(s => s.id === id ? { ...s, group_id: groupId } : s)); showMsg("✓ Group updated — phrases carried over"); }
     catch(e) { showMsg("Error", "error"); }
   };
 
