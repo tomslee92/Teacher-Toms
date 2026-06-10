@@ -161,6 +161,9 @@ const NOTES_FEATURES_ENABLED = false;
 // (the student home card is hidden for everyone else); flip to true to roll out to all
 // students. The teacher-side Scenario Builder is unaffected (teacher dashboard only).
 const SCENARIOS_STUDENT_ENABLED = false;
+// Groups (by id) allowed to see curated scenarios while still gated from everyone else.
+// Add a group id here to roll out to that class without flipping the global switch.
+const SCENARIOS_ALLOW_GROUP_IDS = ["b629d52c-73cf-421d-a686-7c8d9cecbda3"]; // Group 4 (Judy)
 
 // ── Teacher name resolution ───────────────────────────────────────────────────
 // Single source of truth for the default teacher display name.
@@ -21038,7 +21041,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const [scenarios, setScenarios] = useState([]); // curated Listen Mode sessions available to this student
   const [collapsedCats, setCollapsedCats] = useState({}); // category name → true when collapsed on the home card
   // Toms-only while testing; flip SCENARIOS_STUDENT_ENABLED to roll out to all students.
-  const scenariosVisible = SCENARIOS_STUDENT_ENABLED || user?.name === "Toms Lee" || user?.name === "Toms";
+  const scenariosVisible = SCENARIOS_STUDENT_ENABLED || user?.name === "Toms Lee" || user?.name === "Toms"
+    || SCENARIOS_ALLOW_GROUP_IDS.includes(group?.id) || SCENARIOS_ALLOW_GROUP_IDS.includes(user?.group_id);
   const [phrasesMastered, setPhrasesMastered] = useState(null);
   // Week phrases card: tiered surfacing of 3 phrases to practice
   const [weekPhrases, setWeekPhrases] = useState(null); // { phrases: [], total, tier: 1|2|3, passedSet }
