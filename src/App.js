@@ -18627,6 +18627,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     const line = scenarioLines[scenarioIdx] || null;
     const isStudent = line && line.speaker === "student";
     const scAccent = isStudent ? "#c4b5fd" : "rgba(125,211,252,0.95)"; // purple = you, blue = other person
+    const nextLine = scenarioLines[scenarioIdx + 1] || null; // "on-deck" preview so the student sees what's coming
+    const nextIsStudent = nextLine && nextLine.speaker === "student";
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
       React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
       // Top bar
@@ -18664,6 +18666,11 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, "▶ 다시 듣기"),
           React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID, 0.7),
             style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, "🐢 천천히")
+        ),
+        // On-deck preview — the next line, dimmed, so the student knows what's coming
+        nextLine && React.createElement("div", { style: { marginTop: "30px", opacity: 0.42, display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" } },
+          React.createElement("div", { style: { fontSize: "9px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: nextIsStudent ? "#c4b5fd" : "rgba(125,211,252,0.9)" } }, nextIsStudent ? "다음 · 나" : "다음 · 상대방"),
+          React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: "rgba(255,255,255,0.72)", lineHeight: 1.3, textAlign: "center" } }, `"${fillName(nextLine.english_text)}"`)
         )
       ),
       // Exposure offer buttons (loop awaits the answer)
