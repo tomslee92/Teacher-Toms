@@ -16618,6 +16618,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [scShadowPraise, setScShadowPraise] = useState(false); // brief "encouraging" flash after the student speaks
   const [scenarioVideoUrl, setScenarioVideoUrl] = useState(null); // current line's pre-rendered clip (plays instead of avatar+TTS)
   const [scenarioIntroText, setScenarioIntroText] = useState(null); // scene-setter shown + read before the conversation
+  const [paused, setPaused] = useState(false);          // scenario playback paused
+  const [playbackRate, setPlaybackRate] = useState(0.75); // overall scenario speed (research: ~0.75x best for beginners)
 
   // Wavi character rollout — Toms only for now; flip to all wavy_enabled once validated.
   const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
@@ -16917,6 +16919,13 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // the correct version. No microphone — pure listen (shadowing is a later second pass).
   const offerResolveRef = useRef(null);
   const videoDoneRef = useRef(null); // resolver for the currently-playing line video
+  // ── Controlled scenario player (pause / resume / replay / speed) ──
+  const pausedRef = useRef(false);
+  const rateRef = useRef(0.75);
+  const intentResolveRef = useRef(null);  // resolves the advance-gate with "advance" | "replay"
+  const resumeResolveRef = useRef(null);  // resolves waitWhilePaused on resume
+  const autoTimerRef = useRef(null);      // auto-advance timer at the gate
+  const replayPendingRef = useRef(false); // a replay was requested mid-playback
 
   // Play a pre-rendered line clip (carries its own audio, so no TTS). Resolves when the
   // video ends, errors, or a 30s safety cap fires — so the loop can never hang on it.
@@ -16978,6 +16987,79 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     if (r) r(accepted);
   };
 
+  // Block until resumed when paused.
+  const waitWhilePaused = () => new Promise((resolve) => {
+    if (!pausedRef.current) { resolve(); return; }
+    resumeResolveRef.current = resolve;
+  });
+
+  // After a line plays, hold here: auto-advance after a beat (unless paused), or resolve
+  // early with "replay". This gate is where replay/pause are safe (no concurrent audio).
+  const waitIntent = () => new Promise((resolve) => {
+    intentResolveRef.current = resolve;
+    clearTimeout(autoTimerRef.current);
+    if (!pausedRef.current) {
+      autoTimerRef.current = setTimeout(() => {
+        if (intentResolveRef.current) { intentResolveRef.current = null; resolve("advance"); }
+      }, 1100);
+    }
+  });
+
+  // Play one line at the current rate; loop on replay; honor pause. Returns when it's time
+  // to advance. Single audio stream at a time — fixes the replay race.
+  const presentLine = async (line) => {
+    const voiceId = line.speaker === "student" ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID;
+    for (;;) {
+      if (shouldBail()) return;
+      await waitWhilePaused();
+      if (shouldBail()) return;
+      replayPendingRef.current = false;
+      abortRef.current = new AbortController();
+      setWavyState("speaking");
+      try {
+        if (line.wavi_video_url) { await playLineVideo(line.wavi_video_url); setScenarioVideoUrl(null); }
+        else await wavySpeak(fillName(line.english_text), abortRef.current.signal, rateRef.current, voiceId);
+      } catch(e) { /* aborted (pause/replay) */ }
+      setWavyState("idle");
+      if (shouldBail()) return;
+      if (replayPendingRef.current) { replayPendingRef.current = false; continue; } // replay hit mid-play
+      const intent = await waitIntent();
+      if (shouldBail()) return;
+      if (intent === "replay") continue;
+      return; // advance
+    }
+  };
+
+  // Replay the current line (works whether it's playing or waiting at the gate).
+  const replayLine = () => {
+    if (intentResolveRef.current) {
+      clearTimeout(autoTimerRef.current);
+      const r = intentResolveRef.current; intentResolveRef.current = null; r("replay");
+    } else {
+      replayPendingRef.current = true;
+      try { abortRef.current?.abort(); } catch(_) {}
+    }
+  };
+
+  // Pause stops audio + auto-advance; resume replays the current line.
+  const togglePause = () => {
+    const np = !pausedRef.current;
+    pausedRef.current = np; setPaused(np);
+    if (np) {
+      clearTimeout(autoTimerRef.current);
+      try { abortRef.current?.abort(); } catch(_) {}
+    } else if (intentResolveRef.current) {
+      clearTimeout(autoTimerRef.current);
+      const r = intentResolveRef.current; intentResolveRef.current = null; r("replay");
+    } else if (resumeResolveRef.current) {
+      const r = resumeResolveRef.current; resumeResolveRef.current = null; r();
+    } else {
+      replayPendingRef.current = true;
+    }
+  };
+
+  const setRate = (r) => { rateRef.current = r; setPlaybackRate(r); };
+
   const runScenario = async (lines, scenarioObj) => {
     if (shouldBail()) return;
     abortRef.current = new AbortController();
@@ -16999,11 +17081,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       setScenarioIdx(i);
       const line = lines[i];
       const isStudent = line.speaker === "student";
-      const voiceId = isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID;
-      await sleep(isStudent ? 450 : 250); // brief absorb pause before each line
+      await sleep(isStudent ? 350 : 200); // brief absorb pause before each line
       if (shouldBail()) return;
-      if (line.wavi_video_url) { await playLineVideo(line.wavi_video_url); setScenarioVideoUrl(null); setWavyState("idle"); }
-      else await scenarioSay(fillName(line.english_text), voiceId);
+      await presentLine(line); // controlled play: speed, pause/resume, replay, auto-advance
       if (shouldBail()) return;
       // Exposure-driven offers apply to student-role lines only.
       if (isStudent && line.id) {
@@ -17021,7 +17101,6 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           }
         }
       }
-      await sleep(300);
     }
     if (shouldBail()) return;
     // Offer Shadowing only after the student has heard the whole scenario 3+ times
@@ -17121,7 +17200,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const exitWavi = () => {
     sessionEndedRef.current = true;
     try { abortRef.current?.abort(); } catch(_) {}
+    clearTimeout(autoTimerRef.current);
     if (videoDoneRef.current) { const r = videoDoneRef.current; videoDoneRef.current = null; r(); }
+    if (intentResolveRef.current) { const r = intentResolveRef.current; intentResolveRef.current = null; r("advance"); }
+    if (resumeResolveRef.current) { const r = resumeResolveRef.current; resumeResolveRef.current = null; r(); }
     if (manualExitRef.current && onManualExit) onManualExit();
     else onClose();
   };
@@ -18679,11 +18761,17 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "16px", color: scAccent } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나") : "상대방"),
         React.createElement("div", { style: { fontSize: "26px", fontWeight: "800", color: "#fff", lineHeight: 1.35, marginBottom: "12px", letterSpacing: "-0.3px" } }, `"${fillName(line.english_text)}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 } }, fillName(line.korean_text)),
-        !(shadowMode && wavyState === "listening") && !scenarioVideoUrl && React.createElement("div", { style: { marginTop: "26px", display: "flex", gap: "10px", justifyContent: "center" } },
-          React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID),
-            style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, "▶ 다시 듣기"),
-          React.createElement("button", { onClick: () => scenarioSay(fillName(line.english_text), isStudent ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID, 0.7),
-            style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, "🐢 천천히")
+        !shadowMode && !scenarioVideoUrl && React.createElement("div", { style: { marginTop: "26px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" } },
+          React.createElement("div", { style: { display: "flex", gap: "10px", justifyContent: "center" } },
+            React.createElement("button", { onClick: replayLine,
+              style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, "▶ 다시 듣기"),
+            React.createElement("button", { onClick: togglePause,
+              style: { background: paused ? "rgba(125,211,252,0.22)" : "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, paused ? "▶ 계속하기" : "⏸ 잠깐 멈춤")
+          ),
+          React.createElement("div", { style: { display: "flex", borderRadius: "100px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.16)" } },
+            [0.5, 0.75, 1].map(r => React.createElement("button", { key: r, onClick: () => setRate(r),
+              style: { background: playbackRate === r ? "rgba(255,255,255,0.22)" : "transparent", border: "none", color: playbackRate === r ? "#fff" : "rgba(255,255,255,0.55)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "8px 18px" } }, r === 1 ? "1x" : `${r}x`))
+          )
         ),
         // On-deck preview — the next line, dimmed, so the student knows what's coming
         nextLine && React.createElement("div", { style: { marginTop: "30px", opacity: 0.42, display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" } },
@@ -20339,15 +20427,21 @@ Return ONLY valid JSON, no markdown fences, no preamble:
           <textarea value={intro} onChange={e => setIntro(e.target.value)} placeholder="Scene intro (optional) — Wavi reads this in Korean to set the scene, e.g. 잠시 호텔에 도착했다고 상상해 보세요…" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "11px", color: C.textMid, fontWeight: "600" }}>Applies to:</span>
-            {[{ k: "all", label: "Everyone" }, { k: "student", label: "This student" }, { k: "group", label: group?.name ? `Group · ${group.name}` : "Group" }].map(opt => {
-              const disabled = opt.k === "group" && !group?.id;
-              return (
-                <button key={opt.k} disabled={disabled} onClick={() => setScope(opt.k)} style={{ fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${scope === opt.k ? C.navy : C.border}`, background: scope === opt.k ? C.navy : "transparent", color: scope === opt.k ? "#fff" : (disabled ? C.textLight : C.textMid), cursor: disabled ? "default" : "pointer", fontFamily: FONT, opacity: disabled ? 0.5 : 1 }}>
-                  {opt.label}
-                </button>
-              );
-            })}
+            {editingId ? (
+              <span style={{ fontSize: "11px", color: C.textLight }}>Access is set with the <strong style={{ color: C.textMid }}>Assign</strong> button on the list above — those changes save instantly.</span>
+            ) : (
+              <>
+                <span style={{ fontSize: "11px", color: C.textMid, fontWeight: "600" }}>Applies to:</span>
+                {[{ k: "all", label: "Everyone" }, { k: "student", label: "This student" }, { k: "group", label: group?.name ? `Group · ${group.name}` : "Group" }].map(opt => {
+                  const disabled = opt.k === "group" && !group?.id;
+                  return (
+                    <button key={opt.k} disabled={disabled} onClick={() => setScope(opt.k)} style={{ fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${scope === opt.k ? C.navy : C.border}`, background: scope === opt.k ? C.navy : "transparent", color: scope === opt.k ? "#fff" : (disabled ? C.textLight : C.textMid), cursor: disabled ? "default" : "pointer", fontFamily: FONT, opacity: disabled ? 0.5 : 1 }}>
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </>
+            )}
             <button onClick={generate} disabled={generating} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: "700", padding: "5px 14px", borderRadius: "100px", border: "none", background: generating ? C.bgSoft : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: generating ? C.textLight : "#fff", cursor: generating ? "default" : "pointer", fontFamily: FONT }}>
               {generating ? "Generating…" : "✨ Generate with AI"}
             </button>
