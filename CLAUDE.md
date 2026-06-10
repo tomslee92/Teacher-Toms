@@ -147,6 +147,11 @@ A curated "follow along a real conversation" mode for beginners, launched from t
 - Filter chips on PracticeTab, inline tag editor
 - BulkAutoTagger with "↺ Re-tag all" force option, queries DB directly to avoid stale cache
 
+### Phrase queue + group-change migration (added 2026-06, commit 799b1f6)
+`session_phrases` holds both **group phrases** (`group_id` set, `student_id` null) and **personal phrases** (`student_id` set). A student's queue = their group's phrases + their own personal ones, minus dismissals (`phraseScopeFilter`, ~line 754).
+
+**Phrases follow the student; no inheriting a group's back-catalog.** When a student's group changes, `migrateStudentPhrasesOnGroupChange(studentId, oldGroupId, newGroupId)` (module-level, ~line 761) runs: (1) **copies the old group's phrases into the student's personal list** so they follow, (2) **clean-slates (dismisses) the new group's existing phrases** (keeping any now-personal ones) so the student starts clean and only sees phrases added to the new group AFTER they join. Idempotent (dedupes vs existing personal/dismissals). Wired into ALL five group-change paths: `saveGroup` (detail-view move), `updateGroup` (roster move), `confirmDelete` (group delete + reassign — copies BEFORE the group's `session_phrases` are deleted, the bug that wiped Group 5), and both `addStudent` flows (new student → clean-slate the group, no old group). Net: a student's view = their personal phrases + whatever's added to their current group after they joined.
+
 ### Teacher account
 - `TEACHER_NAMES` constant defines who sees the Teacher View button: `["Toms Lee", "Toms"]`
 - Teacher accounts always have Wavi enabled, V2 home enabled, etc. (safety fallback while testing)
