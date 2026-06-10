@@ -18762,6 +18762,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "16px", color: scAccent } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나") : "상대방"),
         React.createElement("div", { style: { fontSize: "26px", fontWeight: "800", color: "#fff", lineHeight: 1.35, marginBottom: "12px", letterSpacing: "-0.3px" } }, `"${fillName(line.english_text)}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 } }, fillName(line.korean_text)),
+        nextLine && React.createElement("div", { style: { marginTop: "22px", opacity: 0.42, display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" } },
+          React.createElement("div", { style: { fontSize: "9px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: nextIsStudent ? "#c4b5fd" : "rgba(125,211,252,0.9)" } }, nextIsStudent ? "다음 · 나" : "다음 · 상대방"),
+          React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: "rgba(255,255,255,0.72)", lineHeight: 1.3, textAlign: "center" } }, `"${fillName(nextLine.english_text)}"`)
+        ),
         !shadowMode && !scenarioVideoUrl && React.createElement("div", { style: { marginTop: "26px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" } },
           React.createElement("div", { style: { display: "flex", gap: "10px", justifyContent: "center" } },
             React.createElement("button", { onClick: replayLine,
@@ -18773,11 +18777,6 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             [0.5, 0.75, 1].map(r => React.createElement("button", { key: r, onClick: () => setRate(r),
               style: { background: playbackRate === r ? "rgba(255,255,255,0.22)" : "transparent", border: "none", color: playbackRate === r ? "#fff" : "rgba(255,255,255,0.55)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "8px 18px" } }, r === 1 ? "1x" : `${r}x`))
           )
-        ),
-        // On-deck preview — the next line, dimmed, so the student knows what's coming
-        nextLine && React.createElement("div", { style: { marginTop: "30px", opacity: 0.42, display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" } },
-          React.createElement("div", { style: { fontSize: "9px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: nextIsStudent ? "#c4b5fd" : "rgba(125,211,252,0.9)" } }, nextIsStudent ? "다음 · 나" : "다음 · 상대방"),
-          React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: "rgba(255,255,255,0.72)", lineHeight: 1.3, textAlign: "center" } }, `"${fillName(nextLine.english_text)}"`)
         )
         )
       ),
