@@ -20174,6 +20174,7 @@ function ScenarioBuilder({ student, group, students, groups, teacher, showMsg })
   const [scope, setScope] = useState("all"); // 'all' (everyone) | 'student' | 'group' — the INITIAL target
   const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
   const [generating, setGenerating] = useState(false);
+  const [generatingIntro, setGeneratingIntro] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -20267,6 +20268,27 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       showMsg("AI draft failed: " + (e?.message || "error"), "error");
     }
     setGenerating(false);
+  };
+
+  // Draft ONLY the scene intro from the full existing conversation (non-destructive — lines untouched).
+  const generateIntro = async () => {
+    const valid = lines.filter(l => (l.english || "").trim());
+    if (!valid.length) { showMsg("Add some lines first", "error"); return; }
+    setGeneratingIntro(true);
+    try {
+      const sys = `You write a scene-setter for a Korean adult (40s-50s) learning English. Given a conversation script, write ONE short, warm Korean 존댓말 scene intro (1-2 sentences, second person) that helps the learner imagine the situation before they listen — grounded in what actually happens in this conversation. No 님 on names.
+Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
+      const convo = valid.map(l => `${l.speaker === "student" ? "Student" : "Other"}: ${l.english}`).join("\n");
+      const usr = `Title: ${title.trim() || "(none)"}\nContext: ${context.trim() || "(none)"}\nConversation:\n${convo}`;
+      const out = await geminiCallForFeedback(usr, sys);
+      const cleaned = out.replace(/^```json\s*|\s*```$/g, "").trim();
+      let parsed;
+      try { parsed = JSON.parse(cleaned); }
+      catch(_) { const m = cleaned.match(/\{[\s\S]*\}/); if (!m) throw new Error("no JSON in response"); parsed = JSON.parse(m[0]); }
+      if (parsed.intro) { setIntro(String(parsed.intro)); showMsg("✓ Intro drafted from the script"); }
+      else showMsg("AI returned no intro — try again", "error");
+    } catch(e) { showMsg("Intro draft failed: " + (e?.message || "error"), "error"); }
+    setGeneratingIntro(false);
   };
 
   // Load an existing scenario back into the composer for editing.
@@ -20425,7 +20447,14 @@ Return ONLY valid JSON, no markdown fences, no preamble:
             </div>
           )}
           <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Context — where this happens, who the other person is, the goal (teacher notes, also guides AI)" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
-          <textarea value={intro} onChange={e => setIntro(e.target.value)} placeholder="Scene intro (optional) — Wavi reads this in Korean to set the scene, e.g. 잠시 호텔에 도착했다고 상상해 보세요…" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
+          <textarea value={intro} onChange={e => setIntro(e.target.value)} placeholder="Scene intro (optional) — Wavi reads this in Korean to set the scene, e.g. 잠시 호텔에 도착했다고 상상해 보세요…" rows={2} style={{ ...inputStyle, marginBottom: "4px", resize: "vertical" }} />
+          {(() => { const hasScript = lines.some(l => (l.english || "").trim()); return (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+              <button onClick={generateIntro} disabled={generatingIntro || !hasScript} title={hasScript ? "Write an intro that fits the conversation below" : "Add lines first"} style={{ fontSize: "11px", fontWeight: "700", padding: "4px 12px", borderRadius: "100px", border: "none", background: (generatingIntro || !hasScript) ? C.bgSoft : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: (generatingIntro || !hasScript) ? C.textLight : "#fff", cursor: (generatingIntro || !hasScript) ? "default" : "pointer", fontFamily: FONT }}>
+                {generatingIntro ? "Generating…" : "✨ Intro from script"}
+              </button>
+            </div>
+          ); })()}
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
             {editingId ? (
