@@ -16617,6 +16617,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [shadowMode, setShadowMode] = useState(false);     // true during the Shadowing second pass (mic on)
   const [scShadowPraise, setScShadowPraise] = useState(false); // brief "encouraging" flash after the student speaks
   const [scenarioVideoUrl, setScenarioVideoUrl] = useState(null); // current line's pre-rendered clip (plays instead of avatar+TTS)
+  const [scenarioIntroText, setScenarioIntroText] = useState(null); // scene-setter shown + read before the conversation
 
   // Wavi character rollout — Toms only for now; flip to all wavy_enabled once validated.
   const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
@@ -16982,7 +16983,16 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     abortRef.current = new AbortController();
     sessionStartTimeRef.current = Date.now();
     const firstName = (user?.name || "").trim().split(" ")[0] || "";
-    await scenarioSay(`${firstName ? firstName + ", " : ""}오늘은 같이 상황을 연습해볼게요. 편하게 듣고 따라오시면 돼요.`, WAVY_VOICE_ID);
+    // Scene-setter: read the intro on a calm intro screen, then flow into the conversation.
+    if (scenarioObj.intro && scenarioObj.intro.trim()) {
+      setScenarioIntroText(fillName(scenarioObj.intro));
+      await scenarioSay(fillName(scenarioObj.intro), WAVY_VOICE_ID);
+      if (shouldBail()) return;
+      await sleep(700);
+      setScenarioIntroText(null);
+    } else {
+      await scenarioSay(`${firstName ? firstName + ", " : ""}오늘은 같이 상황을 연습해볼게요. 편하게 듣고 따라오시면 돼요.`, WAVY_VOICE_ID);
+    }
     const listenCounts = []; // exposure count per student line this pass → min = total full listens
     for (let i = 0; i < lines.length; i++) {
       if (shouldBail()) return;
@@ -18644,8 +18654,16 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       scenario && React.createElement("div", { style: { textAlign: "center", padding: "2px 20px 0", position: "relative", zIndex: 2, fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "600" } }, scenario.title),
       // Audio-bar keyframes + per-line fade
       React.createElement("style", null, "@keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}}@keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}"),
+      // Scene-setter screen — shown while Wavi reads the intro, before the conversation
+      scenarioIntroText && React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 34px", position: "relative", zIndex: 2, gap: "22px", animation: "scFade 0.5s ease both" } },
+        React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", letterSpacing: "3px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" } }, "잠깐, 상상해 보세요"),
+        React.createElement("div", { style: { fontSize: "22px", fontWeight: "700", color: "#fff", lineHeight: 1.55, textAlign: "center", letterSpacing: "-0.2px" } }, scenarioIntroText),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "38px", marginTop: "6px" } },
+          [0, 1, 2, 3, 4].map(i => React.createElement("div", { key: i, style: { width: "5px", height: "34px", borderRadius: "100px", background: "rgba(125,211,252,0.95)", transformOrigin: "center", transform: "scaleY(0.3)", opacity: wavyState === "speaking" ? 1 : 0.35, animation: wavyState === "speaking" ? `scBar 0.9s ease-in-out ${i * 0.1}s infinite` : "none", transition: "opacity 0.3s ease" } }))
+        )
+      ),
       // Focal point — a playing clip if a line has one, else a premium audio indicator (no character)
-      React.createElement("div", { style: { position: "relative", zIndex: 2, height: "150px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "10px" } },
+      !scenarioIntroText && React.createElement("div", { style: { position: "relative", zIndex: 2, height: "150px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "10px" } },
         scenarioVideoUrl
           ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
               onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
@@ -18657,7 +18675,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             )
       ),
       // Current line — one focal line, smooth fade on each advance
-      line && React.createElement("div", { key: scenarioIdx, style: { padding: "20px 28px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", animation: "scFade 0.45s ease both" } },
+      !scenarioIntroText && line && React.createElement("div", { key: scenarioIdx, style: { padding: "20px 28px", position: "relative", zIndex: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", animation: "scFade 0.45s ease both" } },
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "16px", color: scAccent } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나") : "상대방"),
         React.createElement("div", { style: { fontSize: "26px", fontWeight: "800", color: "#fff", lineHeight: 1.35, marginBottom: "12px", letterSpacing: "-0.3px" } }, `"${fillName(line.english_text)}"`),
         line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 } }, fillName(line.korean_text)),
@@ -20063,6 +20081,7 @@ function ScenarioBuilder({ student, group, students, groups, teacher, showMsg })
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
   const [category, setCategory] = useState(""); // optional theme grouping, e.g. "GOLF"
+  const [intro, setIntro] = useState(""); // optional Korean scene-setter Wavi reads before the conversation
   const [scope, setScope] = useState("all"); // 'all' (everyone) | 'student' | 'group' — the INITIAL target
   const [lines, setLines] = useState([]); // [{ speaker:'other'|'student', english, korean }]
   const [generating, setGenerating] = useState(false);
@@ -20134,8 +20153,9 @@ Rules:
 - "speaker" is "other" (the other person in the scene) or "student" (the line our learner will say).
 - "english": natural spoken English — one sentence, occasionally two short ones.
 - "korean": a natural 존댓말 translation that preserves meaning (not word-by-word). No 님 on names.
+Also write "intro": a short, warm Korean 존댓말 scene-setter (1-2 sentences, second person) that helps the learner imagine the situation before starting — e.g. "잠시 친구들과 골프 여행을 떠나 호텔에 막 도착했다고 상상해 보세요."
 Return ONLY valid JSON, no markdown fences, no preamble:
-{"lines":[{"speaker":"other","english":"...","korean":"..."}]}`;
+{"intro":"...","lines":[{"speaker":"other","english":"...","korean":"..."}]}`;
       const usr = `Title: ${title.trim()}\nContext: ${context.trim() || "(none provided)"}`;
       const out = await geminiCallForFeedback(usr, sys);
       const cleaned = out.replace(/^```json\s*|\s*```$/g, "").trim();
@@ -20143,6 +20163,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       try { parsed = JSON.parse(cleaned); }
       catch(_) { const m = cleaned.match(/\{[\s\S]*\}/); if (!m) throw new Error("no JSON in response"); parsed = JSON.parse(m[0]); }
       if (Array.isArray(parsed.lines) && parsed.lines.length) {
+        if (parsed.intro && !intro.trim()) setIntro(String(parsed.intro));
         setLines(parsed.lines.map(l => ({
           speaker: l.speaker === "student" ? "student" : "other",
           english: String(l.english || ""),
@@ -20166,12 +20187,13 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     setTitle(sc.title || "");
     setContext(sc.context_description || "");
     setCategory(sc.category || "");
+    setIntro(sc.intro || "");
     setLines((lns || []).map(l => ({ speaker: l.speaker === "student" ? "student" : "other", english: l.english_text || "", korean: l.korean_text || "", video: l.wavi_video_url || "" })));
     setJustSaved(false); setSaveError(""); setAssignFor(null);
     setOpen(true);
   };
 
-  const closeComposer = () => { setOpen(false); setEditingId(null); setLines([]); setTitle(""); setContext(""); setCategory(""); setScope("all"); };
+  const closeComposer = () => { setOpen(false); setEditingId(null); setLines([]); setTitle(""); setContext(""); setCategory(""); setIntro(""); setScope("all"); };
 
   const save = async () => {
     if (!title.trim()) { showMsg("Add a title", "error"); return; }
@@ -20183,13 +20205,14 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       let scenarioId = editingId;
       if (editingId) {
         // Edit: update fields, then replace all lines (assignments are managed separately).
-        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null, category: category.trim() || null });
+        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null, category: category.trim() || null, intro: intro.trim() || null });
         await db.delete("scenario_lines", `scenario_id=eq.${editingId}`);
       } else {
         const inserted = await db.insert("scenarios", {
           title: title.trim(),
           context_description: context.trim() || null,
           category: category.trim() || null,
+          intro: intro.trim() || null,
           student_id: scope === "student" ? student.id : null,
           group_id: scope === "group" ? group.id : null,
           created_by: teacher?.name || null,
@@ -20312,7 +20335,8 @@ Return ONLY valid JSON, no markdown fences, no preamble:
               ))}
             </div>
           )}
-          <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Context — where this happens, who the other person is, the goal" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
+          <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Context — where this happens, who the other person is, the goal (teacher notes, also guides AI)" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
+          <textarea value={intro} onChange={e => setIntro(e.target.value)} placeholder="Scene intro (optional) — Wavi reads this in Korean to set the scene, e.g. 잠시 호텔에 도착했다고 상상해 보세요…" rows={2} style={{ ...inputStyle, marginBottom: "8px", resize: "vertical" }} />
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "11px", color: C.textMid, fontWeight: "600" }}>Applies to:</span>
