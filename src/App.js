@@ -17312,18 +17312,18 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         // inner 3px white ring → hairline outer ring → soft ambient shadow (drawn outside the
         // clipped box, so overflow:hidden on the images doesn't eat them)
         boxShadow: `0 0 0 3px rgba(255,255,255,0.9), 0 0 0 4px ${WAYVE_TOKENS.hairline}, 0 8px 24px rgba(11,31,58,0.18)`,
-        animation: "waviBreathe 4s ease-in-out infinite alternate",
+        animation: "waviBreathe 6s ease-in-out infinite",
       } },
         videoUrl
           ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true,
               onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
               onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
               onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-              style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%" } })
+              style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 20%" } })
           : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
               React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true",
                 onError: (e) => { e.target.style.visibility = "hidden"; },
-                style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%", opacity: expression === exp ? 1 : 0, transition: "opacity 0.3s ease", pointerEvents: "none" } })
+                style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 20%", opacity: expression === exp ? 1 : 0, transition: "opacity 0.3s ease", pointerEvents: "none" } })
             )
       ),
       // Speaking equalizer pill — directly below the circle, never overlapping her face
@@ -19125,7 +19125,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         0% { transform: scale(0.95); opacity: 1; }
         100% { transform: scale(1.35); opacity: 0; }
       }
-      @keyframes waviBreathe { from { transform: scale(1); } to { transform: scale(1.015); } }
+      @keyframes waviBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
       @keyframes waviEq { 0%, 100% { height: 6px; } 50% { height: 16px; } }
     `)
   );
