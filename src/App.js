@@ -17312,7 +17312,6 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         // inner 3px white ring → hairline outer ring → soft ambient shadow (drawn outside the
         // clipped box, so overflow:hidden on the images doesn't eat them)
         boxShadow: `0 0 0 3px rgba(255,255,255,0.9), 0 0 0 4px ${WAYVE_TOKENS.hairline}, 0 8px 24px rgba(11,31,58,0.18)`,
-        animation: "waviBreathe 6s ease-in-out infinite",
       } },
         videoUrl
           ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true,
@@ -19125,7 +19124,6 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         0% { transform: scale(0.95); opacity: 1; }
         100% { transform: scale(1.35); opacity: 0; }
       }
-      @keyframes waviBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
       @keyframes waviEq { 0%, 100% { height: 6px; } 50% { height: 16px; } }
     `)
   );
