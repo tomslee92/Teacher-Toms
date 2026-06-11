@@ -18829,8 +18829,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
                   onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
                   onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
                   onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-                  style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 20%" } })
-              : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 20%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } }))
+                  style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 16%" } })
+              : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 16%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } }))
           ),
           React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "3px", height: "12px", opacity: waviSpeaking ? 1 : 0, transition: "opacity 0.3s" } },
             [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "3px", height: "11px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: waviSpeaking ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
