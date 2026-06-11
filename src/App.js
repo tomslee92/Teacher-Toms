@@ -165,6 +165,22 @@ const SCENARIOS_STUDENT_ENABLED = false;
 // Add a group id here to roll out to that class without flipping the global switch.
 const SCENARIOS_ALLOW_GROUP_IDS = ["b629d52c-73cf-421d-a686-7c8d9cecbda3"]; // Group 4 (Judy)
 
+// Design tokens — use for ALL NEW UI in the scenario upgrade (Apple-minimal: grouped bg,
+// white 20px cards, hairlines, 8pt grid). Do NOT restyle existing screens with these.
+const WAYVE_TOKENS = {
+  bgGrouped: "#F2F3F7", card: "#FFFFFF",
+  ink: "#16181D", ink2: "#6E7178", ink3: "#9DA0A8",
+  hairline: "rgba(22,24,29,0.08)",
+  navy1: "#0B1F3A", navy2: "#16345C",
+  wave: "#3E7BFA", waveSoft: "#EDF3FF",
+  coral: "#FF5D4E", coralSoft: "#FFF0EE",
+  green: "#2FB344", greenSoft: "#EDF9EF",
+  gold: "#C9A227",
+  rCard: 20, rPill: 100,
+  shadowCard: "0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05)",
+  shadowHero: "0 8px 28px rgba(11,31,58,.28)",
+};
+
 // ── Teacher name resolution ───────────────────────────────────────────────────
 // Single source of truth for the default teacher display name.
 // When a group has its own teacher_name set (Supabase groups.teacher_name),
@@ -17006,16 +17022,26 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
 
   // Increment (or create) the exposure counter for a student-role line. Returns the new count.
   const bumpExposure = async (studentId, lineId) => {
+    const now = new Date().toISOString();
     try {
-      const rows = await db.get("phrase_exposures", `student_id=eq.${studentId}&phrase_id=eq.${lineId}&select=id,exposure_count&limit=1`).catch(() => []);
+      const rows = await db.get("phrase_exposures", `student_id=eq.${studentId}&phrase_id=eq.${lineId}&select=id,exposure_count,attempted&limit=1`).catch(() => []);
       if (rows && rows[0]) {
         const next = (rows[0].exposure_count || 0) + 1;
-        db.update("phrase_exposures", `id=eq.${rows[0].id}`, { exposure_count: next, updated_at: new Date().toISOString() }).catch(() => {});
-        return next;
+        db.update("phrase_exposures", `id=eq.${rows[0].id}`, { exposure_count: next, last_exposed_at: now, updated_at: now }).catch(() => {});
+        return { count: next, attempted: !!rows[0].attempted };
       }
-      db.insert("phrase_exposures", { student_id: studentId, phrase_id: lineId, exposure_count: 1 }).catch(() => {});
-      return 1;
-    } catch(e) { return 0; }
+      db.insert("phrase_exposures", { student_id: studentId, phrase_id: lineId, exposure_count: 1, last_exposed_at: now }).catch(() => {});
+      return { count: 1, attempted: false };
+    } catch(e) { return { count: 0, attempted: false }; }
+  };
+
+  // Mark a student-role line as attempted (the student tried saying it) — silences the 4-5 nudge.
+  const markAttempted = async (studentId, lineId) => {
+    try {
+      const rows = await db.get("phrase_exposures", `student_id=eq.${studentId}&phrase_id=eq.${lineId}&select=id&limit=1`).catch(() => []);
+      if (rows && rows[0]) db.update("phrase_exposures", `id=eq.${rows[0].id}`, { attempted: true }).catch(() => {});
+      else db.insert("phrase_exposures", { student_id: studentId, phrase_id: lineId, exposure_count: 0, attempted: true, last_exposed_at: new Date().toISOString() }).catch(() => {});
+    } catch(e) {}
   };
 
   // Show the graduated "want to try?" offer and await the student's tap. Resolves true/false.
@@ -17129,17 +17155,20 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       if (shouldBail()) return;
       // Exposure-driven offers apply to student-role lines only.
       if (isStudent && line.id) {
-        const count = await bumpExposure(user.id, line.id);
+        const { count, attempted } = await bumpExposure(user.id, line.id);
         listenCounts.push(count);
-        if (count >= 3 && count <= 5) { // 1-2 pure listen, 3 warm, 4-5 gentle, 6+ stop
-          await scenarioSay(count === 3 ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?", WAVY_VOICE_ID);
+        // 1-2 pure listen · 3 warm offer · 4-5 gentle reminder ONLY if not yet attempted · 6+ stop
+        const offer = count === 3 || ((count === 4 || count === 5) && !attempted);
+        if (offer) {
+          await scenarioSay("한 번 말해볼까요?", WAVY_VOICE_ID);
           if (shouldBail()) return;
           const accepted = await showExposureOffer(line, count === 3 ? "warm" : "gentle");
           if (shouldBail()) return;
           if (accepted) {
+            markAttempted(user.id, line.id);
             await scenarioSay("좋아요! 천천히 다시 들려드릴게요. 같이 말해보세요.", WAVY_VOICE_ID);
             if (shouldBail()) return;
-            await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID, 0.85); // slowed replay to shadow along
+            await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID, Math.min(rateRef.current, 0.7)); // slowed replay to shadow along
           }
         }
       }
@@ -17149,7 +17178,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     // (full-listen count = the min exposure across the scenario's student-role lines).
     const fullListens = listenCounts.length ? Math.min(...listenCounts) : 0;
     if (fullListens >= 3) {
-      await scenarioSay("잘 들으셨어요! 이번엔 직접 말해볼래요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
+      await scenarioSay("잘 들으셨어요! 이번에는 직접 말해볼까요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
       if (shouldBail()) return;
       const wantShadow = await showExposureOffer({ id: "shadow" }, "shadow");
       if (shouldBail()) return;
@@ -17209,6 +17238,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         const spoke = await captureShadowLine();
         if (shouldBail()) return;
         if (spoke) {
+          if (line.id) markAttempted(user.id, line.id);
           setScShadowPraise(true);
           await sleep(900);
           setScShadowPraise(false);
@@ -18824,10 +18854,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       ),
       // Exposure offer buttons (loop awaits the answer)
       scenarioOffer && React.createElement("div", { style: { padding: "16px 20px 36px", position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", marginBottom: "4px", textAlign: "center" } }, scenarioOffer.kind === "shadow" ? "이번엔 직접 말해볼래요?" : scenarioOffer.kind === "warm" ? "직접 한번 말해볼래요?" : "한번 따라 말해볼까요?"),
+        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", marginBottom: "4px", textAlign: "center" } }, scenarioOffer.kind === "shadow" ? "이번에는 직접 말해볼까요?" : "한 번 말해볼까요?"),
         React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%", maxWidth: "360px" } },
-          React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "아직 괜찮아요"),
-          React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "네, 해볼게요" : "좋아요, 해볼게요")
+          React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "다음에요"),
+          React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "네, 해볼게요")
         )
       ),
       // Quiet status when not offering (mic prompt during shadowing)
@@ -20348,7 +20378,7 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
 
   const closeComposer = () => { setOpen(false); setEditingId(null); setLines([]); setTitle(""); setContext(""); setCategory(""); setIntro(""); setScope("all"); };
 
-  const save = async () => {
+  const save = async (publish = false) => {
     if (!title.trim()) { showMsg("Add a title", "error"); return; }
     const valid = lines.filter(l => (l.english || "").trim() || (l.korean || "").trim());
     if (!valid.length) { showMsg("Add at least one line", "error"); return; }
@@ -20357,8 +20387,8 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
     try {
       let scenarioId = editingId;
       if (editingId) {
-        // Edit: update fields, then replace all lines (assignments are managed separately).
-        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null, category: category.trim() || null, intro: intro.trim() || null });
+        // Edit: update fields + publish state, then replace all lines (assignments managed separately).
+        await db.update("scenarios", `id=eq.${editingId}`, { title: title.trim(), context_description: context.trim() || null, category: category.trim() || null, intro: intro.trim() || null, is_active: !!publish });
         await db.delete("scenario_lines", `scenario_id=eq.${editingId}`);
       } else {
         const inserted = await db.insert("scenarios", {
@@ -20369,7 +20399,7 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
           student_id: scope === "student" ? student.id : null,
           group_id: scope === "group" ? group.id : null,
           created_by: teacher?.name || null,
-          is_active: true,
+          is_active: !!publish, // draft by default; published only when the teacher publishes
         });
         scenarioId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
         if (!scenarioId) throw new Error("no scenario id returned");
@@ -20391,11 +20421,11 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
           group_id: scope === "group" ? group.id : null,
         }).catch(() => {});
       }
-      showMsg(editingId ? "✓ Scenario updated" : "✓ Scenario saved");
+      showMsg(publish ? "✓ Published — visible to assigned students" : "✓ Saved as draft (hidden from students)");
       setSaveError("");
       setJustSaved(true);
       setEditingId(null);
-      setTitle(""); setContext(""); setLines([]); setScope("all"); setOpen(false);
+      setTitle(""); setContext(""); setLines([]); setCategory(""); setIntro(""); setScope("all"); setOpen(false);
       refresh();
     } catch(e) {
       const msg = e?.message || "error";
@@ -20446,8 +20476,8 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
                 </div>
                 <button onClick={() => startEdit(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${editingId === sc.id ? C.navy : C.border}`, background: editingId === sc.id ? C.navy : "transparent", color: editingId === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Edit</button>
                 <button onClick={() => openAssign(sc)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: `1px solid ${assignFor === sc.id ? C.navy : C.border}`, background: assignFor === sc.id ? C.navy : "transparent", color: assignFor === sc.id ? "#fff" : C.textMid, cursor: "pointer", fontFamily: FONT }}>Assign</button>
-                <button onClick={() => toggleActive(sc)} title="Toggle active" style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
-                  {sc.is_active ? "Active" : "Off"}
+                <button onClick={() => toggleActive(sc)} title={sc.is_active ? "Published — tap to unpublish (hide from students)" : "Draft — tap to publish"} style={{ flexShrink: 0, fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: sc.is_active ? C.successBg : C.bgSoft, color: sc.is_active ? C.success : C.textLight }}>
+                  {sc.is_active ? "Published" : "Draft"}
                 </button>
               </div>
               {assignFor === sc.id && (
@@ -20515,7 +20545,7 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
               </>
             )}
             <button onClick={generate} disabled={generating} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: "700", padding: "5px 14px", borderRadius: "100px", border: "none", background: generating ? C.bgSoft : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: generating ? C.textLight : "#fff", cursor: generating ? "default" : "pointer", fontFamily: FONT }}>
-              {generating ? "Generating…" : "✨ Generate with AI"}
+              {generating ? "Generating…" : "✦ AI로 생성"}
             </button>
           </div>
 
@@ -20552,8 +20582,11 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
 
           <div style={{ display: "flex", gap: "8px" }}>
             <button onClick={closeComposer} style={{ flex: 1, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>Cancel</button>
-            <button onClick={save} disabled={saving} style={{ flex: 2, padding: "11px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: saving ? "default" : "pointer", fontFamily: FONT }}>
-              {saving ? "Saving…" : editingId ? "Save changes" : "Save scenario"}
+            <button onClick={() => save(false)} disabled={saving} title="Save without showing it to students yet" style={{ flex: 1.4, padding: "11px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: saving ? "default" : "pointer", fontFamily: FONT }}>
+              {saving ? "Saving…" : "Save draft"}
+            </button>
+            <button onClick={() => save(true)} disabled={saving} title="Publish — visible to assigned students" style={{ flex: 1.4, padding: "11px", borderRadius: "100px", border: "none", background: WAYVE_TOKENS.green, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: saving ? "default" : "pointer", fontFamily: FONT }}>
+              {saving ? "Saving…" : "Publish"}
             </button>
           </div>
         </div>
