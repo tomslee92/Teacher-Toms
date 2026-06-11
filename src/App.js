@@ -15762,14 +15762,14 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
     return React.createElement("div", {
       style: {
         minHeight: "100vh",
-        background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 100%)",
+        background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         padding: "0 24px",
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)",
       }
     },
-      React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
+      React.createElement("style", null, "html, body { background: #0B1F3A !important; }"),
       React.createElement("div", { style: { fontSize: "64px", marginBottom: "20px" } }, "🌊"),
       React.createElement("div", { style: { fontSize: "22px", fontWeight: "800", color: "#fff", marginBottom: "10px", textAlign: "center", lineHeight: 1.4 } }, `잘하셨어요, ${firstName}!`),
       React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.55)", marginBottom: "40px", textAlign: "center", lineHeight: 1.6 } }, "오늘도 수고하셨어요.\n내일 또 만나요."),
@@ -15835,7 +15835,7 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
   return React.createElement("div", {
     style: {
       minHeight: "100vh",
-      background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 100%)",
+      background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)",
       display: "flex",
       flexDirection: "column",
       paddingTop: "env(safe-area-inset-top)",
@@ -15843,7 +15843,7 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
     }
   },
     React.createElement("style", null, `
-      html, body { background: #0a0a1a !important; }
+      html, body { background: #0B1F3A !important; }
       @keyframes waviCardIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes waviGreetIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes waviWaveIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
@@ -17305,7 +17305,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     // Absolute children are centered with top/left 50% + translate (flex justify doesn't
     // apply to absolutely-positioned elements — that was the off-center bug).
     return React.createElement("div", { style: { position: "relative", zIndex: 2, height: `${H}px`, marginTop: "4px", flexShrink: 0 } },
-      React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "248px", height: "248px", borderRadius: "50%", background: expression === "listening" ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent 70%)" : expression === "encouraging" ? "radial-gradient(circle, rgba(139,92,246,0.22), transparent 70%)" : "radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%)", transition: "background 0.45s ease", pointerEvents: "none" } }),
+      React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "248px", height: "248px", borderRadius: "50%", background: expression === "listening" ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent 70%)" : expression === "encouraging" ? "radial-gradient(circle, rgba(111,160,255,0.22), transparent 70%)" : "radial-gradient(circle, rgba(62,123,250,0.12), transparent 70%)", transition: "background 0.45s ease", pointerEvents: "none" } }),
       videoUrl
         ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true,
             onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
@@ -18259,7 +18259,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     const hasOtherPhrases = (otherPhrasesPoolRef.current || []).length > 0;
     const options = [];
     if (hasSamePool) {
-      options.push({ key: "same", label: "🔄 이번 표현 한 번 더", color: "rgba(139,92,246,0.2)", border: "rgba(139,92,246,0.4)" });
+      options.push({ key: "same", label: "🔄 이번 표현 한 번 더", color: "rgba(111,160,255,0.2)", border: "rgba(111,160,255,0.4)" });
     }
     if (hasOtherPhrases) {
       options.push({ key: "other", label: "📚 예전에 배운 표현 연습하기", color: "rgba(59,130,246,0.2)", border: "rgba(59,130,246,0.4)" });
@@ -18658,9 +18658,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const progressPct = phrases.length > 0 ? Math.round((currentIdx / phrases.length) * 100) : 0;
 
   if (phase === "loading") {
-    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 40px)" } },
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 40px)" } },
       React.createElement("style", null, `
-        html, body { background: #0a0a1a !important; }
+        html, body { background: #0B1F3A !important; }
         @keyframes wavyFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
         @keyframes wavyPulseRing { 0% { transform: scale(0.8); opacity: 0.6; } 100% { transform: scale(2.2); opacity: 0; } }
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -18674,8 +18674,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         : React.createElement("div", { style: { textAlign: "center", animation: "fadeSlideUp 0.5s ease" } },
             // Pulsing ring behind the emoji
             React.createElement("div", { style: { position: "relative", display: "inline-block", marginBottom: "28px" } },
-              React.createElement("div", { style: { position: "absolute", inset: "-20px", borderRadius: "50%", border: "1.5px solid rgba(139,92,246,0.4)", animation: "wavyPulseRing 2s ease-out infinite" } }),
-              React.createElement("div", { style: { position: "absolute", inset: "-20px", borderRadius: "50%", border: "1.5px solid rgba(139,92,246,0.25)", animation: "wavyPulseRing 2s ease-out infinite 0.7s" } }),
+              React.createElement("div", { style: { position: "absolute", inset: "-20px", borderRadius: "50%", border: "1.5px solid rgba(111,160,255,0.4)", animation: "wavyPulseRing 2s ease-out infinite" } }),
+              React.createElement("div", { style: { position: "absolute", inset: "-20px", borderRadius: "50%", border: "1.5px solid rgba(111,160,255,0.25)", animation: "wavyPulseRing 2s ease-out infinite 0.7s" } }),
               React.createElement("div", { style: { fontSize: "64px", animation: "wavyFloat 2.5s ease-in-out infinite", display: "block" } }, "🌊")
             ),
             React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: "#fff", marginBottom: "8px" } }, "Wavi"),
@@ -18686,9 +18686,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
 
   // Exiting phase — clean transitional screen while goodbye audio plays
   if (phase === "exiting") {
-    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 40px)" } },
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 40px)" } },
       // Paint body + html with matching dark color so iOS safe-area-top doesn't show white
-      React.createElement("style", null, "html, body { background: #0a0a1a !important; } @keyframes wavyFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }"),
+      React.createElement("style", null, "html, body { background: #0B1F3A !important; } @keyframes wavyFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }"),
       React.createElement("div", { style: { textAlign: "center" } },
         React.createElement("div", { style: { fontSize: "56px", marginBottom: "20px", animation: "wavyFloat 2s ease-in-out infinite" } }, "🌊"),
         React.createElement("div", { style: { fontSize: "18px", fontWeight: "700", color: "#fff", marginBottom: "8px" } }, `${firstName}, 수고하셨어요`),
@@ -18710,9 +18710,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     const elapsedMin = Math.floor(elapsedMs / 60000);
     const elapsedSec = Math.floor((elapsedMs % 60000) / 1000);
     const timeStr = elapsedMin > 0 ? `${elapsedMin}분 ${elapsedSec}초` : `${elapsedSec}초`;
-    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 100%)", display: "flex", flexDirection: "column", padding: "calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px)", overflowY: "auto" } },
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)", display: "flex", flexDirection: "column", padding: "calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px)", overflowY: "auto" } },
       React.createElement("style", null, `
-        html, body { background: #0a0a1a !important; }
+        html, body { background: #0B1F3A !important; }
         @keyframes recapFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes recapScaleIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
         @keyframes barGrow { from { width: 0%; } to { width: var(--bar-width); } }
@@ -18735,7 +18735,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       // Stat cards — staggered entrance
       React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "20px" } },
         [
-          { emoji: "⏱️", value: timeStr, label: "연습 시간", color: "139,92,246", delay: "0.15s" },
+          { emoji: "⏱️", value: timeStr, label: "연습 시간", color: "111,160,255", delay: "0.15s" },
           { emoji: "🗣️", value: totalPracticed, label: "연습 표현", color: "59,130,246", delay: "0.25s" },
           { emoji: "✨", value: masteredPhrases.length, label: "완전 이해", color: "34,197,94", delay: "0.35s" },
         ].map(s =>
@@ -18760,7 +18760,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             background: masteryPct === 100
               ? "linear-gradient(90deg, #22c55e, #4ade80)"
               : masteryPct >= 60
-              ? "linear-gradient(90deg, #6366f1, #8b5cf6)"
+              ? "linear-gradient(90deg, #3E7BFA, #6FA0FF)"
               : "linear-gradient(90deg, #f59e0b, #fbbf24)",
             borderRadius: "100px",
             transition: "width 1s cubic-bezier(0.16,1,0.3,1) 0.5s"
@@ -18782,7 +18782,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             struggledPhrases.map(p => React.createElement("div", { key: p.id, style: { fontSize: "14px", color: "rgba(255,255,255,0.8)", lineHeight: 1.5, paddingLeft: "4px" } }, p.english))
           )
         ),
-        remainingPhrases.length > 0 && React.createElement("div", { style: { background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.18)", borderRadius: "16px", padding: "16px" } },
+        remainingPhrases.length > 0 && React.createElement("div", { style: { background: "rgba(62,123,250,0.07)", border: "1px solid rgba(62,123,250,0.18)", borderRadius: "16px", padding: "16px" } },
           React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", color: "#a5b4fc", letterSpacing: "2px", textTransform: "uppercase", marginBottom: "12px" } }, `📚 다음 세션에서 이어서`),
           React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
             remainingPhrases.slice(0, 3).map(p => React.createElement("div", { key: p.id, style: { fontSize: "14px", color: "rgba(255,255,255,0.8)", lineHeight: 1.5, paddingLeft: "4px" } }, p.english))
@@ -18799,7 +18799,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             onClose();
           }
         },
-        style: { width: "100%", padding: "17px", background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)", border: "none", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, borderRadius: "100px", letterSpacing: "-0.2px", boxShadow: "0 8px 32px rgba(99,102,241,0.4)" }
+        style: { width: "100%", padding: "17px", background: "linear-gradient(135deg, #3E7BFA 0%, #6FA0FF 100%)", border: "none", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, borderRadius: "100px", letterSpacing: "-0.2px", boxShadow: "0 8px 32px rgba(62,123,250,0.4)" }
       }, manualExitRef.current ? "앱으로 돌아가기" : "Wavi 홈으로")
     );
   }
@@ -18917,13 +18917,13 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     : "neutral"; // idle | thinking
   const characterVideoUrl = null; // set in Mode 1 when a phrase/scenario video exists
 
-  return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
+  return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 50%, #0B1F3A 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
     // Paint body + html dark so iOS safe-area-top doesn't show the white app background
-    React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
+    React.createElement("style", null, "html, body { background: #0B1F3A !important; }"),
 
     // Background pulse
     React.createElement("div", { style: { position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" } },
-      React.createElement("div", { style: { position: "absolute", top: "30%", left: "50%", transform: `translate(-50%, -50%) scale(${1 + micLevel * 0.5})`, width: "300px", height: "300px", borderRadius: "50%", background: wavyState === "speaking" ? "radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 70%)" : wavyState === "listening" ? `radial-gradient(circle, rgba(34,197,94,${0.25 + micLevel * 0.35}) 0%, transparent 70%)` : "radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)", animation: wavyState === "speaking" ? "wavyBgPulse 2s ease-in-out infinite" : "none", transition: "background 0.3s, transform 0.1s" } })
+      React.createElement("div", { style: { position: "absolute", top: "30%", left: "50%", transform: `translate(-50%, -50%) scale(${1 + micLevel * 0.5})`, width: "300px", height: "300px", borderRadius: "50%", background: wavyState === "speaking" ? "radial-gradient(circle, rgba(111,160,255,0.18) 0%, transparent 70%)" : wavyState === "listening" ? `radial-gradient(circle, rgba(34,197,94,${0.25 + micLevel * 0.35}) 0%, transparent 70%)` : "radial-gradient(circle, rgba(62,123,250,0.08) 0%, transparent 70%)", animation: wavyState === "speaking" ? "wavyBgPulse 2s ease-in-out infinite" : "none", transition: "background 0.3s, transform 0.1s" } })
     ),
 
     // Top bar
@@ -18941,7 +18941,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     // Progress bar
     React.createElement("div", { style: { padding: "0 20px 12px", position: "relative", zIndex: 2 } },
       React.createElement("div", { style: { height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "100px", overflow: "hidden" } },
-        React.createElement("div", { style: { height: "100%", width: `${progressPct}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)", borderRadius: "100px", transition: "width 0.4s ease" } })
+        React.createElement("div", { style: { height: "100%", width: `${progressPct}%`, background: "linear-gradient(90deg, #3E7BFA, #6FA0FF)", borderRadius: "100px", transition: "width 0.4s ease" } })
       )
     ),
 
@@ -18972,8 +18972,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         React.createElement("div", { style: {
           maxWidth: "85%", padding: "10px 14px",
           borderRadius: msg.role === "wavy" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
-          background: msg.role === "wavy" ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.1)",
-          border: msg.role === "wavy" ? "1px solid rgba(99,102,241,0.25)" : "1px solid rgba(255,255,255,0.1)",
+          background: msg.role === "wavy" ? "rgba(62,123,250,0.2)" : "rgba(255,255,255,0.1)",
+          border: msg.role === "wavy" ? "1px solid rgba(62,123,250,0.25)" : "1px solid rgba(255,255,255,0.1)",
           fontSize: "14px", color: msg.role === "wavy" ? "#fff" : "rgba(255,255,255,0.85)", lineHeight: 1.55,
         } }, msg.text)
       )),
@@ -19044,7 +19044,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       // SPEAKING / THINKING / IDLE state: smaller compact indicator
       wavyState !== "listening" && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)", fontWeight: "600" } },
         React.createElement("div", { style: { width: "8px", height: "8px", borderRadius: "50%",
-          background: wavyState === "speaking" ? "#8b5cf6" : wavyState === "thinking" ? "#fbbf24" : "rgba(255,255,255,0.3)",
+          background: wavyState === "speaking" ? "#6FA0FF" : wavyState === "thinking" ? "#fbbf24" : "rgba(255,255,255,0.3)",
           animation: wavyState !== "idle" ? "wavyDot 1s ease-in-out infinite" : "none",
         } }),
         wavyState === "speaking" ? "Wavi가 말하고 있어요" :
