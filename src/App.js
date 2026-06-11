@@ -16678,6 +16678,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [scenarioIntroText, setScenarioIntroText] = useState(null); // scene-setter shown + read before the conversation
   const [paused, setPaused] = useState(false);          // scenario playback paused
   const [playbackRate, setPlaybackRate] = useState(0.75); // overall scenario speed (research: ~0.75x best for beginners)
+  const [showScenarioChar, setShowScenarioChar] = useState(true); // character on scenario screen (A/B toggle, Toms can flip)
+  const scenarioEndRef = useRef(null); // auto-scroll the bubble transcript
 
   // Wavi character rollout — Toms only for now; flip to all wavy_enabled once validated.
   const showCharacter = user?.name === "Toms Lee" || user?.name === "Toms";
@@ -16779,6 +16781,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
 
   // Keep refs in sync with state — used by listener callbacks to avoid stale closures
   useEffect(() => { phrasesRef.current = phrases; }, [phrases]);
+  useEffect(() => { if (phase === "scenario") { try { scenarioEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); } catch(_) {} } }, [scenarioIdx, phase]);
   useEffect(() => { currentIdxRef.current = currentIdx; }, [currentIdx]);
   useEffect(() => { phraseStatusRef.current = phraseStatus; }, [phraseStatus]);
 
@@ -18786,94 +18789,95 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     );
   }
 
-  // ── Listen Mode (scenario) render ───────────────────────────────────────────
+  // ── Listen Mode (scenario) render — light, message-bubble layout (WAYVE_TOKENS) ──
   if (phase === "scenario") {
-    const line = scenarioLines[scenarioIdx] || null;
-    const isStudent = line && line.speaker === "student";
-    const scAccent = isStudent ? "#c4b5fd" : "rgba(125,211,252,0.95)"; // purple = you, blue = other person
-    const nextLine = scenarioLines[scenarioIdx + 1] || null; // "on-deck" preview so the student sees what's coming
-    const nextIsStudent = nextLine && nextLine.speaker === "student";
-    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
-      React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
+    const T = WAYVE_TOKENS;
+    const firstName = (user?.name || "").trim().split(/\s+/)[0] || "";
+    const charExpr = scShadowPraise ? "encouraging" : wavyState === "listening" ? "listening" : wavyState === "speaking" ? "speaking" : "neutral";
+    const isTomsAcct = user?.name === "Toms Lee" || user?.name === "Toms";
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: T.bgGrouped, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
+      React.createElement("style", null, "html, body { background: #F2F3F7 !important; } @keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}} @keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes scPop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}"),
       // Top bar
-      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px", position: "relative", zIndex: 2 } },
-        React.createElement("button", { onClick: exitWavi, style: { background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, padding: "8px 14px", borderRadius: "100px" } }, "← 나가기"),
-        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: "#fff", display: "flex", alignItems: "center", gap: "5px", letterSpacing: "-0.2px" } },
-          React.createElement("span", { style: { fontSize: "16px" } }, "🌊"),
-          React.createElement("span", null, "Wavi")
-        ),
-        React.createElement("div", { style: { fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", background: "rgba(255,255,255,0.07)", padding: "4px 10px", borderRadius: "100px" } }, `${scenarioIdx + 1} / ${scenarioLines.length}`)
+      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", flexShrink: 0 } },
+        React.createElement("button", { onClick: exitWavi, style: { background: "transparent", border: "none", color: T.ink2, fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, padding: "6px 4px" } }, "← 나가기"),
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T.ink, display: "flex", alignItems: "center", gap: "5px", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, React.createElement("span", { style: { fontSize: "15px" } }, "🌊"), React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis" } }, scenario ? scenario.title : "Wavi")),
+        isTomsAcct
+          ? React.createElement("button", { onClick: () => setShowScenarioChar(v => !v), title: "Toggle character (A/B)", style: { background: showScenarioChar ? T.waveSoft : "transparent", border: `1px solid ${T.hairline}`, color: showScenarioChar ? T.wave : T.ink3, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "5px 9px", borderRadius: T.rPill } }, "👤")
+          : React.createElement("div", { style: { width: "30px" } })
       ),
-      // Scenario title
-      scenario && React.createElement("div", { style: { textAlign: "center", padding: "2px 20px 0", position: "relative", zIndex: 2, fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "600" } }, scenario.title),
-      // Audio-bar keyframes + per-line fade
-      React.createElement("style", null, "@keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}}@keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}"),
-      // Scene-setter screen — shown while Wavi reads the intro, before the conversation
-      scenarioIntroText && React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 34px", position: "relative", zIndex: 2, gap: "22px", animation: "scFade 0.5s ease both" } },
-        React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", letterSpacing: "3px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" } }, "잠깐, 상상해 보세요"),
-        React.createElement("div", { style: { fontSize: "22px", fontWeight: "700", color: "#fff", lineHeight: 1.55, textAlign: "center", letterSpacing: "-0.2px" } }, scenarioIntroText),
-        React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "38px", marginTop: "6px" } },
-          [0, 1, 2, 3, 4].map(i => React.createElement("div", { key: i, style: { width: "5px", height: "34px", borderRadius: "100px", background: "rgba(125,211,252,0.95)", transformOrigin: "center", transform: "scaleY(0.3)", opacity: wavyState === "speaking" ? 1 : 0.35, animation: wavyState === "speaking" ? `scBar 0.9s ease-in-out ${i * 0.1}s infinite` : "none", transition: "opacity 0.3s ease" } }))
+      // Scene-setter screen
+      scenarioIntroText && React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 30px", gap: "20px", animation: "scFade 0.5s ease both" } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: T.ink3 } }, "잠깐, 상상해 보세요"),
+        React.createElement("div", { style: { fontSize: "21px", fontWeight: "700", color: T.ink, lineHeight: 1.55, textAlign: "center", wordBreak: "keep-all" } }, scenarioIntroText),
+        React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "5px", height: "26px" } },
+          [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "5px", height: "24px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none", opacity: wavyState === "speaking" ? 1 : 0.4 } }))
         )
       ),
-      // Centered conversation area — the audio indicator + current line + controls form ONE
-      // vertically-centered group, so the whole thing sits in the middle of the screen.
-      !scenarioIntroText && line && React.createElement("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 2, padding: "0 28px" } },
-        React.createElement("div", { style: { height: "108px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginBottom: "6px" } },
+      // Main: character (flagged) + progress dots + bubble transcript + controls
+      !scenarioIntroText && React.createElement(React.Fragment, null,
+        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { position: "relative", width: "100%", height: "190px", flexShrink: 0, overflow: "hidden" } },
           scenarioVideoUrl
             ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
                 onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
                 onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
                 onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-                style: { height: "108px", objectFit: "contain", borderRadius: "20px", boxShadow: "0 16px 44px rgba(0,0,0,0.5)" } })
-            : React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "48px" } },
-                [0, 1, 2, 3, 4].map(i => React.createElement("div", { key: i, style: { width: "6px", height: "44px", borderRadius: "100px", background: scAccent, transformOrigin: "center", transform: "scaleY(0.3)", opacity: wavyState === "speaking" ? 1 : 0.35, animation: wavyState === "speaking" ? `scBar 0.9s ease-in-out ${i * 0.1}s infinite` : "none", transition: "opacity 0.3s ease" } }))
-              )
-        ),
-        React.createElement("div", { key: scenarioIdx, style: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", animation: "scFade 0.45s ease both" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "16px", color: scAccent } }, isStudent ? (shadowMode ? "나 — 말해보세요" : "나") : "상대방"),
-        React.createElement("div", { style: { fontSize: "26px", fontWeight: "800", color: "#fff", lineHeight: 1.35, marginBottom: "12px", letterSpacing: "-0.3px" } }, `"${fillName(line.english_text)}"`),
-        line.korean_text && React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 } }, fillName(line.korean_text)),
-        nextLine && React.createElement("div", { style: { marginTop: "22px", opacity: 0.42, display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" } },
-          React.createElement("div", { style: { fontSize: "9px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: nextIsStudent ? "#c4b5fd" : "rgba(125,211,252,0.9)" } }, nextIsStudent ? "다음 · 나" : "다음 · 상대방"),
-          React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: "rgba(255,255,255,0.72)", lineHeight: 1.3, textAlign: "center" } }, `"${fillName(nextLine.english_text)}"`)
-        ),
-        !shadowMode && !scenarioVideoUrl && React.createElement("div", { style: { marginTop: "26px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" } },
-          React.createElement("div", { style: { display: "flex", gap: "10px", justifyContent: "center" } },
-            React.createElement("button", { onClick: replayLine,
-              style: { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, "▶ 다시 듣기"),
-            React.createElement("button", { onClick: togglePause,
-              style: { background: paused ? "rgba(125,211,252,0.22)" : "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 22px", borderRadius: "100px" } }, paused ? "▶ 계속하기" : "⏸ 잠깐 멈춤")
-          ),
-          React.createElement("div", { style: { display: "flex", borderRadius: "100px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.16)" } },
-            [0.5, 0.75, 1].map(r => React.createElement("button", { key: r, onClick: () => setRate(r),
-              style: { background: playbackRate === r ? "rgba(255,255,255,0.22)" : "transparent", border: "none", color: playbackRate === r ? "#fff" : "rgba(255,255,255,0.55)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "8px 18px" } }, r === 1 ? "1x" : `${r}x`))
+                style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%" } })
+            : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } })),
+          React.createElement("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, height: "56px", background: `linear-gradient(to bottom, transparent, ${T.bgGrouped})`, pointerEvents: "none" } }),
+          React.createElement("div", { style: { position: "absolute", bottom: "12px", right: "16px", display: "flex", alignItems: "flex-end", gap: "3px", height: "20px", opacity: wavyState === "speaking" ? 1 : 0, transition: "opacity 0.3s" } },
+            [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "4px", height: "18px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
           )
+        ),
+        React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: "5px", padding: "10px 0 4px", flexShrink: 0 } },
+          scenarioLines.map((_, i) => React.createElement("div", { key: i, style: { width: i === scenarioIdx ? "18px" : "6px", height: "6px", borderRadius: "100px", background: i === scenarioIdx ? T.wave : (i < scenarioIdx ? "rgba(62,123,250,0.4)" : T.hairline), transition: "all 0.3s" } }))
+        ),
+        React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: "14px" } },
+          scenarioLines.slice(0, scenarioIdx + 1).map((l, i) => {
+            const stu = l.speaker === "student"; const cur = i === scenarioIdx;
+            return React.createElement("div", { key: l.id || i, style: { display: "flex", flexDirection: "column", alignItems: stu ? "flex-end" : "flex-start", animation: cur ? "scPop 0.35s ease both" : "none" } },
+              React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", color: stu ? T.wave : T.ink3, letterSpacing: "0.3px", marginBottom: "5px", padding: "0 8px" } }, stu ? `${firstName}의 역할` : "상대방 · Staff"),
+              React.createElement("div", { style: { maxWidth: "84%", background: stu ? T.waveSoft : T.card, border: stu ? "1px solid rgba(62,123,250,0.22)" : `1px solid ${T.hairline}`, borderRadius: stu ? "20px 7px 20px 20px" : "7px 20px 20px 20px", padding: "12px 14px", boxShadow: cur ? T.shadowCard : "none", opacity: cur ? 1 : 0.66, transition: "opacity 0.3s, box-shadow 0.3s" } },
+                React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all" } }, `"${fillName(l.english_text)}"`),
+                l.korean_text && React.createElement("div", { style: { fontSize: "13px", color: T.ink2, lineHeight: 1.5, marginTop: "5px", wordBreak: "keep-all" } }, fillName(l.korean_text)),
+                React.createElement("button", { onClick: () => (cur ? replayLine() : scenarioSay(fillName(l.english_text), stu ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID)), style: { marginTop: "8px", background: "transparent", border: "none", color: T.wave, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: 0 } }, "▶ 다시 듣기")
+              )
+            );
+          }),
+          React.createElement("div", { ref: scenarioEndRef })
+        ),
+        React.createElement("div", { style: { flexShrink: 0, padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", borderTop: `1px solid ${T.hairline}`, background: T.card } },
+          scenarioOffer
+            ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
+                React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: T.ink, textAlign: "center", wordBreak: "keep-all" } }, scenarioOffer.kind === "shadow" ? "이번에는 직접 말해볼까요?" : "한 번 말해볼까요?"),
+                React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%", maxWidth: "360px" } },
+                  React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: T.rPill, border: `1px solid ${T.hairline}`, background: T.card, color: T.ink2, fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "다음에요"),
+                  React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: T.rPill, border: "none", background: T.wave, color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "네, 해볼게요")
+                )
+              )
+            : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
+                React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: shadowMode && wavyState === "listening" ? T.green : scShadowPraise ? T.wave : T.ink3, minHeight: "16px" } }, shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "따라 들어보세요"),
+                !shadowMode && !scenarioVideoUrl && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+                  React.createElement("button", { onClick: togglePause, style: { background: paused ? T.waveSoft : T.bgGrouped, border: `1px solid ${T.hairline}`, color: paused ? T.wave : T.ink, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 16px", borderRadius: T.rPill } }, paused ? "▶ 계속하기" : "⏸ 잠깐 멈춤"),
+                  React.createElement("div", { style: { display: "flex", borderRadius: T.rPill, overflow: "hidden", border: `1px solid ${T.hairline}` } },
+                    [0.5, 0.75, 1].map(r => React.createElement("button", { key: r, onClick: () => setRate(r), style: { background: playbackRate === r ? T.wave : T.card, border: "none", color: playbackRate === r ? "#fff" : T.ink2, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "8px 14px" } }, r === 1 ? "1x" : `${r}x`))
+                  )
+                )
+              )
         )
-        )
-      ),
-      // Exposure offer buttons (loop awaits the answer)
-      scenarioOffer && React.createElement("div", { style: { padding: "16px 20px 36px", position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", marginBottom: "4px", textAlign: "center" } }, scenarioOffer.kind === "shadow" ? "이번에는 직접 말해볼까요?" : "한 번 말해볼까요?"),
-        React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%", maxWidth: "360px" } },
-          React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "다음에요"),
-          React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "네, 해볼게요")
-        )
-      ),
-      // Quiet status when not offering (mic prompt during shadowing)
-      !scenarioOffer && React.createElement("div", { style: { padding: "0 20px 36px", position: "relative", zIndex: 2, textAlign: "center", fontSize: "13px", fontWeight: "700", color: scShadowPraise ? "rgba(167,139,250,0.95)" : shadowMode && wavyState === "listening" ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.4)" } }, scShadowPraise ? "✓ 좋아요!" : shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : wavyState === "speaking" ? "듣는 중…" : "")
+      )
     );
   }
 
   // ── Listen Mode complete ────────────────────────────────────────────────────
   if (phase === "scenario_done") {
-    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0a0a1a 0%, #0f1a35 50%, #0a0a1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" } },
-      React.createElement("style", null, "html, body { background: #0a0a1a !important; }"),
-      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", position: "relative", zIndex: 2, gap: "16px" } },
-        React.createElement("div", { style: { width: "84px", height: "84px", borderRadius: "50%", background: "linear-gradient(135deg, #34d399, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 14px 40px rgba(16,185,129,0.4)", fontSize: "42px", color: "#fff", fontWeight: "800", marginBottom: "4px" } }, "✓"),
-        React.createElement("div", { style: { fontSize: "20px", fontWeight: "800", color: "#fff", textAlign: "center" } }, "수고하셨어요!"),
-        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.6)", textAlign: "center", lineHeight: 1.5 } }, "오늘 상황 연습을 잘 마쳤어요."),
-        React.createElement("button", { onClick: exitWavi, style: { marginTop: "8px", width: "100%", maxWidth: "360px", padding: "16px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "none", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, borderRadius: "100px" } }, manualExitRef.current ? "앱으로 돌아가기" : "Wavi 홈으로")
+    const T = WAYVE_TOKENS;
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: T.bgGrouped, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
+      React.createElement("style", null, "html, body { background: #F2F3F7 !important; }"),
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", gap: "16px" } },
+        React.createElement("div", { style: { width: "80px", height: "80px", borderRadius: "50%", background: T.green, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 30px rgba(47,179,68,0.32)", fontSize: "40px", color: "#fff", fontWeight: "800" } }, "✓"),
+        React.createElement("div", { style: { fontSize: "20px", fontWeight: "800", color: T.ink, textAlign: "center" } }, "수고하셨어요!"),
+        React.createElement("div", { style: { fontSize: "14px", color: T.ink2, textAlign: "center", lineHeight: 1.5, wordBreak: "keep-all" } }, "오늘 상황 연습을 잘 마쳤어요."),
+        React.createElement("button", { onClick: exitWavi, style: { marginTop: "8px", width: "100%", maxWidth: "340px", padding: "16px", background: T.navy1, border: "none", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, borderRadius: T.rPill } }, manualExitRef.current ? "앱으로 돌아가기" : "Wavi 홈으로")
       )
     );
   }
