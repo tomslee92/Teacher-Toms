@@ -18815,14 +18815,14 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       ),
       // Main: character (flagged) + progress dots + bubble transcript + controls
       !scenarioIntroText && React.createElement(React.Fragment, null,
-        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { position: "relative", width: "100%", height: "190px", flexShrink: 0, overflow: "hidden" } },
+        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { position: "relative", width: "100%", height: "230px", flexShrink: 0, overflow: "hidden" } },
           scenarioVideoUrl
             ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
                 onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
                 onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
                 onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-                style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%" } })
-            : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } })),
+                style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 22%" } })
+            : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 22%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } })),
           React.createElement("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, height: "56px", background: `linear-gradient(to bottom, transparent, ${T.bgGrouped})`, pointerEvents: "none" } }),
           React.createElement("div", { style: { position: "absolute", bottom: "12px", right: "16px", display: "flex", alignItems: "flex-end", gap: "3px", height: "20px", opacity: wavyState === "speaking" ? 1 : 0, transition: "opacity 0.3s" } },
             [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "4px", height: "18px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
