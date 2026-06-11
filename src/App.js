@@ -8745,6 +8745,21 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               <option value="advanced">🎯 Advanced — native-level critique</option>
             </select>
           </div>
+          {/* Optional goal anchor — only for students with a clear goal (home Daily Focus) */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginTop: "8px" }}>
+            <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0, marginTop: "5px" }}>🎯</span>
+            <div style={{ flex: 1 }}>
+              <input value={localStudent.goal_title || ""}
+                onChange={e => setLocalStudent(prev => ({ ...prev, goal_title: e.target.value }))}
+                onBlur={async e => { await db.update("students", `id=eq.${localStudent.id}`, { goal_title: e.target.value.trim() || null }).catch(() => {}); }}
+                placeholder="Goal (optional) — e.g. 코펜하겐 출장 준비"
+                style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "5px 10px", color: "#fff", fontSize: "12px", fontFamily: FONT, outline: "none", boxSizing: "border-box", marginBottom: "6px" }} />
+              <input type="date" value={localStudent.goal_target_date || ""}
+                onChange={async e => { const v = e.target.value || null; setLocalStudent(prev => ({ ...prev, goal_target_date: v })); await db.update("students", `id=eq.${localStudent.id}`, { goal_target_date: v }).catch(() => {}); }}
+                style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "5px 10px", color: "#fff", fontSize: "12px", fontFamily: FONT, outline: "none", boxSizing: "border-box", colorScheme: "dark" }} />
+              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", marginTop: "4px" }}>목표가 명확한 학생에게만 입력 (선택)</div>
+            </div>
+          </div>
           {/* Wavy toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
             <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>🌊</span>
@@ -21133,6 +21148,9 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const [playingPhraseId, setPlayingPhraseId] = useState(null);
   // Today's QoD card
   const [todayQod, setTodayQod] = useState(null); // { prompt, answered }
+  // Daily Focus (오늘의 연습) + same-evening class recap
+  const [dailyFocus, setDailyFocus] = useState(null); // { today, resurfaced, todayDone, resurfDone }
+  const [classRecap, setClassRecap] = useState(null); // [{english,korean}] uploaded this 5am-cycle, or null
   // Staggered-reveal: cards below stats appear together after data loads
   // (or after 600ms safety cap), creating a smooth choreographed entrance
   const [cardsReady, setCardsReady] = useState(false);
@@ -21177,6 +21195,18 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     }
   };
 
+  // Play the recap phrases in sequence (in-home review — there's no separate practice-set route).
+  const reviewRecap = async (phrases) => {
+    for (const p of (phrases || [])) {
+      try {
+        const result = await wavyGenerateAudio(p.english);
+        if (!result?.url) continue;
+        await new Promise((res) => { const a = new Audio(result.url); a.onended = res; a.onerror = res; const pr = a.play(); if (pr && pr.catch) pr.catch(() => res()); });
+        await new Promise(r => setTimeout(r, 250));
+      } catch(e) {}
+    }
+  };
+
   // Load real stats + week phrases + today's QoD
   useEffect(() => {
     if (isPreview || !user?.id) return;
@@ -21195,12 +21225,25 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         const totalSec = segments.reduce((s, r) => s + (r.seconds || 0), 0);
         if (!cancelled) setWeekMinutes(Math.floor(totalSec / 60));
 
-        // Phrases mastered (lifetime)
+        // Phrases mastered (lifetime) + Daily Focus support
         const progAll = await db.get("student_progress",
-          `student_id=eq.${user.id}&select=phrase_id,passed`
+          `student_id=eq.${user.id}&select=phrase_id,passed,updated_at`
         ).catch(() => []);
         const passedSet = new Set(progAll.filter(p => p.passed).map(p => p.phrase_id));
         if (!cancelled) setPhrasesMastered(passedSet.size);
+        // "Practiced today" = a progress row touched since local midnight (for the green checks).
+        const _mid = new Date(); _mid.setHours(0, 0, 0, 0); const todayStartISO = _mid.toISOString();
+        const progMap = {}; progAll.forEach(p => { progMap[p.phrase_id] = p; });
+        const practicedToday = (pid) => { const p = progMap[pid]; return !!(p && p.updated_at && p.updated_at >= todayStartISO); };
+        // 다시 만나는 표현 — oldest mastered phrase inactive > 21 days (omit if none)
+        const cutoffISO = new Date(Date.now() - 21 * 86400000).toISOString();
+        const resurfRows = await db.get("student_progress", `student_id=eq.${user.id}&passed=eq.true&updated_at=lt.${cutoffISO}&order=updated_at.asc&limit=1&select=phrase_id`).catch(() => []);
+        let resurfaced = null;
+        if (resurfRows && resurfRows[0] && resurfRows[0].phrase_id) {
+          const pb = await db.get("phrase_bank", `id=eq.${resurfRows[0].phrase_id}&select=id,english,korean&limit=1`).catch(() => []);
+          resurfaced = pb && pb[0] ? pb[0] : null;
+        }
+        let todayPhrase = null; // 오늘의 표현 (assigned from this week's phrases below)
 
         // ── Curated scenarios available to this student — via scenario_assignments ──
         // Gated to Toms while testing — skip the fetch entirely for other students.
@@ -21259,7 +21302,24 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           if (surfaced.length > 0 && !cancelled) {
             setWeekPhrases({ phrases: surfaced, tier, totalLabel, passedSet });
           }
+
+          // 오늘의 표현 — deterministic by day from this week's phrases (rotates daily, stable within a day)
+          const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+          todayPhrase = thisWeek.length ? thisWeek[dayOfYear % thisWeek.length].phrase_bank : null;
+
+          // 오늘 수업 정리 — phrases uploaded to the group this 5am-cycle (shown until 4:59am next day)
+          const _ws = new Date(); _ws.setHours(5, 0, 0, 0); if (new Date() < _ws) _ws.setDate(_ws.getDate() - 1);
+          const recapRows = await db.get("session_phrases", `group_id=eq.${group.id}&student_id=is.null&created_at=gte.${_ws.toISOString()}&select=phrase_id,phrase_bank(english,korean)`).catch(() => []);
+          const recapPhrases = (recapRows || []).filter(r => r.phrase_bank).map(r => r.phrase_bank);
+          if (!cancelled) setClassRecap(recapPhrases.length ? recapPhrases : null);
         }
+        // Daily Focus card data (오늘의 표현 + 다시 만나는 표현 + 오늘의 질문[from todayQod])
+        if (!cancelled) setDailyFocus({
+          today: todayPhrase,
+          resurfaced,
+          todayDone: todayPhrase ? practicedToday(todayPhrase.id) : false,
+          resurfDone: resurfaced ? practicedToday(resurfaced.id) : false,
+        });
 
         // ── Today's QoD ──────────────────────────────────────────────────────
         const todayStr = localToday();
@@ -21377,6 +21437,65 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       React.createElement("div", { style: { fontSize: "13px", color: C.textLight, fontWeight: "500", marginBottom: "4px" } }, greeting),
       React.createElement("div", { style: { fontSize: "26px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px" } }, `${firstName} 👋`)
     ),
+
+    // ── Goal anchor — thin line under the greeting (only when a goal is set) ──
+    (user?.goal_title && user.goal_title.trim()) && (() => {
+      const T = WAYVE_TOKENS;
+      const title = user.goal_title.trim();
+      let main;
+      if (user.goal_target_date) {
+        const target = new Date(user.goal_target_date + "T00:00:00");
+        const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+        const n = Math.round((target - t0) / 86400000);
+        const dlabel = n > 0 ? `D-${n}` : n === 0 ? "D-day" : `D+${-n}`;
+        main = React.createElement("span", { style: { fontWeight: "800", color: n <= 14 ? T.coral : T.ink2 } }, `${dlabel} · ${title}`);
+      } else {
+        main = React.createElement("span", { style: { fontWeight: "700", color: T.ink2 } }, title);
+      }
+      const scTotal = (scenariosVisible && Array.isArray(scenarios)) ? scenarios.length : 0;
+      return React.createElement("div", { style: { marginTop: "-10px", marginBottom: "16px", fontSize: "13px", letterSpacing: "-0.1px" } },
+        main,
+        scTotal > 0 && React.createElement("span", { style: { color: T.ink3, fontWeight: "600" } }, ` · 시나리오 ${scTotal}개`)
+      );
+    })(),
+
+    // ── 오늘 수업 정리 (same-evening class recap) — priority on class days ──
+    (classRecap && classRecap.length > 0) && (() => {
+      const T = WAYVE_TOKENS;
+      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px", marginBottom: "12px", boxShadow: T.shadowCard } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" } }, "오늘 수업 정리"),
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T.ink, marginBottom: "12px", wordBreak: "keep-all" } }, "오늘 수업에서 다룬 표현이에요"),
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" } },
+          classRecap.slice(0, 8).map((p, i) => React.createElement("div", { key: i, style: { paddingBottom: "8px", borderBottom: i < Math.min(classRecap.length, 8) - 1 ? `1px solid ${T.hairline}` : "none" } },
+            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, wordBreak: "keep-all" } }, p.english),
+            p.korean && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "2px", wordBreak: "keep-all" } }, p.korean)
+          ))
+        ),
+        React.createElement("button", { onClick: () => reviewRecap(classRecap), style: { background: T.wave, border: "none", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "10px 18px", borderRadius: T.rPill } }, "지금 복습하기 →")
+      );
+    })(),
+
+    // ── 오늘의 연습 (Daily Focus) — below greeting, above the Wavi hero ──
+    (dailyFocus && (dailyFocus.today || dailyFocus.resurfaced || todayQod)) && (() => {
+      const T = WAYVE_TOKENS;
+      const rows = [];
+      if (dailyFocus.today) rows.push({ key: "today", label: "오늘의 표현", phrase: dailyFocus.today, done: dailyFocus.todayDone, onClick: () => playPhrase(dailyFocus.today) });
+      if (dailyFocus.resurfaced) rows.push({ key: "resurf", label: "다시 만나는 표현", phrase: dailyFocus.resurfaced, done: dailyFocus.resurfDone, onClick: () => playPhrase(dailyFocus.resurfaced) });
+      if (todayQod) rows.push({ key: "qod", label: todayQod.tag === "Thankful Thursday" ? "🙏 감사한 일" : "오늘의 질문", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
+      if (!rows.length) return null;
+      const allDone = rows.every(r => r.done);
+      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: allDone ? T.green : T.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, allDone ? "오늘 연습 완료 ✓" : "오늘의 연습"),
+        rows.map((r, i) => React.createElement("button", { key: r.key, onClick: r.onClick, style: { display: "flex", alignItems: "center", gap: "12px", width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid ${T.hairline}` : "none", padding: "12px 0", cursor: "pointer", fontFamily: FONT } },
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "3px" } }, r.label),
+            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.qod ? `"${r.text}"` : `"${r.phrase.english}"`),
+            (!r.qod && r.phrase.korean) && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.phrase.korean)
+          ),
+          React.createElement("div", { style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: r.done ? T.greenSoft : "transparent", border: r.done ? "none" : `1px solid ${T.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", color: r.done ? T.green : T.ink3, fontSize: "12px", fontWeight: "800" } }, r.done ? "✓" : (r.qod ? "→" : "▶"))
+        ))
+      );
+    })(),
 
     // ── HERO: Wavi card — Variant B (pure gradient + typography) ──────────────
     React.createElement("div", {
@@ -21590,29 +21709,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         )
       ),
 
-      // ── 오늘의 질문 (today's QoD preview) ─────────────────────────────────────
-      todayQod && React.createElement("div", {
-        onClick: () => onNavigate("community"),
-        style: {
-          background: todayQod.answered
-            ? "linear-gradient(135deg, #f0f8f2 0%, #e3f1e8 100%)"
-            : "linear-gradient(135deg, #fef5f2 0%, #fde9e2 100%)",
-          border: `1px solid ${todayQod.answered ? "#C8E1D0" : "#F5D5C5"}`,
-          borderRadius: "20px",
-          padding: "18px 20px",
-          marginBottom: "12px",
-          cursor: "pointer",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-        }
-      },
-        React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" } },
-          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: todayQod.answered ? "#3D7A52" : "#B85A38", letterSpacing: "1.5px", textTransform: "uppercase" } }, todayQod.tag === "Thankful Thursday" ? "🙏 THANKFUL THURSDAY" : "오늘의 질문"),
-          React.createElement("div", { style: { fontSize: "11px", color: C.textLight, fontWeight: "600" } },
-            todayQod.answered ? "✓ 답변 완료" : "답변하기 →"
-          )
-        ),
-        React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: C.text, letterSpacing: "-0.2px", lineHeight: 1.4 } }, `"${todayQod.prompt}"`)
-      ),
+      // 오늘의 질문 (QoD) now lives inside the 오늘의 연습 (Daily Focus) card above the hero.
 
       // ── 이번 주 표현 — tiered surfacing of 3 phrases ─────────────────────────
       weekPhrases && weekPhrases.phrases.length > 0 && React.createElement("div", {
