@@ -18815,17 +18815,18 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       ),
       // Main: character (flagged) + progress dots + bubble transcript + controls
       !scenarioIntroText && React.createElement(React.Fragment, null,
-        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { position: "relative", width: "100%", height: "230px", flexShrink: 0, overflow: "hidden" } },
-          scenarioVideoUrl
-            ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
-                onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
-                onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-                onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-                style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 22%" } })
-            : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 22%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } })),
-          React.createElement("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, height: "56px", background: `linear-gradient(to bottom, transparent, ${T.bgGrouped})`, pointerEvents: "none" } }),
-          React.createElement("div", { style: { position: "absolute", bottom: "12px", right: "16px", display: "flex", alignItems: "flex-end", gap: "3px", height: "20px", opacity: wavyState === "speaking" ? 1 : 0, transition: "opacity 0.3s" } },
-            [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "4px", height: "18px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
+        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "14px 0 6px", flexShrink: 0 } },
+          React.createElement("div", { style: { position: "relative", width: "84px", height: "84px", borderRadius: "50%", overflow: "hidden", background: T.card, border: `2px solid ${T.card}`, boxShadow: `0 4px 14px rgba(16,24,40,.10)${wavyState === "speaking" ? `, 0 0 0 3px ${T.waveSoft}` : ""}`, transition: "box-shadow 0.3s ease" } },
+            scenarioVideoUrl
+              ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
+                  onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
+                  onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+                  onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+                  style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 26%" } })
+              : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 26%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } }))
+          ),
+          React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "3px", height: "12px", opacity: wavyState === "speaking" ? 1 : 0, transition: "opacity 0.3s" } },
+            [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "3px", height: "11px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
           )
         ),
         React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: "5px", padding: "10px 0 4px", flexShrink: 0 } },
