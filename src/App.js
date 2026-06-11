@@ -21434,8 +21434,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         animation: "greetingEntrance 360ms cubic-bezier(0.16, 1, 0.3, 1) 0ms both",
       }
     },
-      React.createElement("div", { style: { fontSize: "13px", color: C.textLight, fontWeight: "500", marginBottom: "4px" } }, greeting),
-      React.createElement("div", { style: { fontSize: "26px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px" } }, `${firstName} 👋`)
+      React.createElement("div", { style: { fontSize: "13px", color: WAYVE_TOKENS.ink3, fontWeight: "500", marginBottom: "4px" } }, greeting),
+      React.createElement("div", { style: { fontSize: "32px", fontWeight: "800", color: WAYVE_TOKENS.ink, letterSpacing: "-0.8px" } }, `${firstName} 👋`)
     ),
 
     // ── Goal anchor — thin line under the greeting (only when a goal is set) ──
@@ -21500,13 +21500,12 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       onClick: handleWaviTap,
       style: {
         position: "relative",
-        // Multi-stop gradient — deeper, richer than before
-        background: "linear-gradient(135deg, #0a0f24 0%, #14224a 40%, #2a3f7a 80%, #4a5fa8 100%)",
+        // Wavi navy hero gradient (WAYVE_TOKENS navy1 → navy2) + shadowHero
+        background: `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)`,
         backgroundSize: "200% 200%",
-        // Entrance choreography: heroEntrance plays once on mount (200ms delay
-        // after greeting starts), then the two ambient animations loop forever.
-        animation: "heroEntrance 520ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both, heroGradientShift 12s ease-in-out 640ms infinite, heroGlowPulse 4s ease-in-out 640ms infinite",
-        borderRadius: "24px",
+        animation: "heroEntrance 520ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both, heroGradientShift 12s ease-in-out 640ms infinite",
+        borderRadius: WAYVE_TOKENS.rCard,
+        boxShadow: WAYVE_TOKENS.shadowHero,
         padding: "32px 26px",
         marginBottom: "16px",
         cursor: "pointer",
@@ -21525,7 +21524,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           position: "absolute",
           top: "-50%", right: "-30%",
           width: "80%", height: "200%",
-          background: "radial-gradient(ellipse, rgba(99,102,241,0.25) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, rgba(62,123,250,0.22) 0%, transparent 70%)",
           animation: "radialDrift 12s ease-in-out infinite",
           pointerEvents: "none",
         }
@@ -21676,32 +21675,32 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       // ── Stats card ─────────────────────────────────────────────────────────
       React.createElement("div", {
         style: {
-          background: "#fff",
-          border: `1px solid ${C.border}`,
-          borderRadius: "20px",
+          background: WAYVE_TOKENS.card,
+          border: `1px solid ${WAYVE_TOKENS.hairline}`,
+          borderRadius: WAYVE_TOKENS.rCard,
           padding: "18px 20px",
           marginBottom: "16px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          boxShadow: WAYVE_TOKENS.shadowCard,
         }
       },
-        React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "14px" } }, "나의 진행"),
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "14px" } }, "나의 진행"),
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: "12px" } },
           React.createElement("div", { style: { flex: 1, textAlign: "center" } },
             React.createElement("div", { style: { fontSize: "26px", marginBottom: "4px", lineHeight: 1 } }, "🔥"),
-            React.createElement("div", { style: { fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px", lineHeight: 1 } }, streak || 0),
-            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, fontWeight: "600", marginTop: "4px" } }, "일 연속")
+            React.createElement("div", { style: { fontSize: "24px", fontWeight: "800", color: WAYVE_TOKENS.ink, letterSpacing: "-0.5px", lineHeight: 1 } }, streak || 0),
+            React.createElement("div", { style: { fontSize: "11px", color: WAYVE_TOKENS.ink2, fontWeight: "600", marginTop: "4px" } }, "일 연속")
           ),
-          React.createElement("div", { style: { width: "1px", background: C.border, alignSelf: "stretch" } }),
+          React.createElement("div", { style: { width: "1px", background: WAYVE_TOKENS.hairline, alignSelf: "stretch" } }),
           React.createElement("div", { style: { flex: 1, textAlign: "center" } },
             React.createElement("div", { style: { fontSize: "26px", marginBottom: "4px", lineHeight: 1 } }, "⏱"),
-            React.createElement("div", { style: { fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px", lineHeight: 1 } }, weekMinutes != null ? `${weekMinutes}분` : "0분"),
-            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, fontWeight: "600", marginTop: "4px" } }, "이번 주")
+            React.createElement("div", { style: { fontSize: "24px", fontWeight: "800", color: WAYVE_TOKENS.ink, letterSpacing: "-0.5px", lineHeight: 1 } }, weekMinutes != null ? `${weekMinutes}분` : "0분"),
+            React.createElement("div", { style: { fontSize: "11px", color: WAYVE_TOKENS.ink2, fontWeight: "600", marginTop: "4px" } }, "이번 주")
           ),
-          React.createElement("div", { style: { width: "1px", background: C.border, alignSelf: "stretch" } }),
+          React.createElement("div", { style: { width: "1px", background: WAYVE_TOKENS.hairline, alignSelf: "stretch" } }),
           React.createElement("div", { style: { flex: 1, textAlign: "center" } },
             React.createElement("div", { style: { fontSize: "26px", marginBottom: "4px", lineHeight: 1 } }, "✨"),
-            React.createElement("div", { style: { fontSize: "22px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px", lineHeight: 1 } }, phrasesMastered != null ? phrasesMastered : 0),
-            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, fontWeight: "600", marginTop: "4px" } }, "표현 학습")
+            React.createElement("div", { style: { fontSize: "24px", fontWeight: "800", color: WAYVE_TOKENS.ink, letterSpacing: "-0.5px", lineHeight: 1 } }, phrasesMastered != null ? phrasesMastered : 0),
+            React.createElement("div", { style: { fontSize: "11px", color: WAYVE_TOKENS.ink2, fontWeight: "600", marginTop: "4px" } }, "표현 학습")
           )
         )
       ),
@@ -21711,27 +21710,27 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       // ── 이번 주 표현 — tiered surfacing of 3 phrases ─────────────────────────
       weekPhrases && weekPhrases.phrases.length > 0 && React.createElement("div", {
         style: {
-          background: "#fff",
-          border: `1px solid ${C.border}`,
-          borderRadius: "20px",
+          background: WAYVE_TOKENS.card,
+          border: `1px solid ${WAYVE_TOKENS.hairline}`,
+          borderRadius: WAYVE_TOKENS.rCard,
           padding: "18px 18px 14px",
           marginBottom: "20px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          boxShadow: WAYVE_TOKENS.shadowCard,
         }
       },
         // Header — eyebrow + progress fraction
         React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" } },
           React.createElement("div", null,
-            React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "2px" } },
+            React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "2px" } },
               weekPhrases.tier === 3 ? "예전에 배운 표현" : "이번 주 표현"
             ),
-            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, fontWeight: "500" } },
+            React.createElement("div", { style: { fontSize: "13px", color: WAYVE_TOKENS.ink2, fontWeight: "500" } },
               weekPhrases.tier === 1 ? "더 연습해보세요" :
               weekPhrases.tier === 2 ? "다 익히셨네요! 한번 더 들어보세요" :
                                        "다시 만나봐요"
             )
           ),
-          weekPhrases.totalLabel && React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: C.text, background: C.bgSoft, borderRadius: "100px", padding: "3px 10px" } }, weekPhrases.totalLabel)
+          weekPhrases.totalLabel && React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: WAYVE_TOKENS.ink, background: WAYVE_TOKENS.bgGrouped, borderRadius: WAYVE_TOKENS.rPill, padding: "3px 10px" } }, weekPhrases.totalLabel)
         ),
         // Phrase rows — each tappable to play audio inline.
         // Play button color = passed status (subtle green for passed, gray for unpassed).
@@ -21742,8 +21741,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           //   playing → navy
           //   passed (and not playing) → soft green
           //   unpassed (and not playing) → default gray
-          const playBg = isPlaying ? C.navy : (isPassed ? "#DCEEDF" : C.bgSoft);
-          const playIconColor = isPlaying ? "#fff" : (isPassed ? "#3D7A52" : C.textMid);
+          const playBg = isPlaying ? WAYVE_TOKENS.navy1 : (isPassed ? WAYVE_TOKENS.greenSoft : WAYVE_TOKENS.bgGrouped);
+          const playIconColor = isPlaying ? "#fff" : (isPassed ? WAYVE_TOKENS.green : WAYVE_TOKENS.ink2);
           return React.createElement("button", {
             key: p.id,
             onClick: () => playPhrase(p),
@@ -21752,8 +21751,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
               width: "100%", textAlign: "left",
               background: "transparent",
               border: "none",
-              padding: "10px 0",
-              borderTop: `1px solid ${C.bgSoft}`,
+              padding: "11px 0",
+              borderTop: `1px solid ${WAYVE_TOKENS.hairline}`,
               cursor: "pointer",
               fontFamily: FONT,
             }
@@ -21776,9 +21775,9 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
             // Phrase text
             React.createElement("div", {
               style: {
-                flex: 1, fontSize: "14px", fontWeight: "600",
+                flex: 1, fontSize: "15px", fontWeight: "600",
                 // Passed phrases get a slightly muted text color — readable but de-emphasized
-                color: isPassed ? C.textMid : C.text,
+                color: isPassed ? WAYVE_TOKENS.ink2 : WAYVE_TOKENS.ink,
                 lineHeight: 1.4,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }
@@ -21791,13 +21790,13 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           style: {
             width: "100%",
             background: "transparent", border: "none",
-            padding: "10px 0 4px",
-            borderTop: `1px solid ${C.bgSoft}`,
+            padding: "12px 0 4px",
+            borderTop: `1px solid ${WAYVE_TOKENS.hairline}`,
             marginTop: "4px",
             cursor: "pointer",
             fontFamily: FONT,
             textAlign: "right",
-            fontSize: "12px", fontWeight: "700", color: C.textMid,
+            fontSize: "13px", fontWeight: "700", color: WAYVE_TOKENS.wave,
           }
         }, "모두 보기 →")
       )
