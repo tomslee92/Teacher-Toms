@@ -18793,7 +18793,14 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   if (phase === "scenario") {
     const T = WAYVE_TOKENS;
     const firstName = (user?.name || "").trim().split(/\s+/)[0] || "";
-    const charExpr = scShadowPraise ? "encouraging" : wavyState === "listening" ? "listening" : wavyState === "speaking" ? "speaking" : "neutral";
+    // Wavi only "speaks" the student-role lines (she coaches them); on an "other" line she listens.
+    const curSpeaker = (scenarioLines[scenarioIdx] || {}).speaker;
+    const waviSpeaking = wavyState === "speaking" && curSpeaker !== "other"; // her voice (vs the other person's)
+    const charExpr = scShadowPraise ? "encouraging"
+      : wavyState === "listening" ? "listening"          // mic active (shadowing)
+      : (wavyState === "speaking" && curSpeaker === "other") ? "listening"  // other person talking → Wavi listens
+      : wavyState === "speaking" ? "speaking"            // Wavi coaching the student line
+      : "neutral";
     const isTomsAcct = user?.name === "Toms Lee" || user?.name === "Toms";
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: T.bgGrouped, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
       React.createElement("style", null, "html, body { background: #F2F3F7 !important; } @keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}} @keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes scPop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}"),
@@ -18816,7 +18823,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       // Main: character (flagged) + progress dots + bubble transcript + controls
       !scenarioIntroText && React.createElement(React.Fragment, null,
         (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "14px 0 6px", flexShrink: 0 } },
-          React.createElement("div", { style: { position: "relative", width: "84px", height: "84px", borderRadius: "50%", overflow: "hidden", background: T.card, border: `2px solid ${T.card}`, boxShadow: `0 4px 14px rgba(16,24,40,.10)${wavyState === "speaking" ? `, 0 0 0 3px ${T.waveSoft}` : ""}`, transition: "box-shadow 0.3s ease" } },
+          React.createElement("div", { style: { position: "relative", width: "84px", height: "84px", borderRadius: "50%", overflow: "hidden", background: T.card, border: `2px solid ${T.card}`, boxShadow: `0 4px 14px rgba(16,24,40,.10)${waviSpeaking ? `, 0 0 0 3px ${T.waveSoft}` : ""}`, transition: "box-shadow 0.3s ease" } },
             scenarioVideoUrl
               ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
                   onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
@@ -18825,8 +18832,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
                   style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 26%" } })
               : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 26%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } }))
           ),
-          React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "3px", height: "12px", opacity: wavyState === "speaking" ? 1 : 0, transition: "opacity 0.3s" } },
-            [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "3px", height: "11px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
+          React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "3px", height: "12px", opacity: waviSpeaking ? 1 : 0, transition: "opacity 0.3s" } },
+            [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "3px", height: "11px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: waviSpeaking ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
           )
         ),
         React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: "5px", padding: "10px 0 4px", flexShrink: 0 } },
