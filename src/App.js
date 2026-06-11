@@ -21452,11 +21452,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       } else {
         main = React.createElement("span", { style: { fontWeight: "700", color: T.ink2 } }, title);
       }
-      const scTotal = (scenariosVisible && Array.isArray(scenarios)) ? scenarios.length : 0;
-      return React.createElement("div", { style: { marginTop: "-10px", marginBottom: "16px", fontSize: "13px", letterSpacing: "-0.1px" } },
-        main,
-        scTotal > 0 && React.createElement("span", { style: { color: T.ink3, fontWeight: "600" } }, ` · 시나리오 ${scTotal}개`)
-      );
+      // Scenarios are free-form practice (not a weekly assignment), so no count/fraction here.
+      return React.createElement("div", { style: { marginTop: "-10px", marginBottom: "16px", fontSize: "13px", letterSpacing: "-0.1px" } }, main);
     })(),
 
     // ── 오늘 수업 정리 (same-evening class recap) — priority on class days ──
