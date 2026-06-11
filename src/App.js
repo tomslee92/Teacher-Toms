@@ -21456,44 +21456,6 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       return React.createElement("div", { style: { marginTop: "-10px", marginBottom: "16px", fontSize: "13px", letterSpacing: "-0.1px" } }, main);
     })(),
 
-    // ── 오늘 수업 정리 (same-evening class recap) — priority on class days ──
-    (classRecap && classRecap.length > 0) && (() => {
-      const T = WAYVE_TOKENS;
-      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px", marginBottom: "12px", boxShadow: T.shadowCard } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" } }, "오늘 수업 정리"),
-        React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T.ink, marginBottom: "12px", wordBreak: "keep-all" } }, "오늘 수업에서 다룬 표현이에요"),
-        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" } },
-          classRecap.slice(0, 8).map((p, i) => React.createElement("div", { key: i, style: { paddingBottom: "8px", borderBottom: i < Math.min(classRecap.length, 8) - 1 ? `1px solid ${T.hairline}` : "none" } },
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, wordBreak: "keep-all" } }, p.english),
-            p.korean && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "2px", wordBreak: "keep-all" } }, p.korean)
-          ))
-        ),
-        React.createElement("button", { onClick: () => reviewRecap(classRecap), style: { background: T.wave, border: "none", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "10px 18px", borderRadius: T.rPill } }, "지금 복습하기 →")
-      );
-    })(),
-
-    // ── 오늘의 연습 (Daily Focus) — below greeting, above the Wavi hero ──
-    (dailyFocus && (dailyFocus.today || dailyFocus.resurfaced || todayQod)) && (() => {
-      const T = WAYVE_TOKENS;
-      const rows = [];
-      if (dailyFocus.today) rows.push({ key: "today", label: "오늘의 표현", phrase: dailyFocus.today, done: dailyFocus.todayDone, onClick: () => playPhrase(dailyFocus.today) });
-      if (dailyFocus.resurfaced) rows.push({ key: "resurf", label: "다시 만나는 표현", phrase: dailyFocus.resurfaced, done: dailyFocus.resurfDone, onClick: () => playPhrase(dailyFocus.resurfaced) });
-      if (todayQod) rows.push({ key: "qod", label: todayQod.tag === "Thankful Thursday" ? "🙏 감사한 일" : "오늘의 질문", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
-      if (!rows.length) return null;
-      const allDone = rows.every(r => r.done);
-      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: allDone ? T.green : T.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, allDone ? "오늘 연습 완료 ✓" : "오늘의 연습"),
-        rows.map((r, i) => React.createElement("button", { key: r.key, onClick: r.onClick, style: { display: "flex", alignItems: "center", gap: "12px", width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid ${T.hairline}` : "none", padding: "12px 0", cursor: "pointer", fontFamily: FONT } },
-          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-            React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "3px" } }, r.label),
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.qod ? `"${r.text}"` : `"${r.phrase.english}"`),
-            (!r.qod && r.phrase.korean) && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.phrase.korean)
-          ),
-          React.createElement("div", { style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: r.done ? T.greenSoft : "transparent", border: r.done ? "none" : `1px solid ${T.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", color: r.done ? T.green : T.ink3, fontSize: "12px", fontWeight: "800" } }, r.done ? "✓" : (r.qod ? "→" : "▶"))
-        ))
-      );
-    })(),
-
     // ── HERO: Wavi card — Variant B (pure gradient + typography) ──────────────
     React.createElement("div", {
       ref: waviCardRef,
@@ -21565,6 +21527,44 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         React.createElement("span", { style: { fontSize: "14px", color: "#fff" } }, "→")
       )
     ),
+
+    // ── 오늘 수업 정리 (same-evening class recap) — priority on class days ──
+    (classRecap && classRecap.length > 0) && (() => {
+      const T = WAYVE_TOKENS;
+      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px", marginBottom: "12px", boxShadow: T.shadowCard } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" } }, "오늘 수업 정리"),
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T.ink, marginBottom: "12px", wordBreak: "keep-all" } }, "오늘 수업에서 다룬 표현이에요"),
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" } },
+          classRecap.slice(0, 8).map((p, i) => React.createElement("div", { key: i, style: { paddingBottom: "8px", borderBottom: i < Math.min(classRecap.length, 8) - 1 ? `1px solid ${T.hairline}` : "none" } },
+            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, wordBreak: "keep-all" } }, p.english),
+            p.korean && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "2px", wordBreak: "keep-all" } }, p.korean)
+          ))
+        ),
+        React.createElement("button", { onClick: () => reviewRecap(classRecap), style: { background: T.wave, border: "none", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "10px 18px", borderRadius: T.rPill } }, "지금 복습하기 →")
+      );
+    })(),
+
+    // ── 오늘의 연습 (Daily Focus) ──
+    (dailyFocus && (dailyFocus.today || dailyFocus.resurfaced || todayQod)) && (() => {
+      const T = WAYVE_TOKENS;
+      const rows = [];
+      if (dailyFocus.today) rows.push({ key: "today", label: "오늘의 표현", phrase: dailyFocus.today, done: dailyFocus.todayDone, onClick: () => playPhrase(dailyFocus.today) });
+      if (dailyFocus.resurfaced) rows.push({ key: "resurf", label: "다시 만나는 표현", phrase: dailyFocus.resurfaced, done: dailyFocus.resurfDone, onClick: () => playPhrase(dailyFocus.resurfaced) });
+      if (todayQod) rows.push({ key: "qod", label: todayQod.tag === "Thankful Thursday" ? "🙏 감사한 일" : "오늘의 질문", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
+      if (!rows.length) return null;
+      const allDone = rows.every(r => r.done);
+      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: allDone ? T.green : T.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, allDone ? "오늘 연습 완료 ✓" : "오늘의 연습"),
+        rows.map((r, i) => React.createElement("button", { key: r.key, onClick: r.onClick, style: { display: "flex", alignItems: "center", gap: "12px", width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid ${T.hairline}` : "none", padding: "12px 0", cursor: "pointer", fontFamily: FONT } },
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "3px" } }, r.label),
+            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.qod ? `"${r.text}"` : `"${r.phrase.english}"`),
+            (!r.qod && r.phrase.korean) && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.phrase.korean)
+          ),
+          React.createElement("div", { style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: r.done ? T.greenSoft : "transparent", border: r.done ? "none" : `1px solid ${T.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", color: r.done ? T.green : T.ink3, fontSize: "12px", fontWeight: "800" } }, r.done ? "✓" : (r.qod ? "→" : "▶"))
+        ))
+      );
+    })(),
 
     // ── Unified reveal gate ────────────────────────────────────────────────────
     // Everything below the Wavi hero (stats, QoD, week phrases) is hidden until
@@ -21707,8 +21707,9 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
 
       // 오늘의 질문 (QoD) now lives inside the 오늘의 연습 (Daily Focus) card above the hero.
 
-      // ── 이번 주 표현 — tiered surfacing of 3 phrases ─────────────────────────
-      weekPhrases && weekPhrases.phrases.length > 0 && React.createElement("div", {
+      // ── 이번 주 표현 — REMOVED: deduped against the 오늘의 연습 (Daily Focus) card.
+      //    Week-phrase practice now happens in Wavi (top) + the Practice tab.
+      false && weekPhrases && weekPhrases.phrases.length > 0 && React.createElement("div", {
         style: {
           background: WAYVE_TOKENS.card,
           border: `1px solid ${WAYVE_TOKENS.hairline}`,
