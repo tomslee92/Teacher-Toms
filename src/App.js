@@ -17298,25 +17298,38 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     else onClose();
   };
 
-  // Shared character renderer (cross-fading expression stack, or a video clip).
+  // Shared character renderer — circular portrait (never a rectangular image box).
+  // Tall portrait PNGs cropped to the face via object-fit cover + object-position 50% 12%,
+  // layered rings + ambient shadow so she sits on the screen, idle "breathing" so a static
+  // image feels alive. While speaking, a 3-bar equalizer pill sits below the circle.
   const renderWaviCharacter = (expression, videoUrl) => {
     if (!showCharacter) return null;
-    const H = 188;
-    // Absolute children are centered with top/left 50% + translate (flex justify doesn't
-    // apply to absolutely-positioned elements — that was the off-center bug).
-    return React.createElement("div", { style: { position: "relative", zIndex: 2, height: `${H}px`, marginTop: "4px", flexShrink: 0 } },
-      React.createElement("div", { style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "248px", height: "248px", borderRadius: "50%", background: expression === "listening" ? "radial-gradient(circle, rgba(34,197,94,0.18), transparent 70%)" : expression === "encouraging" ? "radial-gradient(circle, rgba(111,160,255,0.22), transparent 70%)" : "radial-gradient(circle, rgba(62,123,250,0.12), transparent 70%)", transition: "background 0.45s ease", pointerEvents: "none" } }),
-      videoUrl
-        ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true,
-            onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
-            onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-            onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
-            style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: `${H}px`, objectFit: "contain", borderRadius: "20px", filter: "drop-shadow(0 14px 32px rgba(0,0,0,0.5))" } })
-        : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
-            React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true",
-              onError: (e) => { e.target.style.visibility = "hidden"; },
-              style: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: `${H}px`, objectFit: "contain", opacity: expression === exp ? 1 : 0, transition: "opacity 0.45s ease", filter: "drop-shadow(0 14px 32px rgba(0,0,0,0.5))", pointerEvents: "none" } })
-          )
+    const D = 132; // circular portrait diameter in-session
+    const speaking = expression === "speaking";
+    return React.createElement("div", { style: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", marginTop: "8px", flexShrink: 0 } },
+      React.createElement("div", { style: {
+        position: "relative", width: `${D}px`, height: `${D}px`, borderRadius: "50%", overflow: "hidden",
+        // inner 3px white ring → hairline outer ring → soft ambient shadow (drawn outside the
+        // clipped box, so overflow:hidden on the images doesn't eat them)
+        boxShadow: `0 0 0 3px rgba(255,255,255,0.9), 0 0 0 4px ${WAYVE_TOKENS.hairline}, 0 8px 24px rgba(11,31,58,0.18)`,
+        animation: "waviBreathe 4s ease-in-out infinite alternate",
+      } },
+        videoUrl
+          ? React.createElement("video", { src: videoUrl, autoPlay: true, playsInline: true,
+              onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
+              onEnded: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+              onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
+              style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%" } })
+          : ["neutral", "speaking", "listening", "encouraging"].map(exp =>
+              React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true",
+                onError: (e) => { e.target.style.visibility = "hidden"; },
+                style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%", opacity: expression === exp ? 1 : 0, transition: "opacity 0.3s ease", pointerEvents: "none" } })
+            )
+      ),
+      // Speaking equalizer pill — directly below the circle, never overlapping her face
+      speaking && React.createElement("div", { style: { marginTop: "10px", display: "flex", alignItems: "center", gap: "3px", padding: "5px 11px", borderRadius: "100px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.14)" } },
+        [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "3px", height: "10px", borderRadius: "100px", background: "#6FA0FF", animation: `waviEq 0.9s ease-in-out ${i * 0.15}s infinite` } }))
+      )
     );
   };
 
@@ -18655,7 +18668,6 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const currentPhrase = phrases[currentIdx];
-  const progressPct = phrases.length > 0 ? Math.round((currentIdx / phrases.length) * 100) : 0;
 
   if (phase === "loading") {
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top) + 40px) 24px calc(env(safe-area-inset-bottom) + 40px)" } },
@@ -18938,11 +18950,14 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       React.createElement("div", { style: { fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: "700", background: "rgba(255,255,255,0.07)", padding: "4px 10px", borderRadius: "100px" } }, `${currentIdx + 1} / ${phrases.length}`)
     ),
 
-    // Progress bar
-    React.createElement("div", { style: { padding: "0 20px 12px", position: "relative", zIndex: 2 } },
-      React.createElement("div", { style: { height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "100px", overflow: "hidden" } },
-        React.createElement("div", { style: { height: "100%", width: `${progressPct}%`, background: "linear-gradient(90deg, #3E7BFA, #6FA0FF)", borderRadius: "100px", transition: "width 0.4s ease" } })
-      )
+    // Progress dots — quiet honoring of the session length (same style as scenario progress)
+    phrases.length > 1 && React.createElement("div", { style: { padding: "0 20px 12px", display: "flex", justifyContent: "center", alignItems: "center", gap: "7px", position: "relative", zIndex: 2 } },
+      phrases.map((_, i) => React.createElement("div", { key: i, style: {
+        width: i === currentIdx ? "9px" : "7px", height: i === currentIdx ? "9px" : "7px",
+        borderRadius: "50%",
+        background: i < currentIdx ? "#3E7BFA" : i === currentIdx ? "#6FA0FF" : "rgba(255,255,255,0.18)",
+        transition: "all 0.3s ease",
+      } }))
     ),
 
     // Wavi character — cross-fading expression stack (Toms-only rollout for now).
@@ -19110,6 +19125,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         0% { transform: scale(0.95); opacity: 1; }
         100% { transform: scale(1.35); opacity: 0; }
       }
+      @keyframes waviBreathe { from { transform: scale(1); } to { transform: scale(1.015); } }
+      @keyframes waviEq { 0%, 100% { height: 6px; } 50% { height: 16px; } }
     `)
   );
 }
