@@ -771,7 +771,7 @@ async function migrateStudentPhrasesOnGroupChange(studentId, oldGroupId, newGrou
       const personal = await db.get("session_phrases", `student_id=eq.${studentId}&select=phrase_id`).catch(() => []);
       const have = new Set(personal.map(r => r.phrase_id));
       const toCopy = oldPhrases.filter(r => r.phrase_id && !have.has(r.phrase_id));
-      if (toCopy.length) await db.insert("session_phrases", toCopy.map(r => ({ student_id: studentId, phrase_id: r.phrase_id, in_library: !!r.in_library }))).catch(() => {});
+      if (toCopy.length) await db.insert("session_phrases", toCopy.map(r => ({ student_id: studentId, phrase_id: r.phrase_id, session_number: 1, in_library: !!r.in_library }))).catch(() => {});
     }
     if (newGroupId) {
       const newPhrases = await db.get("session_phrases", `group_id=eq.${newGroupId}&student_id=is.null&select=phrase_id`).catch(() => []);
