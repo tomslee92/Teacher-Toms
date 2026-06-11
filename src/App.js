@@ -4116,6 +4116,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   _tokenUser = user; _tokenGroup = group;
   const [tab, setTab] = useState(initialTab);
   const [showWavy, setShowWavy] = useState(false);
+  const [showUIPreview, setShowUIPreview] = useState(false); // Toms-only isolated preview of the grouped-card design language
   const [scenarioToLaunch, setScenarioToLaunch] = useState(null); // curated scenario chosen from the home card
   const [showProfile, setShowProfile] = useState(false);
   const [profileUser, setProfileUser] = useState(user);
@@ -4481,6 +4482,9 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
             {isTeacherName && (
               <button onClick={() => { setShowTeacherPrompt(true); setTeacherPassInput(""); setTeacherPassError(""); }} style={{ background: C.navy, border: "none", color: "#fff", padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>Teacher</button>
             )}
+            {isTeacherName && (
+              <button onClick={() => setShowUIPreview(true)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>🎨 미리보기</button>
+            )}
           </div>
         </div>
       </div>
@@ -4567,6 +4571,11 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       initialScenarioId: scenarioToLaunch?.id || null,
       onClose: () => { setShowWavy(false); setScenarioToLaunch(null); },
       onManualExit: () => { setShowWavy(false); setScenarioToLaunch(null); },
+    })}
+
+    {showUIPreview && React.createElement(UIPreviewScreen, {
+      user: profileUser,
+      onClose: () => setShowUIPreview(false),
     })}
 
     {showProfile && React.createElement(ProfileModal, { user: profileUser, showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep, onClose: () => {
@@ -4715,6 +4724,145 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
 
     </LangContext.Provider>
     </TourContext.Provider>
+  );
+}
+
+// ── UI Preview (Toms-only) ────────────────────────────────────────────────────
+// An ISOLATED mockup of the grouped-card design language (WAYVE_TOKENS) applied to
+// the toolkit screens — Practice/Library, My List, QoD — so the look can be judged on
+// a real device before any rollout. Touches NO existing component; sample data only.
+// Opened from the Toms-only "🎨 미리보기" header button; gated by showUIPreview.
+function UIPreviewScreen({ user, onClose }) {
+  const T = WAYVE_TOKENS;
+  const firstName = (user?.name || "").split(" ")[0] || "";
+  const [openId, setOpenId] = React.useState(2);   // one card pre-expanded to show progressive disclosure
+  const [activeTag, setActiveTag] = React.useState("전체");
+
+  const tags = ["전체", "비즈니스", "일상", "여행"];
+  const weekPhrases = [
+    { id: 1, english: "Could you walk me through it?", korean: "한번 자세히 설명해 주시겠어요?", status: "review" },
+    { id: 2, english: "Let's circle back on this.",     korean: "이건 나중에 다시 얘기해요.",      status: "new",  note: "circle back — 어떤 주제로 다시 돌아오다" },
+    { id: 3, english: "I'm on the same page.",          korean: "저도 같은 생각이에요.",          status: "done" },
+  ];
+  const myList = [
+    { id: 11, english: "That works for me.",     korean: "저는 괜찮아요, 좋아요." },
+    { id: 12, english: "Let me get back to you.", korean: "나중에 다시 연락드릴게요." },
+  ];
+
+  const chipFor = (status) =>
+    status === "review" ? { label: "복습 필요", bg: T.coralSoft, fg: T.coral } :
+    status === "done"   ? { label: "완료",      bg: T.greenSoft, fg: T.green } :
+                          { label: "새 표현",    bg: T.waveSoft,  fg: T.wave };
+
+  // Reusable pill button
+  const pill = (label, kind, onClick) => React.createElement("button", {
+    onClick: onClick || (() => {}),
+    style: {
+      fontFamily: FONT, fontSize: "13px", fontWeight: "700", cursor: "pointer",
+      padding: "9px 16px", borderRadius: T.rPill,
+      border: kind === "primary" ? "none" : `1px solid ${T.hairline}`,
+      background: kind === "primary" ? T.wave : T.card,
+      color: kind === "primary" ? "#fff" : T.ink2,
+    },
+  }, label);
+
+  // Phrase card (collapsed/expanded)
+  const phraseCard = (p) => {
+    const open = openId === p.id;
+    const chip = chipFor(p.status);
+    return React.createElement("div", {
+      key: p.id,
+      onClick: () => setOpenId(open ? null : p.id),
+      style: {
+        background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard,
+        boxShadow: T.shadowCard, padding: "16px 18px", marginBottom: "10px", cursor: "pointer",
+        transition: "box-shadow 0.2s ease",
+      },
+    },
+      React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" } },
+        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+          React.createElement("div", { style: { fontSize: open ? "19px" : "17px", fontWeight: "700", color: T.ink, lineHeight: 1.4, letterSpacing: "-0.2px", wordBreak: "keep-all" } }, `"${p.english}"`),
+          React.createElement("div", { style: { fontSize: "14px", color: T.ink2, marginTop: "4px", wordBreak: "keep-all" } }, p.korean)
+        ),
+        React.createElement("div", { style: { flexShrink: 0, fontSize: "11px", fontWeight: "700", color: chip.fg, background: chip.bg, padding: "4px 10px", borderRadius: T.rPill, whiteSpace: "nowrap" } }, chip.label)
+      ),
+      open && React.createElement("div", { style: { marginTop: "14px" } },
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } },
+          pill("▶ 다시 듣기", "ghost"),
+          pill("천천히", "ghost"),
+          pill("연습하기", "primary")
+        ),
+        p.note && React.createElement("div", { style: { marginTop: "12px", padding: "10px 12px", background: T.bgGrouped, borderRadius: 12 } },
+          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.ink3, letterSpacing: "0.4px", textTransform: "uppercase", marginBottom: "3px" } }, "표현 설명"),
+          React.createElement("div", { style: { fontSize: "13px", color: T.ink2, wordBreak: "keep-all" } }, p.note)
+        ),
+        React.createElement("button", { onClick: (e) => e.stopPropagation(), style: { marginTop: "12px", background: "transparent", border: "none", color: T.wave, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: 0 } }, "🙋 수업에서 다루기")
+      )
+    );
+  };
+
+  const sectionLabel = (text, sub) => React.createElement("div", { style: { margin: "26px 2px 12px" } },
+    React.createElement("div", { style: { fontSize: "20px", fontWeight: "800", color: T.ink, letterSpacing: "-0.3px" } }, text),
+    sub && React.createElement("div", { style: { fontSize: "13px", color: T.ink2, marginTop: "3px" } }, sub)
+  );
+
+  return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 10000, background: T.bgGrouped, display: "flex", flexDirection: "column", fontFamily: FONT, paddingTop: "env(safe-area-inset-top)" } },
+    React.createElement("style", null, "html, body { background: " + T.bgGrouped + " !important; }"),
+
+    // Sticky top bar
+    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(242,243,247,0.92)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${T.hairline}`, flexShrink: 0 } },
+      React.createElement("button", { onClick: onClose, style: { background: T.card, border: `1px solid ${T.hairline}`, color: T.ink, width: "34px", height: "34px", borderRadius: "50%", fontSize: "16px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "←"),
+      React.createElement("div", { style: { flex: 1 } },
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: T.ink, letterSpacing: "-0.2px" } }, "새 UI 미리보기"),
+        React.createElement("div", { style: { fontSize: "11px", color: T.ink3, fontWeight: "600" } }, "나만 보여요 · 학생 화면엔 적용 안 됨")
+      ),
+      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.wave, background: T.waveSoft, padding: "5px 11px", borderRadius: T.rPill } }, "DRAFT")
+    ),
+
+    // Scroll content
+    React.createElement("div", { style: { flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" } },
+      React.createElement("div", { style: { maxWidth: "600px", margin: "0 auto", padding: "8px 16px calc(env(safe-area-inset-bottom) + 40px)" } },
+
+        // ── 연습 (Library) ──
+        sectionLabel("연습", firstName ? `${firstName}, 이번 주 표현이에요` : "이번 주 표현이에요"),
+        React.createElement("div", { style: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", marginBottom: "14px" } },
+          tags.map(tag => React.createElement("button", {
+            key: tag, onClick: () => setActiveTag(tag),
+            style: {
+              flexShrink: 0, fontFamily: FONT, fontSize: "13px", fontWeight: "700", cursor: "pointer",
+              padding: "8px 15px", borderRadius: T.rPill,
+              border: activeTag === tag ? "none" : `1px solid ${T.hairline}`,
+              background: activeTag === tag ? T.wave : T.card,
+              color: activeTag === tag ? "#fff" : T.ink2,
+            },
+          }, tag))
+        ),
+        weekPhrases.map(phraseCard),
+
+        // ── 내 목록 (My List) ──
+        sectionLabel("내 목록", "저장한 표현"),
+        myList.map(phraseCard),
+
+        // ── 오늘의 질문 (QoD) ──
+        sectionLabel("오늘의 질문"),
+        React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, boxShadow: T.shadowCard, padding: "18px 20px" } },
+          React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" } }, "오늘의 질문"),
+          React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: T.ink, lineHeight: 1.5, marginBottom: "16px", wordBreak: "keep-all" } }, "What's one small thing that made you smile this week?"),
+          React.createElement("div", { style: { display: "flex", gap: "8px" } },
+            pill("🎙 답하기", "primary"),
+            pill("나중에", "ghost")
+          )
+        ),
+
+        // ── 버튼 시스템 ──
+        sectionLabel("버튼", "기본 / 보조 / 위험"),
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "10px" } },
+          React.createElement("button", { style: { fontFamily: FONT, fontSize: "14px", fontWeight: "700", padding: "12px 22px", borderRadius: T.rPill, border: "none", background: T.wave, color: "#fff", cursor: "pointer" } }, "기본 동작"),
+          React.createElement("button", { style: { fontFamily: FONT, fontSize: "14px", fontWeight: "700", padding: "12px 22px", borderRadius: T.rPill, border: `1px solid ${T.hairline}`, background: T.card, color: T.ink, cursor: "pointer" } }, "보조 동작"),
+          React.createElement("button", { style: { fontFamily: FONT, fontSize: "14px", fontWeight: "700", padding: "12px 22px", borderRadius: T.rPill, border: `1px solid ${T.coralSoft}`, background: T.coralSoft, color: T.coral, cursor: "pointer" } }, "삭제")
+        )
+      )
+    )
   );
 }
 
