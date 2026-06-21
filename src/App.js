@@ -534,6 +534,23 @@ const localToday = () => {
 // the passive daily appearances (home Daily Focus row, Community tab) to Thursday only.
 // getDay(): 0=Sun … 4=Thu. The opt-in Wavi "full" mode QoD is left untouched.
 const isQodDay = (d = new Date()) => d.getDay() === 4;
+// Thankful Thursday — the weekly QoD is now a gratitude ritual: every Thursday all
+// students share one thing they're thankful for. The prompt is auto-created so the
+// experience runs without the teacher scheduling one (a teacher-scheduled Thursday
+// prompt, if present, takes precedence). `db` is module-level (defined below; this
+// declaration is only invoked at runtime, so referencing it here is fine).
+const THANKFUL_THURSDAY_TAG = "Thankful Thursday";
+const THANKFUL_THURSDAY_PROMPT = "What's one thing you're thankful for this week?";
+async function ensureThankfulThursdayPrompt() {
+  if (!isQodDay()) return null;
+  const today = localToday();
+  const existing = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
+  if (existing[0]) return existing[0];
+  try {
+    const r = await db.insert("qod_prompts", { prompt: THANKFUL_THURSDAY_PROMPT, tag: THANKFUL_THURSDAY_TAG, spark: "Thankful Thursday", category: "weekly", difficulty: "easy", scheduled_date: today });
+    return Array.isArray(r) ? r[0] : r;
+  } catch (e) { return { prompt: THANKFUL_THURSDAY_PROMPT, tag: THANKFUL_THURSDAY_TAG, id: "tt_" + today, scheduled_date: today }; }
+}
 // Returns ISO timestamps for start/end of the local calendar day in UTC
 const localDayRange = () => {
   const d = new Date();
@@ -13611,9 +13628,8 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
   const loadCommunityData = async () => {
     setLoading(true);
     try {
-      // Get today's QoD prompt — only on Thursdays (weekly ritual; see isQodDay)
-      const prompts = isQodDay() ? await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []) : [];
-      const prompt = prompts[0] || null;
+      // Thankful Thursday — auto-provided gratitude prompt on Thursdays, null otherwise
+      const prompt = await ensureThankfulThursdayPrompt().catch(() => null);
       setQodPrompt(prompt);
 
       if (!prompt) { setLoading(false); return; }
@@ -13743,17 +13759,17 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
 
   if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "60px" } }, React.createElement(Spinner));
 
-  // No prompt today
+  // No prompt today — Thankful Thursday only surfaces on Thursdays
   if (!qodPrompt) return (
     <div style={{ textAlign: "center", padding: "60px 20px" }}>
-      <div style={{ fontSize: "48px", marginBottom: "16px" }}>{isQodDay() ? "☀️" : "🗓"}</div>
+      <div style={{ fontSize: "48px", marginBottom: "16px" }}>🙏</div>
       <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", letterSpacing: "-0.3px" }}>
-        {isQodDay() ? "오늘의 질문 준비 중" : "오늘의 질문은 목요일에 만나요"}
+        {isQodDay() ? "Thankful Thursday 준비 중" : "Thankful Thursday는 목요일에 만나요"}
       </div>
       <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6, whiteSpace: "pre-line" }}>
         {isQodDay()
-          ? "오늘의 질문이 곧 올라와요.\n잠시 후 다시 확인해 주세요!"
-          : "매주 목요일, 한 가지 질문으로\n가볍게 영어로 이야기해요."}
+          ? "잠시 후 다시 확인해 주세요!"
+          : "매주 목요일, 감사한 일 한 가지를\n영어로 나누는 시간이에요."}
       </div>
     </div>
   );
@@ -13807,34 +13823,39 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         document.body
       )}
 
-      {/* Today's Question Card */}
-      <div data-tour-phrase-first="true" style={{ background: C.bgDark, borderRadius: "16px", padding: "24px", marginBottom: "20px", color: "#fff", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "100px", opacity: 0.04 }}>💬</div>
+      {/* Thankful Thursday card */}
+      <div data-tour-phrase-first="true" style={{ background: "linear-gradient(160deg, #9A5A2E 0%, #4E2C16 100%)", borderRadius: "16px", padding: "24px", marginBottom: "20px", color: "#fff", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-16px", right: "-6px", fontSize: "96px", opacity: 0.10 }}>🙏</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
           <div>
-            <div style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "3px", textTransform: "uppercase", opacity: 0.5, marginBottom: "4px" }}>{T("qod_label", lang)} · {cityGroup.emoji} {cityGroup.name}</div>
-            <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", letterSpacing: "1px" }}>{today}</div>
+            <div style={{ fontSize: "10px", fontWeight: "800", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "5px", display: "flex", alignItems: "center", gap: "5px" }}>
+              <span>🙏</span> Thankful Thursday
+            </div>
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.6)", fontWeight: "600", letterSpacing: "0.3px" }}>{cityGroup.emoji} {cityGroup.name} · {today}</div>
           </div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.08)", padding: "4px 10px", borderRadius: "100px" }}>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)", background: "rgba(255,255,255,0.12)", padding: "4px 10px", borderRadius: "100px" }}>
             {responses.length} {responses.length === 1 ? "response" : "responses"}
           </div>
         </div>
-        <div style={{ fontSize: "20px", fontWeight: "700", lineHeight: 1.5, fontStyle: "italic", marginBottom: "18px", letterSpacing: "-0.3px" }}>
+        <div style={{ fontSize: "20px", fontWeight: "700", lineHeight: 1.5, marginBottom: "6px", letterSpacing: "-0.3px" }}>
           "{qodPrompt.prompt}"
+        </div>
+        <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.72)", lineHeight: 1.6, marginBottom: "18px" }}>
+          {lang === "zh" ? "本周让你心怀感激的一件事，用英语分享一下吧。" : "이번 주, 감사한 일 한 가지를 영어로 나눠 주세요."}
         </div>
         {!hasAnsweredToday ? (
           <button onClick={() => setShowQodFlow(true)}
-            style={{ background: "#fff", color: C.text, border: "none", borderRadius: "100px", padding: "12px 28px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s", margin: "0 auto" }}>
-            <span>🎙</span> {lang === "zh" ? "回答 · Answer Now" : "답하기 · Answer Now"}
+            style={{ background: "#fff", color: "#5E3417", border: "none", borderRadius: "100px", padding: "12px 28px", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s", margin: "0 auto" }}>
+            <span>🙏</span> {lang === "zh" ? "分享感激 · Share" : "감사한 일 나누기"}
           </button>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: "100px", padding: "8px 16px", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
-              ✅ 오늘 답했어요!
+            <div style={{ background: "rgba(255,255,255,0.14)", borderRadius: "100px", padding: "8px 16px", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+              ✅ 감사한 일을 나눴어요!
             </div>
             <button onClick={() => setShowQodFlow(true)}
-              style={{ background: "transparent", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "8px 14px", fontSize: "12px", cursor: "pointer", fontFamily: FONT }}>
-              {lang === "zh" ? "重新回答" : "다시 답하기"}
+              style={{ background: "transparent", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "100px", padding: "8px 14px", fontSize: "12px", cursor: "pointer", fontFamily: FONT }}>
+              {lang === "zh" ? "重新分享" : "다시 나누기"}
             </button>
           </div>
         )}
@@ -14332,7 +14353,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
 
   // ── Shared header shown on all steps
   const QuestionHeader = () => React.createElement("div", { style: { marginBottom: "20px" } },
-    React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "8px" } }, T("qod_label", lang)),
+    React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: prompt?.tag === THANKFUL_THURSDAY_TAG ? "#9A5A2E" : C.textLight, letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: "8px" } }, prompt?.tag === THANKFUL_THURSDAY_TAG ? "🙏 Thankful Thursday" : T("qod_label", lang)),
     React.createElement("div", { style: { fontSize: "19px", fontWeight: "700", lineHeight: 1.5, fontStyle: "italic", letterSpacing: "-0.3px", marginBottom: "12px" } },
       `"${prompt.prompt}"`
     ),
@@ -21624,20 +21645,20 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           resurfDone: resurfaced ? practicedToday(resurfaced.id) : false,
         });
 
-        // ── Today's QoD ──────────────────────────────────────────────────────
+        // ── Thankful Thursday QoD (weekly; null on other days via ensure helper) ──
         const todayStr = localToday();
-        const [promptRows, responseRows, noteRows] = await Promise.all([
-          db.get("qod_prompts", `scheduled_date=eq.${todayStr}&limit=1`).catch(() => []),
+        const [todayPrompt, responseRows, noteRows] = await Promise.all([
+          ensureThankfulThursdayPrompt().catch(() => null),
           db.get("qod_responses", `student_id=eq.${user.id}&order=created_at.desc&limit=1&select=created_at`).catch(() => []),
           // ── Session notes (gated on render) — fetch always so archive opens instantly
           notesEnabled
             ? db.get("session_notes", `student_id=eq.${user.id}&select=*&order=session_date.desc,created_at.desc`).catch(() => [])
             : Promise.resolve([]),
         ]);
-        if (promptRows[0] && !cancelled && isQodDay()) {
+        if (todayPrompt && !cancelled) {
           const lastResp = responseRows[0]?.created_at;
           const answered = lastResp && lastResp.startsWith(todayStr);
-          setTodayQod({ prompt: promptRows[0].prompt, tag: promptRows[0].tag || null, answered });
+          setTodayQod({ prompt: todayPrompt.prompt, tag: todayPrompt.tag || null, answered });
         }
         if (!cancelled) {
           setAllNotes(noteRows || []);
@@ -21853,7 +21874,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       const rows = [];
       if (dailyFocus.today) rows.push({ key: "today", label: "오늘의 표현", phrase: dailyFocus.today, done: dailyFocus.todayDone, onClick: () => playPhrase(dailyFocus.today) });
       if (dailyFocus.resurfaced) rows.push({ key: "resurf", label: "다시 만나는 표현", phrase: dailyFocus.resurfaced, done: dailyFocus.resurfDone, onClick: () => playPhrase(dailyFocus.resurfaced) });
-      if (todayQod) rows.push({ key: "qod", label: todayQod.tag === "Thankful Thursday" ? "🙏 감사한 일" : "오늘의 질문", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
+      if (todayQod) rows.push({ key: "qod", label: todayQod.tag === THANKFUL_THURSDAY_TAG ? "🙏 감사한 일" : "오늘의 질문", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
       if (!rows.length) return null;
       const allDone = rows.every(r => r.done);
       return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
