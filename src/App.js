@@ -529,6 +529,11 @@ const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
+// QoD is now a weekly Thursday ritual, not a daily prompt — students didn't engage with
+// it daily, and the daily goal is practice (phrases/Wavi), not answering a question. Gate
+// the passive daily appearances (home Daily Focus row, Community tab) to Thursday only.
+// getDay(): 0=Sun … 4=Thu. The opt-in Wavi "full" mode QoD is left untouched.
+const isQodDay = (d = new Date()) => d.getDay() === 4;
 // Returns ISO timestamps for start/end of the local calendar day in UTC
 const localDayRange = () => {
   const d = new Date();
@@ -13606,8 +13611,8 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
   const loadCommunityData = async () => {
     setLoading(true);
     try {
-      // Get today's QoD prompt
-      const prompts = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
+      // Get today's QoD prompt — only on Thursdays (weekly ritual; see isQodDay)
+      const prompts = isQodDay() ? await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []) : [];
       const prompt = prompts[0] || null;
       setQodPrompt(prompt);
 
@@ -13741,9 +13746,15 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
   // No prompt today
   if (!qodPrompt) return (
     <div style={{ textAlign: "center", padding: "60px 20px" }}>
-      <div style={{ fontSize: "48px", marginBottom: "16px" }}>☀️</div>
-      <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", letterSpacing: "-0.3px" }}>No question today</div>
-      <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6 }}>{TEACHER_DISPLAY_NAME} hasn't posted today's question yet...<br />Check back soon!</div>
+      <div style={{ fontSize: "48px", marginBottom: "16px" }}>{isQodDay() ? "☀️" : "🗓"}</div>
+      <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", letterSpacing: "-0.3px" }}>
+        {isQodDay() ? "오늘의 질문 준비 중" : "오늘의 질문은 목요일에 만나요"}
+      </div>
+      <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6, whiteSpace: "pre-line" }}>
+        {isQodDay()
+          ? "오늘의 질문이 곧 올라와요.\n잠시 후 다시 확인해 주세요!"
+          : "매주 목요일, 한 가지 질문으로\n가볍게 영어로 이야기해요."}
+      </div>
     </div>
   );
 
@@ -21623,7 +21634,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
             ? db.get("session_notes", `student_id=eq.${user.id}&select=*&order=session_date.desc,created_at.desc`).catch(() => [])
             : Promise.resolve([]),
         ]);
-        if (promptRows[0] && !cancelled) {
+        if (promptRows[0] && !cancelled && isQodDay()) {
           const lastResp = responseRows[0]?.created_at;
           const answered = lastResp && lastResp.startsWith(todayStr);
           setTodayQod({ prompt: promptRows[0].prompt, tag: promptRows[0].tag || null, answered });
