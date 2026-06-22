@@ -2371,17 +2371,18 @@ function InlineEdit({ value, onSave, style = {} }) {
 
 // ── Mini Phrase Practice (inline recording + feedback) ────────────────────────
 // ── RecordButton — shared waveform recording UI ───────────────────────────────
-function RecordButton({ isRec, time, onStart, onStop, idleLabel = "Tap to speak", size = "lg", darkBg = false }) {
+function RecordButton({ isRec, time, onStart, onStop, idleLabel = "Tap to speak", size = "lg", darkBg = false, accent = null }) {
   const btnSize = size === "lg" ? "72px" : "52px";
   const emojiSize = size === "lg" ? "26px" : "20px";
   const labelColor = darkBg ? "rgba(255,255,255,0.9)" : C.text;
+  const idleBg = accent || C.text; // grouped-card UI passes wave as the mic accent
 
   return React.createElement("div", { style: { textAlign: "center" } },
     React.createElement("button", {
       style: { position: "relative", width: btnSize, height: btnSize, margin: "0 auto 10px", cursor: "pointer", background: "none", border: "none", padding: 0, display: "block", WebkitAppearance: "none" },
       onClick: isRec ? onStop : onStart
     },
-      React.createElement("div", { style: { width: btnSize, height: btnSize, borderRadius: "50%", background: isRec ? C.navy : C.text, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" } },
+      React.createElement("div", { style: { width: btnSize, height: btnSize, borderRadius: "50%", background: isRec ? C.navy : idleBg, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" } },
         isRec
           ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "3px", height: "32px" } },
               ...[0, 1, 2, 3, 4].map(i =>
@@ -5814,6 +5815,7 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
               onPracticed,
               onClose: () => setOpenId(null),
               onGraduate: onGraduate && !inLibrary ? onGraduate : null,
+              newUI,
             })
           )}
         </div>
@@ -5838,7 +5840,7 @@ function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpda
 }
 
 // ── Phrase Card ───────────────────────────────────────────────────────────────
-function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onClose, autoStart = false, hideContext = false, onGraduate = null }) {
+function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onClose, autoStart = false, hideContext = false, onGraduate = null, newUI = false }) {
   const lang = useLang();
   const [feedback, setFeedback] = useState(null);
   const [transcription, setTranscription] = useState(null);
@@ -5919,7 +5921,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
         {loading
           ? React.createElement("div", { style: { padding: "20px", color: C.textMid, display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", fontSize: "13px" } },
               React.createElement(Spinner), React.createElement("span", null, T("analyzing", lang)))
-          : React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: rec.start, onStop: rec.stop, idleLabel: feedback ? T("re_record", lang) : T("tap_to_record", lang), size: "lg", darkBg: false })
+          : React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: rec.start, onStop: rec.stop, idleLabel: feedback ? T("re_record", lang) : T("tap_to_record", lang), size: "lg", darkBg: false, accent: newUI ? WAYVE_TOKENS.wave : null })
         }
       </div>
 
@@ -5929,7 +5931,7 @@ function PhraseCard({ phrase, user, prog, isPreview, onUpdate, onPracticed, onCl
       {feedback && (
         <div ref={feedbackRef} style={{ marginTop: "20px", paddingTop: "16px", borderTop: `1px solid ${C.border}` }} className="fade-in">
           {transcription && (
-            <div style={{ background: C.bg, padding: "9px 12px", borderRadius: "8px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${C.text}` }}>
+            <div style={{ background: newUI ? WAYVE_TOKENS.waveSoft : C.bg, padding: "9px 12px", borderRadius: "8px", marginBottom: "12px", fontSize: "13px", color: C.textMid, borderLeft: `3px solid ${newUI ? WAYVE_TOKENS.wave : C.text}` }}>
               🎙 {highlightMissed(phrase.english, transcription)}
             </div>
           )}
@@ -13629,6 +13631,7 @@ const REACTION_EMOJIS = ["🔥", "👏", "💪", "😄", "🌊", "⭐"];
 
 function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = new Set(), refreshUnreadComments = () => {}, onSubmitToday = () => {} }) {
   const lang = useLang();
+  const newUI = isNewUI(user);
   const [qodPrompt, setQodPrompt] = useState(null);
   const [cityGroup, setCityGroup] = useState(null);
   const [responses, setResponses] = useState([]);
@@ -13912,6 +13915,7 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
                 userId={user.id}
                 index={i}
                 onCommentSeen={refreshUnreadComments}
+                newUI={newUI}
               />
             ))}
           </div>
@@ -14046,7 +14050,7 @@ function HistoryResponseCard({ r, user }) {
 }
 
 // ── Response Card ─────────────────────────────────────────────────────────────
-function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onCommentSeen }) {
+function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onCommentSeen, newUI = false }) {
   // Use optimistic reaction data from parent (updated instantly on tap)
   // Fall back to DB fetch only on first load when optimistic data not yet set
   const [dbReactions, setDbReactions] = useState(null);
@@ -14078,7 +14082,7 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onComm
   };
 
   return (
-    <div className="response-card" style={{ background: C.bgCard, border: `1px solid ${isMe ? C.text : C.border}`, borderRadius: "14px", padding: "16px", animationDelay: `${index * 0.05}s`, ...(isMe ? { borderWidth: "1.5px" } : {}) }}>
+    <div className="response-card" style={{ background: C.bgCard, border: `1px solid ${isMe ? (newUI ? WAYVE_TOKENS.wave : C.text) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`, borderRadius: newUI ? WAYVE_TOKENS.rCard : "14px", boxShadow: newUI ? WAYVE_TOKENS.shadowCard : undefined, padding: "16px", animationDelay: `${index * 0.05}s`, ...(isMe ? { borderWidth: "1.5px" } : {}) }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
