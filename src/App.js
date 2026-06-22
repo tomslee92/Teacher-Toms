@@ -338,7 +338,7 @@ const TRANSLATIONS = {
   profile_cta_desc:   { ko: "지역, 직업, 취미를 입력하면 연습 문장이 나에게 딱 맞게 바뀌어요", zh: "填写家乡、职业、爱好，练习内容将为您个性化" },
 
   // QOD screen
-  qod_label:          { ko: "오늘의 질문",               zh: "今日问题" },
+  qod_label:          { ko: "Thankful Thursday",         zh: "Thankful Thursday" },
   qod_need_help:      { ko: "답변에 도움이 필요하세요?",   zh: "需要帮助回答吗？" },
   qod_skip:           { ko: "나중에 할게요",              zh: "以后再说" },
   qod_translate_btn:  { ko: "🇰🇷 한국어",                zh: "🇨🇳 中文" },
@@ -19899,7 +19899,7 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
       React.createElement("div", { style: { background: C.bgSoft, borderRadius: "14px", padding: "14px 16px", marginBottom: "20px", border: `1px solid ${C.border}` } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
           React.createElement("div", { style: { fontSize: "20px" } }, "🔔"),
-          React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text } }, lang === "zh" ? "每日问题提醒" : lang === "ko" ? "오늘의 질문 알림" : "Daily Question Reminder"),
+          React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text } }, lang === "zh" ? "Thankful Thursday 알림" : lang === "ko" ? "Thankful Thursday 알림" : "Thankful Thursday Reminder"),
         ),
         React.createElement("div", { style: { fontSize: "12px", color: C.textMid, lineHeight: 1.6, marginBottom: "12px" } },
           notifState === "granted"
@@ -21910,7 +21910,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       const rows = [];
       if (dailyFocus.today) rows.push({ key: "today", label: "오늘의 표현", phrase: dailyFocus.today, done: dailyFocus.todayDone, onClick: () => playPhrase(dailyFocus.today) });
       if (dailyFocus.resurfaced) rows.push({ key: "resurf", label: "다시 만나는 표현", phrase: dailyFocus.resurfaced, done: dailyFocus.resurfDone, onClick: () => playPhrase(dailyFocus.resurfaced) });
-      if (todayQod) rows.push({ key: "qod", label: todayQod.tag === THANKFUL_THURSDAY_TAG ? "🙏 감사한 일" : "오늘의 질문", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
+      if (todayQod) rows.push({ key: "qod", label: "🙏 Thankful Thursday", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
       if (!rows.length) return null;
       const allDone = rows.every(r => r.done);
       return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
