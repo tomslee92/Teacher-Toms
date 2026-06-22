@@ -6542,7 +6542,7 @@ Return ONLY this JSON array, no markdown:
         transition: "max-height 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease, margin-bottom 0.3s ease",
         pointerEvents: openTool ? "none" : "auto",
       }}>
-      <div style={{ background: C.navy, borderRadius: "20px", padding: "28px 22px 24px", boxShadow: "0 4px 16px rgba(26,58,110,0.15)", textAlign: "center", animation: "ftReveal 0.45s ease both" }}>
+      <div style={{ background: newUI ? `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)` : C.navy, borderRadius: "20px", padding: "28px 22px 24px", boxShadow: newUI ? "0 8px 24px rgba(11,31,58,0.22)" : "0 4px 16px rgba(26,58,110,0.15)", textAlign: "center", animation: "ftReveal 0.45s ease both" }}>
         <div style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "16px" }}>Solo Practice</div>
 
         {/* Idle state */}
