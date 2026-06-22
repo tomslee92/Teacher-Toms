@@ -5681,11 +5681,9 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         {/* Top row: source label + score/status. Tags moved to expanded view for cleaner scan. */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, flex: 1 }}>
-            {!newUI && (
-              <span style={{ fontSize: "10px", fontWeight: "500", color: C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
-                {phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine")}
-              </span>
-            )}
+            <span style={{ fontSize: newUI ? "11px" : "10px", fontWeight: newUI ? "700" : "500", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
+              {phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine")}
+            </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }} onClick={e => e.stopPropagation()}>
             {passed && onRetry && sectionAllDone && (
