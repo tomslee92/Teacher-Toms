@@ -537,7 +537,7 @@ const isQodDay = (d = new Date()) => d.getDay() === 4;
 // New grouped-card toolkit UI — rolling out per student. On for the new_ui_enabled flag
 // or always for Toms (safety/testing fallback, mirrors the home_v2/wavy pattern). The
 // column may not exist yet; undefined is falsy so the name fallback still works.
-const isNewUI = (u) => !!(u && (u.new_ui_enabled || u.name === "Toms Lee"));
+const isNewUI = (u) => !!(u && (u.new_ui_enabled || TEACHER_NAMES.includes(u.name)));
 // Thankful Thursday — the weekly QoD is now a gratitude ritual: every Thursday all
 // students share one thing they're thankful for. The prompt is auto-created so the
 // experience runs without the teacher scheduling one (a teacher-scheduled Thursday
@@ -4538,7 +4538,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
             {/* V2 home layout — TEST FLAG: only for Toms Lee right now */}
             {/* HomeGridV2 — gated by per-student DB flag, toggleable from teacher dashboard.
                 Toms Lee always sees V2 as a safety fallback for testing/debugging. */}
-            {(user.home_v2_enabled || user.name === "Toms Lee") ? (
+            {(user.home_v2_enabled || TEACHER_NAMES.includes(user.name)) ? (
               React.createElement(HomeGridV2, {
                 user: profileUser, group, isPreview,
                 onNavigate: (dest) => {
