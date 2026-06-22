@@ -5681,37 +5681,51 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         {/* Top row: source label + score/status. Tags moved to expanded view for cleaner scan. */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, flex: 1 }}>
-            <span style={{ fontSize: "10px", fontWeight: "500", color: C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
-              {phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine")}
-            </span>
+            {!newUI && (
+              <span style={{ fontSize: "10px", fontWeight: "500", color: C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
+                {phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine")}
+              </span>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }} onClick={e => e.stopPropagation()}>
             {passed && onRetry && sectionAllDone && (
-              <button onClick={() => onRetry(phrase.id)} style={{ padding: "2px 9px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "10px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>↺ 다시</button>
+              <button onClick={() => onRetry(phrase.id)} style={{ padding: "2px 9px", borderRadius: "100px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, background: newUI ? WAYVE_TOKENS.card : C.bg, color: C.textMid, fontSize: "10px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>↺ 다시</button>
             )}
-            {passed && !inLibrary && <span style={{ fontSize: "15px" }}>✅</span>}
-            {needsRetry && <span style={{ fontSize: "13px" }}>🔄</span>}
-            {prog?.best_score > 0 && (
-              <span style={{ fontSize: "11px", color: passed ? C.success : C.textMid, background: passed ? C.successBg : C.bgMid, padding: "2px 8px", borderRadius: "100px", fontWeight: "700", border: `1px solid ${passed ? "#B8D5C0" : C.border}` }}>
-                {prog.best_score}/10
-              </span>
+            {newUI ? (
+              (passed || needsRetry) && (
+                <span style={{ fontSize: "11px", fontWeight: "700", whiteSpace: "nowrap", padding: "4px 10px", borderRadius: "100px",
+                  color: passed ? WAYVE_TOKENS.green : WAYVE_TOKENS.coral,
+                  background: passed ? WAYVE_TOKENS.greenSoft : WAYVE_TOKENS.coralSoft }}>
+                  {passed ? "완료" : "복습 필요"}
+                </span>
+              )
+            ) : (
+              <React.Fragment>
+                {passed && !inLibrary && <span style={{ fontSize: "15px" }}>✅</span>}
+                {needsRetry && <span style={{ fontSize: "13px" }}>🔄</span>}
+                {prog?.best_score > 0 && (
+                  <span style={{ fontSize: "11px", color: passed ? C.success : C.textMid, background: passed ? C.successBg : C.bgMid, padding: "2px 8px", borderRadius: "100px", fontWeight: "700", border: `1px solid ${passed ? "#B8D5C0" : C.border}` }}>
+                    {prog.best_score}/10
+                  </span>
+                )}
+              </React.Fragment>
             )}
             <div style={{ width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d={open ? "M2 8L6 4L10 8" : "M2 4L6 8L10 4"} stroke={C.textLight} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d={open ? "M2 8L6 4L10 8" : "M2 4L6 8L10 4"} stroke={newUI ? WAYVE_TOKENS.ink3 : C.textLight} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
           </div>
         </div>
 
         {/* Phrase — the hero text */}
-        <div style={{ fontSize: "16px", fontWeight: "700", color: C.text, lineHeight: 1.4, letterSpacing: "-0.2px", marginBottom: phrase.korean ? "4px" : "0" }}>
+        <div style={{ fontSize: newUI ? (open ? "19px" : "17px") : "16px", fontWeight: "700", color: newUI ? WAYVE_TOKENS.ink : C.text, lineHeight: 1.4, letterSpacing: "-0.2px", marginBottom: phrase.korean ? "4px" : "0", transition: "font-size 0.2s ease" }}>
           "{open
             ? React.createElement(TappableText, { text: applyPhraseTokens(phrase.english), onWordTap: setTappedWord, highlightWord: tappedWord })
             : applyPhraseTokens(phrase.english)}"
         </div>
         {phrase.korean && (
-          <div style={{ fontSize: "13px", color: C.textMid, lineHeight: 1.4 }}>
+          <div style={{ fontSize: newUI ? "14px" : "13px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, lineHeight: 1.4 }}>
             {open
               ? React.createElement(KoreanWordHighlight, {
                   korean: applyPhraseTokens(lang === "zh" && phrase.chinese ? phrase.chinese : phrase.korean),
@@ -5732,14 +5746,14 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
       {/* ── Action row — always visible, no separator border ── */}
       <div style={{ padding: "0 16px 12px", display: "flex", gap: "6px", alignItems: "center", flexWrap: "nowrap", overflowX: "auto" }} onClick={e => e.stopPropagation()}>
         <ListenButton text={applyPhraseTokens(phrase.english)} label={" " + T("listen", lang)} variant="plain"
-          style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
+          style={{ background: newUI ? WAYVE_TOKENS.card : C.bgSoft, border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
         <ListenButton text={applyPhraseTokens(phrase.english)} speed={0.6} label={" " + T("listen_slow", lang)} fallbackIcon="🐢" exactSpeed={true} variant="plain"
-          style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
+          style={{ background: newUI ? WAYVE_TOKENS.card : C.bgSoft, border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
         {/* 🙋🏻 Request for next class */}
         {onPin && !isPreview && (
           <button onClick={() => { onPin(phrase); haptic.light(); }}
             title={isPinned ? T("requested", lang) : T("class_request", lang)}
-            style={{ background: isPinned ? "#EEF2FF" : "transparent", border: `1px solid ${isPinned ? C.navy : C.border}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", cursor: "pointer", fontFamily: FONT, color: isPinned ? C.navy : C.textLight, fontWeight: isPinned ? "700" : "500", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
+            style={{ background: isPinned ? (newUI ? WAYVE_TOKENS.waveSoft : "#EEF2FF") : "transparent", border: `1px solid ${isPinned ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", cursor: "pointer", fontFamily: FONT, color: isPinned ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.ink3 : C.textLight), fontWeight: isPinned ? "700" : "500", transition: "all 0.15s", display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
             {isPinned ? T("requested", lang) : "🙋🏻 " + T("class_request", lang)}
           </button>
         )}
@@ -7243,7 +7257,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
           {/* ── Active section ── */}
           <div style={{ marginBottom: "28px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-              <div style={{ fontSize: "13px", fontWeight: "800", color: C.text }}>연습 중 <span style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, marginLeft: "4px" }}>{active.length}개</span></div>
+              <div style={{ fontSize: newUI ? "20px" : "13px", fontWeight: "800", color: newUI ? W.ink : C.text, letterSpacing: newUI ? "-0.3px" : "0" }}>연습 중 <span style={{ fontSize: "11px", fontWeight: "600", color: newUI ? W.ink3 : C.textLight, marginLeft: "4px" }}>{active.length}개</span></div>
             </div>
             {/* Tag filter */}
             {activeTags.length >= 2 && (
@@ -7284,7 +7298,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
           {library.length > 0 && (
             <div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                <div style={{ fontSize: "13px", fontWeight: "800", color: C.text }}>🎓 라이브러리 <span style={{ fontSize: "11px", fontWeight: "600", color: C.textLight, marginLeft: "4px" }}>{library.length}개</span></div>
+                <div style={{ fontSize: newUI ? "20px" : "13px", fontWeight: "800", color: newUI ? W.ink : C.text, letterSpacing: newUI ? "-0.3px" : "0" }}>🎓 라이브러리 <span style={{ fontSize: "11px", fontWeight: "600", color: newUI ? W.ink3 : C.textLight, marginLeft: "4px" }}>{library.length}개</span></div>
               </div>
               <div style={{ fontSize: "12px", color: C.textLight, marginBottom: "10px" }}>마스터한 표현들이에요. 언제든 다시 연습할 수 있어요!</div>
               {/* Tag filter */}
