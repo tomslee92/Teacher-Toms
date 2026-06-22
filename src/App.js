@@ -5028,6 +5028,9 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
   _tokenUser = user; _tokenGroup = group;
   const lang = useLang();
   const newUI = isNewUI(user);
+  // Tag-chip accent: wave in the new UI, legacy navy otherwise
+  const navyA = newUI ? WAYVE_TOKENS.wave : C.navy;
+  const navyTint = newUI ? WAYVE_TOKENS.waveSoft : "#EEF2FF";
   const [sessions, setSessions] = useState({});
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
@@ -5379,13 +5382,13 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       {libraryPhrases.length > 0 && availableTags.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "12px" } },
         React.createElement("button", {
           onClick: () => setFilterSheetOpen(true),
-          style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "100px", border: `1px solid ${activeFilterTag ? C.navy : C.border}`, background: C.bg, color: activeFilterTag ? C.navy : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+          style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "100px", border: `1px solid ${activeFilterTag ? navyA : C.border}`, background: C.bg, color: activeFilterTag ? navyA : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
         }, React.createElement("span", null, "🔽"), React.createElement("span", null, "필터")),
         activeFilterTag && React.createElement("div", {
-          style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "100px", background: "#EEF2FF", border: `1px solid ${C.navy}33`, color: C.navy, fontSize: "12px", fontWeight: "700" }
+          style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "100px", background: navyTint, border: `1px solid ${navyA}33`, color: navyA, fontSize: "12px", fontWeight: "700" }
         },
           React.createElement("span", null, `${activeFilterTag.emoji} ${activeFilterTag.label}`),
-          React.createElement("button", { onClick: () => setActivePracticeTags(new Set()), "aria-label": "필터 해제", style: { background: "transparent", border: "none", color: C.navy, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 } }, "✕")
+          React.createElement("button", { onClick: () => setActivePracticeTags(new Set()), "aria-label": "필터 해제", style: { background: "transparent", border: "none", color: navyA, cursor: "pointer", fontSize: "13px", lineHeight: 1, padding: 0 } }, "✕")
         )
       )}
 
@@ -5460,14 +5463,14 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           React.createElement("div", { style: { overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", paddingBottom: "4px" } },
             React.createElement("button", {
               onClick: () => { setActivePracticeTags(new Set()); setFilterSheetOpen(false); },
-              style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left", padding: "0 14px", minHeight: "50px", borderRadius: "12px", border: `1px solid ${activePracticeTags.size === 0 ? C.navy : C.border}`, background: activePracticeTags.size === 0 ? "#EEF2FF" : C.bg, color: C.text, fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }
+              style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left", padding: "0 14px", minHeight: "50px", borderRadius: "12px", border: `1px solid ${activePracticeTags.size === 0 ? navyA : C.border}`, background: activePracticeTags.size === 0 ? navyTint : C.bg, color: C.text, fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }
             }, "전체 · 필터 해제"),
             availableTags.map(tag => {
               const isActive = activePracticeTags.has(tag.id);
               return React.createElement("button", {
                 key: tag.id,
                 onClick: () => { setActivePracticeTags(new Set([tag.id])); setFilterSheetOpen(false); },
-                style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left", padding: "0 14px", minHeight: "50px", borderRadius: "12px", border: `1px solid ${isActive ? C.navy : C.border}`, background: isActive ? "#EEF2FF" : C.bg, color: C.text, fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }
+                style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left", padding: "0 14px", minHeight: "50px", borderRadius: "12px", border: `1px solid ${isActive ? navyA : C.border}`, background: isActive ? navyTint : C.bg, color: C.text, fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }
               },
                 React.createElement("span", { style: { fontSize: "18px" } }, tag.emoji),
                 React.createElement("span", null, tag.label)
@@ -7110,6 +7113,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
   const lang = useLang();
   const newUI = isNewUI(user);
   const W = WAYVE_TOKENS;
+  const navyA = newUI ? W.wave : C.navy; // tag-chip accent
   const [phrases, setPhrases] = useState([]);
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
@@ -7242,8 +7246,8 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
             {/* Tag filter */}
             {activeTags.length >= 2 && (
               <div style={{ display: "flex", gap: "6px", overflowX: "auto", marginBottom: "10px", paddingBottom: "2px", WebkitOverflowScrolling: "touch" }}>
-                <button onClick={() => setActiveTagFilter(null)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${activeTagFilter === null ? C.navy : C.border}`, background: activeTagFilter === null ? C.navy : C.bg, color: activeTagFilter === null ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>전체</button>
-                {activeTags.map(tid => { const t = getTagById(tid); return t ? <button key={tid} onClick={() => setActiveTagFilter(activeTagFilter === tid ? null : tid)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${activeTagFilter === tid ? C.navy : C.border}`, background: activeTagFilter === tid ? C.navy : C.bg, color: activeTagFilter === tid ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>{t.emoji} {t.label}</button> : null; })}
+                <button onClick={() => setActiveTagFilter(null)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${activeTagFilter === null ? navyA : C.border}`, background: activeTagFilter === null ? navyA : C.bg, color: activeTagFilter === null ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>전체</button>
+                {activeTags.map(tid => { const t = getTagById(tid); return t ? <button key={tid} onClick={() => setActiveTagFilter(activeTagFilter === tid ? null : tid)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${activeTagFilter === tid ? navyA : C.border}`, background: activeTagFilter === tid ? navyA : C.bg, color: activeTagFilter === tid ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>{t.emoji} {t.label}</button> : null; })}
               </div>
             )}
             {filteredActive.length === 0 ? (
@@ -7284,8 +7288,8 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
               {/* Tag filter */}
               {libraryTags.length >= 2 && (
                 <div style={{ display: "flex", gap: "6px", overflowX: "auto", marginBottom: "10px", paddingBottom: "2px", WebkitOverflowScrolling: "touch" }}>
-                  <button onClick={() => setLibraryTagFilter(null)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${libraryTagFilter === null ? C.navy : C.border}`, background: libraryTagFilter === null ? C.navy : C.bg, color: libraryTagFilter === null ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>전체</button>
-                  {libraryTags.map(tid => { const t = getTagById(tid); return t ? <button key={tid} onClick={() => setLibraryTagFilter(libraryTagFilter === tid ? null : tid)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${libraryTagFilter === tid ? C.navy : C.border}`, background: libraryTagFilter === tid ? C.navy : C.bg, color: libraryTagFilter === tid ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>{t.emoji} {t.label}</button> : null; })}
+                  <button onClick={() => setLibraryTagFilter(null)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${libraryTagFilter === null ? navyA : C.border}`, background: libraryTagFilter === null ? navyA : C.bg, color: libraryTagFilter === null ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>전체</button>
+                  {libraryTags.map(tid => { const t = getTagById(tid); return t ? <button key={tid} onClick={() => setLibraryTagFilter(libraryTagFilter === tid ? null : tid)} style={{ flexShrink: 0, padding: "4px 10px", borderRadius: "100px", border: `1px solid ${libraryTagFilter === tid ? navyA : C.border}`, background: libraryTagFilter === tid ? navyA : C.bg, color: libraryTagFilter === tid ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>{t.emoji} {t.label}</button> : null; })}
                 </div>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
