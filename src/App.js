@@ -4525,8 +4525,10 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
           overscrollBehavior: "contain",
-          // New grouped-card UI (Toms rollout): grey grouped page so white cards lift off it
-          background: isNewUI(user) ? WAYVE_TOKENS.bgGrouped : undefined,
+          // New grouped-card UI (Toms rollout): grey grouped page so white cards lift off it.
+          // Deeper than the #F2F3F7 token — that near-white read as plain white on device,
+          // so the card-on-grey effect was invisible everywhere except the rebuilt cards.
+          background: isNewUI(user) ? "#E7EAF0" : undefined,
         }}>
         <div style={{
           maxWidth: "600px", margin: "0 auto",
