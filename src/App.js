@@ -6108,6 +6108,7 @@ function RotatingPrompt() {
 
 function FreeTalkTab({ user, group, isPreview, onPracticed, onPhraseSaved }) {
   const lang = useLang();
+  const newUI = isNewUI(user);
   const feedbackRef = useRef(null);
   const heroRef = useRef(null);
   const [feedback, setFeedback] = useState(null);
@@ -6570,7 +6571,7 @@ Return ONLY this JSON array, no markdown:
 
       {/* ── FEEDBACK — clean white card below hero ───────────────────────── */}
       {feedback && !loadingFeedback && (
-        <div ref={feedbackRef} style={{ background: C.bg, borderRadius: "16px", border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", padding: "18px 18px", marginBottom: "16px", animation: "fadeIn 0.5s ease" }} className="fade-in">
+        <div ref={feedbackRef} style={{ background: C.bg, borderRadius: newUI ? WAYVE_TOKENS.rCard : "16px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, boxShadow: newUI ? WAYVE_TOKENS.shadowCard : "0 2px 8px rgba(0,0,0,0.06)", padding: "18px 18px", marginBottom: "16px", animation: "fadeIn 0.5s ease" }} className="fade-in">
 
           {/* My recording */}
           {recordingUrl && (
@@ -6915,7 +6916,7 @@ Return ONLY this JSON array, no markdown:
               {exprList.map((expr, i) => {
                 const isSaved = savedIds.has(expr.expression);
                 return (
-                  <div key={i} style={{ background: C.bgCard, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+                  <div key={i} style={{ background: C.bgCard, borderRadius: newUI ? WAYVE_TOKENS.rCard : "14px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, overflow: "hidden", boxShadow: newUI ? WAYVE_TOKENS.shadowCard : "0 1px 4px rgba(0,0,0,0.05)" }}>
                     <div style={{ padding: "16px 16px 10px" }}>
                       <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, letterSpacing: "-0.3px", marginBottom: "6px" }}>"{expr.expression}"</div>
                       {expr.korean && (
