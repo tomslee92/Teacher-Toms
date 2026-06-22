@@ -5027,6 +5027,7 @@ function UIPreviewScreen({ user, onClose }) {
 function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {}, onCelebrate = () => {}, onRandomPhrase = () => {} }) {
   _tokenUser = user; _tokenGroup = group;
   const lang = useLang();
+  const newUI = isNewUI(user);
   const [sessions, setSessions] = useState({});
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
@@ -5413,6 +5414,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
             onPin: handlePinPhrase,
             pinnedIds: pinnedPhraseIds,
             onDismiss: isPreview ? null : (p) => setDismissTarget(p),
+            newUI,
           }),
           mastered.length > 0 && React.createElement(PhraseSection, {
             sectionKey: "mastered",
@@ -5433,6 +5435,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
             onPin: handlePinPhrase,
             pinnedIds: pinnedPhraseIds,
             onDismiss: isPreview ? null : (p) => setDismissTarget(p),
+            newUI,
           })
         );
       })()}
@@ -5499,7 +5502,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
 // ── Phrase Section ────────────────────────────────────────────────────────────
 // Renders one of the two named phrase sections (Most Recent or Library).
 // Replaces the old SessionFeed which was per-session-number.
-function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set(), onDismiss, onMoveToLibrary }) {
+function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set(), onDismiss, onMoveToLibrary, newUI = false }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [openId, setOpenId] = useState(null);
   const { passed, total } = sectionProgress;
@@ -5608,6 +5611,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
                 isPinned: pinnedIds.has(phrase.id) || pinnedIds.has(phrase.english),
                 onDismiss,
                 onGraduate: (phrase.isPersonal && onMoveToLibrary) ? () => onMoveToLibrary(phrase) : null,
+                newUI,
               })
             );
           })}
@@ -5817,7 +5821,7 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
 
 // ── Expandable Row ────────────────────────────────────────────────────────────
 // Practice tab wrapper — uses UnifiedPhraseRow with class source
-function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, onSave, isSaved, onPin, isPinned, onDismiss, onGraduate }) {
+function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, onSave, isSaved, onPin, isPinned, onDismiss, onGraduate, newUI = false }) {
   return React.createElement(UnifiedPhraseRow, {
     phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry,
     sectionAllDone, openId, setOpenId,
@@ -5826,6 +5830,7 @@ function ExpandableRow({ phrase, progress, sessionReset, user, isPreview, onUpda
     onPin, isPinned,
     onDismiss,
     onGraduate,
+    newUI,
   });
 }
 
