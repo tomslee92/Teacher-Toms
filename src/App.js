@@ -534,6 +534,10 @@ const localToday = () => {
 // the passive daily appearances (home Daily Focus row, Community tab) to Thursday only.
 // getDay(): 0=Sun … 4=Thu. The opt-in Wavi "full" mode QoD is left untouched.
 const isQodDay = (d = new Date()) => d.getDay() === 4;
+// New grouped-card toolkit UI — rolling out per student. On for the new_ui_enabled flag
+// or always for Toms (safety/testing fallback, mirrors the home_v2/wavy pattern). The
+// column may not exist yet; undefined is falsy so the name fallback still works.
+const isNewUI = (u) => !!(u && (u.new_ui_enabled || u.name === "Toms Lee"));
 // Thankful Thursday — the weekly QoD is now a gratitude ritual: every Thursday all
 // students share one thing they're thankful for. The prompt is auto-created so the
 // experience runs without the teacher scheduling one (a teacher-scheduled Thursday
@@ -4520,6 +4524,8 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
           overscrollBehavior: "contain",
+          // New grouped-card UI (Toms rollout): grey grouped page so white cards lift off it
+          background: isNewUI(user) ? WAYVE_TOKENS.bgGrouped : undefined,
         }}>
         <div style={{
           maxWidth: "600px", margin: "0 auto",
@@ -5618,7 +5624,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
 // onGraduate: move to library (hidden=true)
 // onUngraduate: move back to active (hidden=false)
 // onDelete: remove from My List entirely
-function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, source = "mine", onSave, isSaved, onGraduate, onUngraduate, onDelete, inLibrary = false, onPin, isPinned = false, onDismiss }) {
+function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, source = "mine", onSave, isSaved, onGraduate, onUngraduate, onDelete, inLibrary = false, onPin, isPinned = false, onDismiss, newUI = false }) {
   const lang = useLang();
   const open = openId === phrase.id;
   const setOpen = () => setOpenId(open ? null : phrase.id);
@@ -5652,13 +5658,13 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
 
   return (
     <div style={{
-      borderRadius: "16px",
-      border: `1px solid ${passed && !inLibrary ? "#B8D5C0" : needsRetry && !inLibrary ? "#E8C090" : C.border}`,
+      borderRadius: newUI ? WAYVE_TOKENS.rCard : "16px",
+      border: `1px solid ${passed && !inLibrary ? "#B8D5C0" : needsRetry && !inLibrary ? "#E8C090" : (newUI ? WAYVE_TOKENS.hairline : C.border)}`,
       background: cardBg,
       overflow: "hidden",
       transition: "all 0.25s ease",
       opacity: openId && openId !== phrase.id ? 0.3 : 1,
-      boxShadow: open ? "0 4px 20px rgba(0,0,0,0.08)" : "none",
+      boxShadow: open ? "0 4px 20px rgba(0,0,0,0.08)" : (newUI ? WAYVE_TOKENS.shadowCard : "none"),
     }}>
 
       {/* ── Main tap target ── */}
@@ -7096,6 +7102,8 @@ RULES:
 
 function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
   const lang = useLang();
+  const newUI = isNewUI(user);
+  const W = WAYVE_TOKENS;
   const [phrases, setPhrases] = useState([]);
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
@@ -7209,7 +7217,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
       {/* Search */}
       <div style={{ position: "relative", marginBottom: "16px" }}>
         <div style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: C.textLight, fontSize: "14px", pointerEvents: "none" }}>🔍</div>
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={lang === "zh" ? "搜索表达…" : "표현 검색…"} style={{ paddingLeft: "38px", background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "12px" }} />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={lang === "zh" ? "搜索表达…" : "표현 검색…"} style={{ paddingLeft: "38px", background: newUI ? W.card : C.bgSoft, border: `1px solid ${newUI ? W.hairline : C.border}`, borderRadius: newUI ? "14px" : "12px" }} />
       </div>
 
       {phrases.length === 0 ? (
@@ -7251,6 +7259,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
                     onGraduate: () => toggleHide(p.id, false),
                     onDelete: () => deletePhrase(p.id),
                     inLibrary: false,
+                    newUI,
                     onPin: handlePinPhrase,
                     isPinned: pinnedIds.has(p.phrase_id || p.english || p.id) || pinnedIds.has(p.english),
                   })
@@ -7286,6 +7295,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
                   onUngraduate: () => toggleHide(p.id, true),
                   onDelete: () => deletePhrase(p.id),
                   inLibrary: true,
+                  newUI,
                   onPin: handlePinPhrase,
                   isPinned: pinnedIds.has(p.phrase_id || p.english || p.id) || pinnedIds.has(p.english),
                 }))}
