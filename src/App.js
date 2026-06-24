@@ -284,14 +284,14 @@ const TRANSLATIONS = {
 
   // Notifications
   notif_title:        { ko: "Thankful Thursday Reminder", zh: "Thankful Thursday Reminder" },
-  notif_desc_on:      { ko: "✅ You'll get a reminder when today's question is posted.", zh: "✅ 每日问题发布时您会收到提醒。" },
+  notif_desc_on:      { ko: "✅ You'll get a Thankful Thursday reminder each week.", zh: "✅ 每周四会收到 Thankful Thursday 提醒。" },
   notif_btn:          { ko: "🔔 알림 허용하기",       zh: "🔔 开启通知" },
 
   // My Phrases
   active_phrases:     { ko: "연습 중",              zh: "练习中" },
   library:            { ko: "Library",             zh: "库" },
   no_phrases:         { ko: "아직 저장된 표현이 없어요", zh: "还没有保存的表达" },
-  add_phrase_hint:    { ko: "Practice, Solo Practice, Daily Question 탭에서 ⭐ 버튼을 눌러 마음에 드는 표현을 저장해보세요", zh: "在练习、Solo Practice或每日问题标签中点击 ⭐ 保存喜欢的表达" },
+  add_phrase_hint:    { ko: "Practice, Solo Practice, Thankful Thursday 탭에서 ⭐ 버튼을 눌러 마음에 드는 표현을 저장해보세요", zh: "在练习、Solo Practice或 Thankful Thursday 标签中点击 ⭐ 保存喜欢的表达" },
 
   // Solo Practice
   expr_title:         { ko: "오늘의 표현",            zh: "今日表达" },
@@ -4040,20 +4040,20 @@ const TOUR_STEPS = [
   // Step 3: Daily Question card spotlight
   {
     location: "home", cardKey: "community",
-    titleKo: "❓ Daily Question",
-    titleZh: "❓ Daily Question",
-    bodyKo: "매일 새로운 질문이 올라와요. 영어로 답하고 그룹 친구들의 답도 들어볼 수 있어요. 탭해서 볼까요?",
-    bodyZh: "每天都会有新问题。用英语回答，还可以听小组成员的回答。点击看看！",
+    titleKo: "🙏 Thankful Thursday",
+    titleZh: "🙏 Thankful Thursday",
+    bodyKo: "매주 목요일, 감사한 일 한 가지를 영어로 나누는 시간이에요. 그룹 친구들의 이야기도 들어볼 수 있어요. 탭해서 볼까요?",
+    bodyZh: "每周四，用英语分享一件感恩的事。还可以听小组成员的分享。点击看看！",
     ctaKo: "탭해서 열어보세요 →", ctaZh: "点击打开 →",
     canTap: true,
   },
   // Step 4: Inside Community tab
   {
     location: "community",
-    titleKo: "❓ 매일 영어로 말해보세요!",
-    titleZh: "❓ 每天用英语开口！",
-    bodyKo: "영어로 말해서 녹음을 보내면 AI가 바로 문법 피드백을 줘요. 그룹 친구들의 답변도 들을 수 있어요. 부담 없이 — 짧게 말해도 돼요!",
-    bodyZh: "用英语回答并发送录音，AI会立即给出语法反馈。你也可以听到小组成员的回答。放轻松——说短一点也没关系！",
+    titleKo: "🙏 매주 목요일, 감사한 일을 나눠요!",
+    titleZh: "🙏 每周四，分享感恩的事！",
+    bodyKo: "감사한 일을 영어로 말해서 녹음을 보내면 AI가 바로 문법 피드백을 줘요. 그룹 친구들의 이야기도 들을 수 있어요. 부담 없이 — 짧게 말해도 돼요!",
+    bodyZh: "用英语说出一件感恩的事并发送录音，AI会立即给出语法反馈。你也可以听到小组成员的分享。放轻松——说短一点也没关系！",
     ctaKo: "← 홈으로 돌아가기", ctaZh: "← 返回主页",
     canTap: false,
   },
@@ -4132,8 +4132,8 @@ const TOUR_STEPS = [
     location: "home", cardKey: null,
     titleKo: "📅 이렇게 하면 실력이 쑥쑥!",
     titleZh: "📅 这样用，进步飞快！",
-    bodyKo: "수업 후 → 🎯 Practice 연습\n원할 때 → ❓ Daily Question 답하기\n틈날 때 → 🎙 Solo Practice로 표현 찾기\n마음에 드는 표현 → ⭐ 저장 또는 🙋🏻 요청\n수업 전 → 연습 목록 복습",
-    bodyZh: "课后 → 练习🎯 Practice\n想要时 → 回答❓ Daily Question\n空闲时 → 用🎙 Solo Practice找表达\n喜欢的表达 → ⭐保存或🙋🏻申请\n课前 → 复习练习列表",
+    bodyKo: "수업 후 → 🎯 Practice 연습\n매주 목요일 → 🙏 Thankful Thursday 나누기\n틈날 때 → 🎙 Solo Practice로 표현 찾기\n마음에 드는 표현 → ⭐ 저장 또는 🙋🏻 요청\n수업 전 → 연습 목록 복습",
+    bodyZh: "课后 → 练习🎯 Practice\n每周四 → 🙏 Thankful Thursday 分享\n空闲时 → 用🎙 Solo Practice找表达\n喜欢的表达 → ⭐保存或🙋🏻申请\n课前 → 复习练习列表",
     ctaKo: "시작하기! 🚀", ctaZh: "开始吧！🚀",
     canTap: false, isList: true, isFinal: true,
   },
@@ -6865,7 +6865,7 @@ Return ONLY this JSON array, no markdown:
                         그동안 이런 기능은 계속 쓸 수 있어요:<br/>
                         🎯 <strong>Practice</strong> — 문장 듣기 & 복습<br/>
                         ⭐ <strong>Practice List</strong> — 저장된 표현 보기<br/>
-                        ❓ <strong>Daily Question</strong> — 질문 듣기 & 답변 보기
+                        🙏 <strong>Thankful Thursday</strong> — 매주 목요일 감사한 일 나누기
                       </div>
                     </>
                   ) : (
@@ -12993,7 +12993,7 @@ SPARK_6: [one sentence]`);
               <button onClick={() => setPreviewPrompt(null)} style={{ background: C.bgSoft, border: "none", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", color: C.textMid }}>×</button>
             </div>
             <div style={{ background: C.bgDark, borderRadius: "12px", padding: "24px", marginBottom: "16px", textAlign: "center", color: "#fff" }}>
-              <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>오늘의 질문</div>
+              <div style={{ fontSize: "10px", opacity: 0.5, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>🙏 Thankful Thursday</div>
               <div style={{ fontSize: "19px", fontWeight: "700", lineHeight: 1.5, fontStyle: "italic" }}>"{previewPrompt.prompt}"</div>
             </div>
             {previewPrompt.spark && (
@@ -15279,8 +15279,8 @@ function QodTourOverlay({ lang, onDismiss, onSkip, onStepChange = () => {} }) {
       ),
       React.createElement("div", { style: { fontSize: 15, color: "#555", lineHeight: 1.7, textAlign: "center", marginBottom: 48, maxWidth: 300, animation: "wv-rise 0.45s ease 0.6s both", opacity: 0 } },
         lang === "zh"
-          ? "앱 사용법을 간단히 안내해 드릴게요. 먼저 매일 만나게 될 Daily Question 화면부터 살펴볼까요?"
-          : "앱 사용법을 간단히 안내해 드릴게요. 먼저 매일 만나게 될 Daily Question 화면부터 살펴볼까요?"
+          ? "앱 사용법을 간단히 안내해 드릴게요. 먼저 홈 화면부터 살펴볼까요?"
+          : "앱 사용법을 간단히 안내해 드릴게요. 먼저 홈 화면부터 살펴볼까요?"
       ),
       React.createElement("button", {
         onClick: () => { haptic.medium(); advance(); },
@@ -15295,8 +15295,8 @@ function QodTourOverlay({ lang, onDismiss, onSkip, onStepChange = () => {} }) {
   const STEPS = [
     null, // step 0 handled above
     {
-      title: lang === "zh" ? "❓ 오늘의 질문이에요" : "❓ 오늘의 질문이에요",
-      body: lang === "zh" ? "선생님이 매일 새로운 영어 질문을 올려요. 질문을 읽고 영어로 짧게 답해보세요!" : "선생님이 매일 새로운 영어 질문을 올려요. 질문을 읽고 영어로 짧게 답해보세요!",
+      title: lang === "zh" ? "🙏 Thankful Thursday예요" : "🙏 Thankful Thursday예요",
+      body: lang === "zh" ? "매주 목요일, 감사한 일 한 가지를 영어로 나누는 시간이에요. 부담 없이 짧게 말해보세요!" : "매주 목요일, 감사한 일 한 가지를 영어로 나누는 시간이에요. 부담 없이 짧게 말해보세요!",
       cta: lang === "zh" ? "다음 →" : "다음 →",
     },
     {
@@ -19671,8 +19671,8 @@ function HelpModal({ lang, onClose, user }) {
       subtitle: isZh ? "기능과 작동 방식" : "기능과 작동 방식",
       items: [
         {
-          q: isZh ? "로그인하면 왜 매번 질문이 나오나요?" : "로그인하면 왜 매번 질문이 나오나요?",
-          a: isZh ? "每天登录时会出现「今日问题」。这是练习用英语自由表达的机会。可以回答，也可以跳过直接进入主页，或者选择练习一个短语。" : "매일 로그인할 때 '오늘의 질문'이 나와요. 짧게 영어로 말해보는 연습이에요. 답변하거나, 건너뛰고 바로 홈으로 가거나, 대신 표현을 연습할 수 있어요."
+          q: isZh ? "Thankful Thursday가 뭔가요?" : "Thankful Thursday가 뭔가요?",
+          a: isZh ? "每周四，用英语分享一件让你心怀感激的事。轻松地用英语开口练习的机会——커뮤니티 标签里可以看到，也能听到小组成员的分享。" : "매주 목요일, 감사한 일 한 가지를 영어로 나누는 시간이에요. 부담 없이 영어로 말해보는 연습이에요. 커뮤니티 탭에서 만날 수 있고, 그룹 친구들의 이야기도 들어볼 수 있어요."
         },
         {
           q: isZh ? "점수는 어떻게 계산되나요?" : "점수는 어떻게 계산되나요?",
@@ -19688,7 +19688,7 @@ function HelpModal({ lang, onClose, user }) {
         },
         {
           q: isZh ? "스트릭(연속 기록)은 어떻게 쌓이나요?" : "스트릭(연속 기록)은 어떻게 쌓이나요?",
-          a: isZh ? "매일 오늘의 질문에 답하거나 표현을 연습하면 스트릭이 쌓여요. 하루라도 빠지면 스트릭이 초기화돼요." : "매일 오늘의 질문에 답하거나 표현을 연습하면 스트릭이 쌓여요. 하루라도 빠지면 스트릭이 초기화돼요."
+          a: isZh ? "每天练习短语或用 Wavi 学习就能累积连续记录。哪怕一天没做也会重置。" : "매일 표현을 연습하거나 Wavi로 학습하면 스트릭이 쌓여요. 하루라도 빠지면 스트릭이 초기화돼요."
         },
       ]
     },
@@ -19912,7 +19912,7 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
             ? (lang === "zh" ? "通知已被屏蔽。请在 iPhone 设置 → Safari → WAYVE 中允许。" : "알림이 차단됐어요. iPhone 설정 → Safari → WAYVE에서 허용해 주세요.")
             : notifState === "unsupported"
             ? (lang === "zh" ? "将应用添加到主屏幕后可接收通知（分享 → 添加到主屏幕）。" : "홈 화면에 앱을 추가하면 알림을 받을 수 있어요. (공유 → 홈 화면에 추가)")
-            : (lang === "zh" ? "每日问题发布时接收提醒。将应用添加到主屏幕后开启通知。" : "매일 질문이 올라오면 알림을 받아보세요. 홈 화면에 앱을 추가한 후 허용해 주세요.")
+            : (lang === "zh" ? "每周四 Thankful Thursday 提醒。将应用添加到主屏幕后开启通知。" : "매주 목요일 Thankful Thursday 알림을 받아보세요. 홈 화면에 앱을 추가한 후 허용해 주세요.")
         ),
         notifState !== "granted" && notifState !== "denied" && (
           React.createElement("button", {
@@ -19965,11 +19965,11 @@ const ONBOARDING_SLIDES = [
     bodyZh: "老师在课堂上教你的句子都在「🎯 Practice」标签里。每天练习一点，目标是得8分以上。完成的句子会自动移到练习库。",
   },
   {
-    emoji: "❓",
-    titleKo: "Daily Question — 매일 영어로 말해보세요",
-    titleZh: "Daily Question — 每天用英语开口",
-    bodyKo: "앱을 열면 「❓ Daily Question」이 먼저 나와요. 선생님이 매일 질문을 올리면 영어로 말해서 녹음을 보내요. AI가 바로 문법 피드백을 줘요.\n\n매일 한 번씩 영어로 말하는 것만으로도 실력이 훨씬 빠르게 늘어요! 정답은 없어요 — 용기 있게 말하는 게 중요해요. 그룹 친구들의 답변도 들을 수 있어요.",
-    bodyZh: "打开应用时，「❓ Daily Question」会首先出现。老师每天发布问题，用英语回答并发送录音。AI会立即给出语法反馈。\n\n每天说一次英语，进步会快很多！没有标准答案——勇敢开口最重要。你也可以听到小组成员的回答。",
+    emoji: "🙏",
+    titleKo: "Thankful Thursday — 매주 목요일, 감사한 일을 나눠요",
+    titleZh: "Thankful Thursday — 每周四，分享感恩的事",
+    bodyKo: "매주 목요일, 「🙏 Thankful Thursday」가 열려요. 그 주에 감사한 일 한 가지를 영어로 말해서 녹음을 보내면 AI가 바로 문법 피드백을 줘요.\n\n부담 갖지 마세요 — 정답은 없어요. 짧아도 괜찮아요. 일주일에 한 번, 영어로 마음을 나누는 시간이에요. 그룹 친구들의 이야기도 들어볼 수 있어요.",
+    bodyZh: "每周四，「🙏 Thankful Thursday」会开启。用英语说出那一周让你感恩的一件事并发送录音，AI会立即给出语法反馈。\n\n别有压力——没有标准答案，说短一点也没关系。每周一次，用英语分享心情。你也可以听到小组成员的分享。",
     isMultiPara: true,
   },
   {
@@ -19990,8 +19990,8 @@ const ONBOARDING_SLIDES = [
     emoji: "📅",
     titleKo: "이렇게 하면 영어 실력이 쑥쑥 늘어요!",
     titleZh: "这样使用，英语进步飞快！",
-    bodyKo: "수업 후 → 🎯 Practice에서 이번 주 문장 연습하기\n매일 → ❓ Daily Question에 영어로 답하기\n틈날 때 → 🎙 Solo Practice로 자유롭게 말하기\n마음에 드는 표현 → ⭐ 저장하거나 🙋🏻 다음 수업에 요청하기\n수업 전 → 연습 목록 복습해서 워밍업하기",
-    bodyZh: "课后 → 在🎯 Practice中练习本周句子\n每天 → 用英语回答❓ Daily Question\n空闲时 → 用🎙 Solo Practice自由练习\n喜欢的表达 → ⭐保存或🙋🏻申请下节课学习\n课前 → 复习练习列表热身",
+    bodyKo: "수업 후 → 🎯 Practice에서 이번 주 문장 연습하기\n매일 → 🌊 Wavi와 대화하며 표현 익히기\n틈날 때 → 🎙 Solo Practice로 자유롭게 말하기\n매주 목요일 → 🙏 Thankful Thursday에 감사한 일 나누기\n수업 전 → 연습 목록 복습해서 워밍업하기",
+    bodyZh: "课后 → 在🎯 Practice中练习本周句子\n每天 → 和🌊 Wavi对话练习表达\n空闲时 → 用🎙 Solo Practice自由练习\n每周四 → 在🙏 Thankful Thursday分享感恩的事\n课前 → 复习练习列表热身",
     isList: true,
   },
 ];
