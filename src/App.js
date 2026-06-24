@@ -231,7 +231,7 @@ const TRANSLATIONS = {
   // Nav tabs
   nav_home:           { ko: "Home",               zh: "首页" },
   nav_practice:       { ko: "Practice",           zh: "练习" },
-  nav_community:      { ko: "Daily Question",     zh: "每日问题" },
+  nav_community:      { ko: "Thankful Thursday",  zh: "Thankful Thursday" },
   nav_freetalk:       { ko: "Solo Practice",      zh: "自由练习" },
   nav_myphrases:      { ko: "Practice List",      zh: "练习列表" },
 
@@ -283,7 +283,7 @@ const TRANSLATIONS = {
   lang_zh:            { ko: "🇨🇳 中文",             zh: "🇨🇳 中文" },
 
   // Notifications
-  notif_title:        { ko: "Daily Question Reminder", zh: "每日问题提醒" },
+  notif_title:        { ko: "Thankful Thursday Reminder", zh: "Thankful Thursday Reminder" },
   notif_desc_on:      { ko: "✅ You'll get a reminder when today's question is posted.", zh: "✅ 每日问题发布时您会收到提醒。" },
   notif_btn:          { ko: "🔔 알림 허용하기",       zh: "🔔 开启通知" },
 
@@ -3113,7 +3113,7 @@ function QodCelebration({ isFirst, responses, user, onDone }) {
               {/* Footer hint */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center", padding: "8px 0 4px", animation: `communitySlideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${0.26 + others.length * 0.07}s both`, opacity: 0 }}>
                 <div style={{ fontSize: "11px", color: C.textLight }}>{lang === "zh" ? "在" : "전체 답변은"}</div>
-                <div style={{ fontSize: "11px", fontWeight: "700", color: C.navy }}>Daily Question</div>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: C.navy }}>Thankful Thursday</div>
                 <div style={{ fontSize: "11px", color: C.textLight }}>{lang === "zh" ? "标签查看全部" : "탭에서 볼 수 있어요"}</div>
               </div>
             </div>
@@ -3125,7 +3125,7 @@ function QodCelebration({ isFirst, responses, user, onDone }) {
                 {T("qod_waiting", lang)}
               </div>
               <div style={{ fontSize: "13px", color: C.textMid, lineHeight: 1.6 }}>
-                {lang === "zh" ? "稍后在每日问题标签查看" : "나중에 Daily Question 탭에서 확인해보세요"}
+                {lang === "zh" ? "나중에 Thankful Thursday 탭에서 확인해보세요" : "나중에 Thankful Thursday 탭에서 확인해보세요"}
               </div>
             </div>
           )}
@@ -3504,7 +3504,7 @@ function TourCompletionEffect({ lang, submittedToday, onAnswerQuestion, onJustHo
             cursor: "pointer", fontFamily: FONT, marginBottom: 10,
             boxShadow: "0 4px 20px rgba(26,58,110,0.3)",
           }
-        }, lang === "zh" ? "오늘의 질문 답하기 →" : "오늘의 질문 답하기 →"),
+        }, lang === "zh" ? "🙏 Thankful Thursday 나누기 →" : "🙏 Thankful Thursday 나누기 →"),
         // Secondary — go home
         React.createElement("button", {
           onClick: () => { haptic.light(); handleExit(onJustHome); },
@@ -3808,7 +3808,7 @@ function TourSpotlight({ step, cardRefs, lang, onAdvance, onBack, canGoBack, onS
                 React.createElement("div", { style: { background: "#f8f8f8", borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.border}`, marginBottom: 12, display: "flex", alignItems: "center", gap: 12 } },
                   React.createElement("div", { style: { fontSize: 28 } }, "❓"),
                   React.createElement("div", null,
-                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 2 } }, "Daily Question"),
+                    React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 2 } }, "Thankful Thursday"),
                     React.createElement("div", { style: { fontSize: 13, color: C.text, fontWeight: 600 } }, "What do you enjoy doing on weekends?"),
                     React.createElement("div", { style: { fontSize: 11, color: C.textLight, marginTop: 2 } }, "선생님이 매일 올려요")
                   )
@@ -4478,13 +4478,15 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         </div>
       )}
 
-      {/* Frosted-glass header — flex child, always visible above the scroll area */}
+      {/* Frosted-glass header — flex child, always visible above the scroll area.
+          New UI: tint the frosted glass to the grouped grey (not white) so there's no
+          hard white/grey seam against the grey page below. */}
       <div style={{
         flexShrink: 0,
         zIndex: 10,
         background: studentScrolled
-          ? "rgba(255,255,255,0.92)"
-          : "rgba(255,255,255,0)",
+          ? (isNewUI(user) ? "rgba(231,234,240,0.85)" : "rgba(255,255,255,0.92)")
+          : (isNewUI(user) ? "rgba(231,234,240,0)" : "rgba(255,255,255,0)"),
         backdropFilter: studentScrolled ? "blur(20px) saturate(180%)" : "none",
         WebkitBackdropFilter: studentScrolled ? "blur(20px) saturate(180%)" : "none",
         borderBottom: studentScrolled ? `0.5px solid rgba(0,0,0,0.08)` : "0.5px solid transparent",
@@ -8251,13 +8253,13 @@ function TeacherTodayTab({ students, groups, showMsg, onSelectStudent }) {
   const handleSendReminder = async () => {
     setSendingNotif(true);
     try {
-      const prompt = todayPrompt?.prompt || "오늘의 질문에 답해보세요!";
+      const prompt = todayPrompt?.prompt || "이번 주, 감사한 일 한 가지를 나눠보세요!";
       const res = await fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           secret: process.env.REACT_APP_NOTIFY_SECRET || "wayve-notify-2026",
-          title: "🎙 WAYVE — 오늘의 질문",
+          title: "🙏 WAYVE — Thankful Thursday",
           body: `"${prompt.slice(0, 80)}" — Tap to answer!`,
         }),
       });
@@ -16168,8 +16170,8 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
       icon: "💬",
       label: "다 해볼게요",
       duration: "15분+",
-      detail: "세션 + 오늘의 질문",
-      desc: "오늘의 질문도",
+      detail: "세션 + Thankful Thursday",
+      desc: "Thankful Thursday도",
       bg: "linear-gradient(135deg, #1a3a2a 0%, #0d2018 100%)",
       bgSuggested: "linear-gradient(135deg, #265f3f 0%, #133324 100%)",
       accent: "rgba(74,222,128,0.9)",
@@ -20234,7 +20236,7 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak, submittedToday, 
         ? (lang === "zh" ? `已提交 · 今天${stats.communityVoices}人参与` : `제출 완료 · 오늘 ${stats.communityVoices}명 참여`)
         : T("submitted_done", lang);
     }
-    if (stats.communityVoices === 0) return lang === "zh" ? "回答今日问题" : "오늘의 질문에 답해보세요";
+    if (stats.communityVoices === 0) return lang === "zh" ? "감사한 일 나누기" : "감사한 일을 나눠보세요";
     if (stats.communityVoices < 3) return lang === "zh" ? "今天你会怎么回答？" : "오늘은 어떻게 답해볼까요?";
     return lang === "zh" ? `今天${stats.communityVoices}人参与！` : `오늘 ${stats.communityVoices}명 참여중!`;
   };
@@ -20300,7 +20302,7 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak, submittedToday, 
           <div>
             <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px", color: isSubmitted ? "#16A34A" : "#DC2626" }}>Daily</div>
             <div style={{ fontSize: "21px", fontWeight: "900", letterSpacing: "-0.4px", marginBottom: "5px", color: isSubmitted ? "#14532D" : "#7F1D1D" }}>
-              {isSubmitted ? "✅ Daily Question" : "❓ Daily Question"}
+              {isSubmitted ? "✅ Thankful Thursday" : "🙏 Thankful Thursday"}
             </div>
             <div style={{ fontSize: "12px", color: isSubmitted ? "#15803D" : "#B91C1C" }}>{dqSubtitle()}</div>
           </div>
