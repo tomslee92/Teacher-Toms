@@ -231,7 +231,7 @@ const TRANSLATIONS = {
   // Nav tabs
   nav_home:           { ko: "Home",               zh: "首页" },
   nav_practice:       { ko: "Practice",           zh: "练习" },
-  nav_community:      { ko: "Thankful Thursday",  zh: "Thankful Thursday" },
+  nav_community:      { ko: "Community",          zh: "Community" },
   nav_freetalk:       { ko: "Solo Practice",      zh: "自由练习" },
   nav_myphrases:      { ko: "Practice List",      zh: "练习列表" },
 
@@ -13667,11 +13667,11 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
   const loadCommunityData = async () => {
     setLoading(true);
     try {
-      // Thankful Thursday — auto-provided gratitude prompt on Thursdays, null otherwise
+      // Thankful Thursday — auto-provided gratitude prompt on Thursdays, null otherwise.
+      // The Community room is always-on: even with no prompt today, we still load the
+      // city group + the feed of recent responses so students can listen and react any day.
       const prompt = await ensureThankfulThursdayPrompt().catch(() => null);
       setQodPrompt(prompt);
-
-      if (!prompt) { setLoading(false); return; }
 
       // Get user's city group
       const cityMembers = await db.get("city_group_members", `group_id=eq.${group?.id}&select=*,city_groups(*)`).catch(() => []);
@@ -13681,34 +13681,40 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
 
       if (!city) { setLoading(false); return; }
 
-      // Get responses for this city + prompt — today only, public only for the board
-      const { start: todayStart, end: todayEnd } = localDayRange();
-      const resp = await db.get("qod_responses",
-        `prompt_id=eq.${prompt.id}&city_group_id=eq.${city.id}&created_at=gte.${todayStart}&created_at=lte.${todayEnd}&is_private=eq.false&order=created_at.asc`
-      ).catch(() => []);
-      setResponses(resp);
+      // Today's responses + "already answered" only make sense when there's a prompt (Thursday).
+      if (prompt) {
+        // Get responses for this city + prompt — today only, public only for the board
+        const { start: todayStart, end: todayEnd } = localDayRange();
+        const resp = await db.get("qod_responses",
+          `prompt_id=eq.${prompt.id}&city_group_id=eq.${city.id}&created_at=gte.${todayStart}&created_at=lte.${todayEnd}&is_private=eq.false&order=created_at.asc`
+        ).catch(() => []);
+        setResponses(resp);
 
-      // Check if user already answered today — includes private submissions
-      const myAny = await db.get("qod_responses",
-        `prompt_id=eq.${prompt.id}&student_id=eq.${user.id}&created_at=gte.${todayStart}&created_at=lte.${todayEnd}&limit=1`
-      ).catch(() => []);
-      // Fallback: check localStorage for stored response ID (handles RLS blocking private rows).
-      // Key uses localToday() to match the write site (QodEntryScreen) — slicing todayStart would
-      // shift by a day for users east of UTC (e.g. KST after local midnight but before UTC midnight).
-      let mine = resp.find(r => r.student_id === user.id) || myAny[0] || null;
-      if (!mine) {
-        try {
-          const storedId = localStorage.getItem(`wayve_qod_response_id_${user.id}_${today}`);
-          if (storedId) mine = { id: storedId, student_id: user.id, prompt_id: prompt.id };
-        } catch(e) {}
+        // Check if user already answered today — includes private submissions
+        const myAny = await db.get("qod_responses",
+          `prompt_id=eq.${prompt.id}&student_id=eq.${user.id}&created_at=gte.${todayStart}&created_at=lte.${todayEnd}&limit=1`
+        ).catch(() => []);
+        // Fallback: check localStorage for stored response ID (handles RLS blocking private rows).
+        // Key uses localToday() to match the write site (QodEntryScreen) — slicing todayStart would
+        // shift by a day for users east of UTC (e.g. KST after local midnight but before UTC midnight).
+        let mine = resp.find(r => r.student_id === user.id) || myAny[0] || null;
+        if (!mine) {
+          try {
+            const storedId = localStorage.getItem(`wayve_qod_response_id_${user.id}_${today}`);
+            if (storedId) mine = { id: storedId, student_id: user.id, prompt_id: prompt.id };
+          } catch(e) {}
+        }
+        if (mine) { setHasAnsweredToday(true); setMyResponse(mine); }
+      } else {
+        setResponses([]);
       }
-      if (mine) { setHasAnsweredToday(true); setMyResponse(mine); }
 
-      // Load previous 3 days of prompts + responses
+      // Load the recent feed — past prompts + responses. 14 days so the last Thursday's
+      // batch always shows between weekly events (the room stays alive on non-Thursdays).
       // Use local date arithmetic (not toISOString which returns UTC) so
       // Korea UTC+9 dates are correct — e.g. midnight KST is still yesterday UTC
       const days = [];
-      for (let i = 1; i <= 3; i++) {
+      for (let i = 1; i <= 14; i++) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -13729,7 +13735,11 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
           return { date: dateStr, prompt: p, responses: dayResp };
         } catch(e) { return null; }
       }));
-      setHistory(historyData.filter(Boolean).filter(d => d.responses.length > 0));
+      const hist = historyData.filter(Boolean).filter(d => d.responses.length > 0);
+      setHistory(hist);
+      // On non-Thursday the history feed IS the room's content — auto-expand the most
+      // recent batch (last Thursday) so it reads as a live feed, not a collapsed archive.
+      if (!prompt && hist.length > 0) setExpandedDay(hist[0].date);
     } catch(e) {}
     setLoading(false);
   };
@@ -13798,20 +13808,8 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
 
   if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "60px" } }, React.createElement(Spinner));
 
-  // No prompt today — Thankful Thursday only surfaces on Thursdays
-  if (!qodPrompt) return (
-    <div style={{ textAlign: "center", padding: "60px 20px" }}>
-      <div style={{ fontSize: "48px", marginBottom: "16px" }}>🙏</div>
-      <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "8px", letterSpacing: "-0.3px" }}>
-        {isQodDay() ? "Thankful Thursday 준비 중" : "Thankful Thursday는 목요일에 만나요"}
-      </div>
-      <div style={{ fontSize: "14px", color: C.textMid, lineHeight: 1.6, whiteSpace: "pre-line" }}>
-        {isQodDay()
-          ? "잠시 후 다시 확인해 주세요!"
-          : "매주 목요일, 감사한 일 한 가지를\n영어로 나누는 시간이에요."}
-      </div>
-    </div>
-  );
+  // (No early-return for a missing prompt — the Community room is always-on. When there's
+  //  no Thankful Thursday today, the render below shows a light room header + the feed.)
 
   // No city group
   if (!cityGroup) return (
@@ -13862,7 +13860,19 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         document.body
       )}
 
-      {/* Thankful Thursday card */}
+      {/* Non-Thursday: a light room header so the Community space has identity even when
+          the weekly event isn't live. The room hosts Thankful Thursday; it isn't named for it. */}
+      {!qodPrompt && (
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ fontSize: "22px", fontWeight: "800", color: newUI ? WAYVE_TOKENS.ink : C.text, letterSpacing: "-0.3px", marginBottom: "5px" }}>{cityGroup.emoji} {cityGroup.name}</div>
+          <div style={{ fontSize: "13px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, lineHeight: 1.55 }}>
+            🙏 매주 목요일, <strong style={{ fontWeight: "700" }}>Thankful Thursday</strong>에 감사한 일을 나눠요. 친구들의 이야기를 듣고 반응을 남겨보세요.
+          </div>
+        </div>
+      )}
+
+      {/* Thankful Thursday card — the weekly event, only on Thursdays */}
+      {qodPrompt && (
       <div data-tour-phrase-first="true" style={{ background: "linear-gradient(160deg, #9A5A2E 0%, #4E2C16 100%)", borderRadius: "16px", padding: "24px", marginBottom: "20px", color: "#fff", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-16px", right: "-6px", fontSize: "96px", opacity: 0.10 }}>🙏</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
@@ -13899,9 +13909,10 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
           </div>
         )}
       </div>
+      )}
 
-      {/* Responses feed */}
-      {responses.length === 0 ? (
+      {/* Today's responses feed — only when the weekly event is live (Thursday) */}
+      {qodPrompt && (responses.length === 0 ? (
         // Apple-style quiet empty state — no card, no container, just breathing room
         // Private submitters see this too which is correct — board is genuinely empty
         <div style={{ textAlign: "center", padding: "32px 20px 20px" }}>
@@ -13936,7 +13947,7 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
             ))}
           </div>
         </div>
-      )}
+      ))}
       {/* ── Previous days ── */}
       {history.length > 0 && (
         <div style={{ marginTop: "24px" }}>
