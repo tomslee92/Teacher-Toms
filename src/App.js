@@ -4151,7 +4151,6 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   _tokenUser = user; _tokenGroup = group;
   const [tab, setTab] = useState(initialTab);
   const [showWavy, setShowWavy] = useState(false);
-  const [showUIPreview, setShowUIPreview] = useState(false); // Toms-only isolated preview of the grouped-card design language
   const [scenarioToLaunch, setScenarioToLaunch] = useState(null); // curated scenario chosen from the home card
   const [showProfile, setShowProfile] = useState(false);
   const [profileUser, setProfileUser] = useState(user);
@@ -4519,9 +4518,6 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
             {isTeacherName && (
               <button onClick={() => { setShowTeacherPrompt(true); setTeacherPassInput(""); setTeacherPassError(""); }} style={{ background: C.navy, border: "none", color: "#fff", padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>Teacher</button>
             )}
-            {isTeacherName && (
-              <button onClick={() => setShowUIPreview(true)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>🎨 미리보기</button>
-            )}
           </div>
         </div>
       </div>
@@ -4612,11 +4608,6 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       initialScenarioId: scenarioToLaunch?.id || null,
       onClose: () => { setShowWavy(false); setScenarioToLaunch(null); },
       onManualExit: () => { setShowWavy(false); setScenarioToLaunch(null); },
-    })}
-
-    {showUIPreview && React.createElement(UIPreviewScreen, {
-      user: profileUser,
-      onClose: () => setShowUIPreview(false),
     })}
 
     {showProfile && React.createElement(ProfileModal, { user: profileUser, showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep, onClose: () => {
@@ -4767,274 +4758,6 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
 
     </LangContext.Provider>
     </TourContext.Provider>
-  );
-}
-
-// ── UI Preview (Toms-only) ────────────────────────────────────────────────────
-// An ISOLATED mockup of the grouped-card design language (WAYVE_TOKENS) applied to
-// the toolkit screens — Practice/Library, My List, QoD — so the look can be judged on
-// a real device before any rollout. Touches NO existing component; sample data only.
-// Opened from the Toms-only "🎨 미리보기" header button; gated by showUIPreview.
-function UIPreviewScreen({ user, onClose }) {
-  const T = WAYVE_TOKENS;
-  const firstName = (user?.name || "").split(" ")[0] || "";
-  const [screen, setScreen] = React.useState("home");
-  const [openId, setOpenId] = React.useState(2);   // one library card pre-expanded
-  const [activeTag, setActiveTag] = React.useState("전체");
-
-  // ── shared atoms ──
-  const card = (children, extra) => React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, boxShadow: T.shadowCard, ...(extra || {}) } }, children);
-  const pill = (label, kind, onClick) => React.createElement("button", {
-    onClick: onClick || (() => {}),
-    style: {
-      fontFamily: FONT, fontSize: "13px", fontWeight: "700", cursor: "pointer",
-      padding: "9px 16px", borderRadius: T.rPill,
-      border: kind === "primary" ? "none" : `1px solid ${T.hairline}`,
-      background: kind === "primary" ? T.wave : T.card,
-      color: kind === "primary" ? "#fff" : T.ink2,
-    },
-  }, label);
-  const sectionLabel = (text, sub) => React.createElement("div", { style: { margin: "24px 2px 12px" } },
-    React.createElement("div", { style: { fontSize: "20px", fontWeight: "800", color: T.ink, letterSpacing: "-0.3px" } }, text),
-    sub && React.createElement("div", { style: { fontSize: "13px", color: T.ink2, marginTop: "3px" } }, sub)
-  );
-  const chipFor = (status) =>
-    status === "review" ? { label: "복습 필요", bg: T.coralSoft, fg: T.coral } :
-    status === "done"   ? { label: "완료",      bg: T.greenSoft, fg: T.green } :
-                          { label: "새 표현",    bg: T.waveSoft,  fg: T.wave };
-
-  // ── sample data ──
-  const weekPhrases = [
-    { id: 1, english: "Could you walk me through it?", korean: "한번 자세히 설명해 주시겠어요?", status: "review" },
-    { id: 2, english: "Let's circle back on this.",     korean: "이건 나중에 다시 얘기해요.",      status: "new",  note: "circle back — 어떤 주제로 다시 돌아오다" },
-    { id: 3, english: "I'm on the same page.",          korean: "저도 같은 생각이에요.",          status: "done" },
-  ];
-  const myList = [
-    { id: 11, english: "That works for me.",      korean: "저는 괜찮아요, 좋아요." },
-    { id: 12, english: "Let me get back to you.", korean: "나중에 다시 연락드릴게요." },
-  ];
-
-  const phraseCard = (p) => {
-    const open = openId === p.id;
-    const chip = chipFor(p.status);
-    return React.createElement("div", {
-      key: p.id,
-      onClick: () => setOpenId(open ? null : p.id),
-      style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, boxShadow: T.shadowCard, padding: "16px 18px", marginBottom: "10px", cursor: "pointer" },
-    },
-      React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" } },
-        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-          React.createElement("div", { style: { fontSize: open ? "19px" : "17px", fontWeight: "700", color: T.ink, lineHeight: 1.4, letterSpacing: "-0.2px", wordBreak: "keep-all" } }, `"${p.english}"`),
-          React.createElement("div", { style: { fontSize: "14px", color: T.ink2, marginTop: "4px", wordBreak: "keep-all" } }, p.korean)
-        ),
-        p.status && React.createElement("div", { style: { flexShrink: 0, fontSize: "11px", fontWeight: "700", color: chip.fg, background: chip.bg, padding: "4px 10px", borderRadius: T.rPill, whiteSpace: "nowrap" } }, chip.label)
-      ),
-      open && React.createElement("div", { style: { marginTop: "14px" } },
-        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } },
-          pill("▶ 다시 듣기", "ghost"), pill("천천히", "ghost"), pill("연습하기", "primary")
-        ),
-        p.note && React.createElement("div", { style: { marginTop: "12px", padding: "10px 12px", background: T.bgGrouped, borderRadius: 12 } },
-          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.ink3, letterSpacing: "0.4px", textTransform: "uppercase", marginBottom: "3px" } }, "표현 설명"),
-          React.createElement("div", { style: { fontSize: "13px", color: T.ink2, wordBreak: "keep-all" } }, p.note)
-        ),
-        React.createElement("button", { onClick: (e) => e.stopPropagation(), style: { marginTop: "12px", background: "transparent", border: "none", color: T.wave, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: 0 } }, "🙋 수업에서 다루기")
-      )
-    );
-  };
-
-  // ── screen renderers ──
-  const renderHome = () => React.createElement(React.Fragment, null,
-    React.createElement("div", { style: { fontSize: "13px", color: T.ink3, fontWeight: "600", marginTop: "6px" } }, "좋은 저녁이에요"),
-    React.createElement("div", { style: { fontSize: "28px", fontWeight: "900", color: T.ink, letterSpacing: "-0.6px", marginBottom: "16px" } }, `${firstName || "토마스"} 👋`),
-    // Wavi hero
-    React.createElement("div", { style: { background: `linear-gradient(135deg, ${T.navy1}, ${T.navy2})`, borderRadius: T.rCard, padding: "22px 22px 20px", boxShadow: "0 8px 24px rgba(11,31,58,0.22)", marginBottom: "14px" } },
-      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" } },
-        React.createElement("span", { style: { fontSize: "26px" } }, "🌊"),
-        React.createElement("span", { style: { fontSize: "30px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px" } }, "Wavi")
-      ),
-      React.createElement("div", { style: { fontSize: "15px", color: "rgba(255,255,255,0.85)", marginBottom: "16px", wordBreak: "keep-all" } }, "오늘 얼마나 시간 있어요?"),
-      React.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: T.rPill, padding: "10px 18px" } },
-        React.createElement("span", { style: { fontSize: "14px", fontWeight: "700", color: "#fff" } }, "연습 시작"),
-        React.createElement("span", { style: { fontSize: "14px", color: "#fff" } }, "→")
-      )
-    ),
-    // Stats
-    card(
-      React.createElement("div", { style: { display: "flex" } },
-        [["🔥", "5", "연속"], ["⏱", "120분", "이번 주"], ["✨", "34", "익힌 표현"]].map((s, i) =>
-          React.createElement("div", { key: i, style: { flex: 1, textAlign: "center", padding: "16px 8px", borderLeft: i ? `1px solid ${T.hairline}` : "none" } },
-            React.createElement("div", { style: { fontSize: "20px", marginBottom: "4px" } }, s[0]),
-            React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: T.ink } }, s[1]),
-            React.createElement("div", { style: { fontSize: "11px", color: T.ink3, fontWeight: "600", marginTop: "2px" } }, s[2])
-          )
-        )
-      ),
-      { marginBottom: "14px" }
-    ),
-    // Daily focus
-    card(
-      React.createElement("div", { style: { padding: "16px 18px 6px" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, "오늘의 연습"),
-        [["오늘의 표현", "Let's circle back on this.", "▶"], ["다시 만나는 표현", "I'm on the same page.", "▶"], ["오늘의 질문", "What made you smile?", "→"]].map((r, i) =>
-          React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: i ? `1px solid ${T.hairline}` : "none" } },
-            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-              React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "3px" } }, r[0]),
-              React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, `"${r[1]}"`)
-            ),
-            React.createElement("div", { style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", border: `1px solid ${T.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", color: T.ink3, fontSize: "12px", fontWeight: "800" } }, r[2])
-          )
-        )
-      )
-    )
-  );
-
-  const renderLibrary = () => React.createElement(React.Fragment, null,
-    sectionLabel("연습", firstName ? `${firstName}, 이번 주 표현이에요` : "이번 주 표현이에요"),
-    React.createElement("div", { style: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", marginBottom: "14px" } },
-      ["전체", "비즈니스", "일상", "여행"].map(tag => React.createElement("button", {
-        key: tag, onClick: () => setActiveTag(tag),
-        style: { flexShrink: 0, fontFamily: FONT, fontSize: "13px", fontWeight: "700", cursor: "pointer", padding: "8px 15px", borderRadius: T.rPill, border: activeTag === tag ? "none" : `1px solid ${T.hairline}`, background: activeTag === tag ? T.wave : T.card, color: activeTag === tag ? "#fff" : T.ink2 },
-      }, tag))
-    ),
-    weekPhrases.map(phraseCard)
-  );
-
-  const renderSolo = () => React.createElement(React.Fragment, null,
-    sectionLabel("Solo Practice", "자유롭게 말해보세요"),
-    card(
-      React.createElement("div", { style: { padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
-        React.createElement("div", { style: { fontSize: "15px", color: T.ink2, marginBottom: "20px", wordBreak: "keep-all" } }, "무엇이든 영어로 말해보세요. Wavi가 자연스러운 표현으로 다듬어 드려요."),
-        React.createElement("div", { style: { width: "76px", height: "76px", borderRadius: "50%", background: T.wave, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px", boxShadow: "0 8px 20px rgba(62,123,250,0.35)", marginBottom: "12px" } }, "🎙"),
-        React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: T.ink3 } }, "탭해서 말하기")
-      ),
-      { marginBottom: "14px" }
-    ),
-    card(
-      React.createElement("div", { style: { padding: "16px 18px" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "6px" } }, "내가 말한 것"),
-        React.createElement("div", { style: { fontSize: "15px", color: T.ink2, marginBottom: "14px", wordBreak: "keep-all" } }, "\"I want talk about my work project today.\""),
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.wave, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "6px" } }, "더 자연스럽게"),
-        React.createElement("div", { style: { fontSize: "16px", fontWeight: "700", color: T.ink, marginBottom: "14px", wordBreak: "keep-all" } }, "\"I'd like to talk about my work project today.\""),
-        React.createElement("div", { style: { display: "flex", gap: "8px" } }, pill("▶ 듣기", "ghost"), pill("이 표현 저장", "primary"))
-      )
-    )
-  );
-
-  const renderMyList = () => React.createElement(React.Fragment, null,
-    sectionLabel("내 목록", "저장한 표현"),
-    myList.map(phraseCard)
-  );
-
-  const renderCommunity = () => React.createElement(React.Fragment, null,
-    sectionLabel("오늘의 질문"),
-    card(
-      React.createElement("div", { style: { padding: "18px 20px" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" } }, "오늘의 질문"),
-        React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: T.ink, lineHeight: 1.5, marginBottom: "16px", wordBreak: "keep-all" } }, "What's one small thing that made you smile this week?"),
-        React.createElement("div", { style: { display: "flex", gap: "8px" } }, pill("🎙 답하기", "primary"), pill("나중에", "ghost"))
-      ),
-      { marginBottom: "14px" }
-    ),
-    [["David", "My daughter called me from college.", "딸이 대학에서 전화했어요.", "👍 3 · ❤️ 2"], ["Chris", "Finished a book I started months ago.", "몇 달 전 시작한 책을 다 읽었어요.", "👍 5"]].map((r, i) =>
-      React.createElement("div", { key: i, style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, boxShadow: T.shadowCard, padding: "16px 18px", marginBottom: "10px" } },
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" } },
-          React.createElement("div", { style: { width: "34px", height: "34px", borderRadius: "50%", background: T.navy2, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "800" } }, r[0][0]),
-          React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T.ink } }, r[0])
-        ),
-        React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: T.ink, wordBreak: "keep-all" } }, r[1]),
-        React.createElement("div", { style: { fontSize: "13px", color: T.ink2, marginTop: "3px", wordBreak: "keep-all" } }, r[2]),
-        React.createElement("div", { style: { fontSize: "12px", color: T.ink3, fontWeight: "600", marginTop: "10px" } }, r[3])
-      )
-    )
-  );
-
-  const renderLogin = () => React.createElement("div", { style: { minHeight: "70vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "20px 8px" } },
-    React.createElement("div", { style: { fontSize: "44px", fontWeight: "900", color: T.ink, letterSpacing: "-1px", marginBottom: "6px" } }, "Wayve"),
-    React.createElement("div", { style: { fontSize: "15px", color: T.ink2, marginBottom: "32px" } }, "영어가 편해지는 곳"),
-    React.createElement("input", { placeholder: "이름을 입력하세요", style: { width: "100%", maxWidth: "320px", padding: "15px 18px", fontSize: "15px", fontFamily: FONT, color: T.ink, background: T.card, border: `1px solid ${T.hairline}`, borderRadius: 14, marginBottom: "12px", outline: "none" } }),
-    React.createElement("button", { style: { width: "100%", maxWidth: "320px", padding: "15px", fontSize: "15px", fontWeight: "800", fontFamily: FONT, color: "#fff", background: T.wave, border: "none", borderRadius: 14, cursor: "pointer", marginBottom: "20px" } }, "시작하기"),
-    React.createElement("div", { style: { display: "flex", gap: "18px" } },
-      React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: T.ink } }, "한국어"),
-      React.createElement("span", { style: { fontSize: "13px", fontWeight: "600", color: T.ink3 } }, "English")
-    )
-  );
-
-  const renderTeacher = () => React.createElement(React.Fragment, null,
-    React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "20px 2px 14px" } },
-      React.createElement("div", { style: { fontSize: "22px", fontWeight: "800", color: T.ink, letterSpacing: "-0.3px" } }, "학생"),
-      React.createElement("div", { style: { fontSize: "13px", color: T.ink3, fontWeight: "600" } }, "3명")
-    ),
-    React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", margin: "0 2px 10px" } }, "그룹 2"),
-    [["David", "120분 / 주", true], ["Chris", "95분 / 주", true]].map((s, i) =>
-      React.createElement("div", { key: i, style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, boxShadow: T.shadowCard, padding: "14px 16px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "12px" } },
-        React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "50%", background: T.navy2, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", flexShrink: 0 } }, s[0][0]),
-        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-          React.createElement("div", { style: { fontSize: "16px", fontWeight: "700", color: T.ink } }, s[0]),
-          React.createElement("div", { style: { fontSize: "13px", color: T.ink2, marginTop: "1px" } }, s[1])
-        ),
-        React.createElement("div", { style: { display: "flex", gap: "6px", flexShrink: 0 } },
-          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.wave, background: T.waveSoft, padding: "5px 9px", borderRadius: T.rPill } }, "🌊 ON"),
-          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.green, background: T.greenSoft, padding: "5px 9px", borderRadius: T.rPill } }, "🏠 ON")
-        )
-      )
-    ),
-    React.createElement("div", { style: { marginTop: "6px" } }, pill("＋ 표현 추가", "primary"))
-  );
-
-  const screens = {
-    home: renderHome, library: renderLibrary, solo: renderSolo,
-    mylist: renderMyList, community: renderCommunity, login: renderLogin, teacher: renderTeacher,
-  };
-  const picker = [
-    { key: "home", label: "홈" }, { key: "library", label: "연습" }, { key: "solo", label: "Solo" },
-    { key: "mylist", label: "내 목록" }, { key: "community", label: "커뮤니티" },
-    { key: "login", label: "로그인" }, { key: "teacher", label: "선생님" },
-  ];
-  const navItems = [
-    { key: "home", label: "홈" }, { key: "library", label: "연습" }, { key: "solo", label: "Solo" },
-    { key: "mylist", label: "내 목록" }, { key: "community", label: "커뮤니티" },
-  ];
-  const showNav = ["home", "library", "solo", "mylist", "community"].includes(screen);
-
-  return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 10000, background: T.bgGrouped, display: "flex", flexDirection: "column", fontFamily: FONT, paddingTop: "env(safe-area-inset-top)" } },
-    React.createElement("style", null, "html, body { background: " + T.bgGrouped + " !important; }"),
-
-    // top bar
-    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(242,243,247,0.92)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${T.hairline}`, flexShrink: 0 } },
-      React.createElement("button", { onClick: onClose, style: { background: T.card, border: `1px solid ${T.hairline}`, color: T.ink, width: "34px", height: "34px", borderRadius: "50%", fontSize: "16px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, "←"),
-      React.createElement("div", { style: { flex: 1 } },
-        React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: T.ink, letterSpacing: "-0.2px" } }, "새 UI 미리보기"),
-        React.createElement("div", { style: { fontSize: "11px", color: T.ink3, fontWeight: "600" } }, "나만 보여요 · 학생 화면엔 적용 안 됨")
-      ),
-      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: T.wave, background: T.waveSoft, padding: "5px 11px", borderRadius: T.rPill } }, "DRAFT")
-    ),
-
-    // screen picker
-    React.createElement("div", { style: { display: "flex", gap: "8px", overflowX: "auto", padding: "10px 16px", background: T.card, borderBottom: `1px solid ${T.hairline}`, flexShrink: 0 } },
-      picker.map(s => React.createElement("button", {
-        key: s.key, onClick: () => setScreen(s.key),
-        style: { flexShrink: 0, fontFamily: FONT, fontSize: "13px", fontWeight: "700", cursor: "pointer", padding: "7px 14px", borderRadius: T.rPill, border: screen === s.key ? "none" : `1px solid ${T.hairline}`, background: screen === s.key ? T.ink : "transparent", color: screen === s.key ? "#fff" : T.ink2 },
-      }, s.label))
-    ),
-
-    // scroll content
-    React.createElement("div", { style: { flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" } },
-      React.createElement("div", { style: { maxWidth: "600px", margin: "0 auto", padding: `8px 16px calc(env(safe-area-inset-bottom) + ${showNav ? "92px" : "40px"})` } },
-        screens[screen]()
-      )
-    ),
-
-    // faux bottom nav (student screens only)
-    showNav && React.createElement("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", background: "rgba(255,255,255,0.96)", backdropFilter: "blur(8px)", borderTop: `1px solid ${T.hairline}`, padding: `8px 8px calc(env(safe-area-inset-bottom) + 8px)` } },
-      navItems.map(n => {
-        const on = screen === n.key;
-        return React.createElement("button", { key: n.key, onClick: () => setScreen(n.key),
-          style: { flex: 1, background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, padding: "6px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" } },
-          React.createElement("div", { style: { width: "6px", height: "6px", borderRadius: "50%", background: on ? T.wave : "transparent" } }),
-          React.createElement("div", { style: { fontSize: "11px", fontWeight: on ? "800" : "600", color: on ? T.wave : T.ink3 } }, n.label)
-        );
-      })
-    )
   );
 }
 
@@ -21887,8 +21610,10 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     ),
 
     // ── 🙏 Thankful Thursday banner — the weekly event's "arrival" moment on the home.
-    //    Only on Thursdays (todayQod is Thursday-gated); taps through to the Community room. ──
-    todayQod && (() => {
+    //    Thursday-only: the open window (model #2) makes todayQod non-null all week, but the
+    //    home banner is the *event* signal, so it's gated on isQodDay(). Mid-week sharing still
+    //    happens from the always-on Community tab. Taps through to the Community room. ──
+    (todayQod && isQodDay()) && (() => {
       const T = WAYVE_TOKENS;
       const answered = !!todayQod.answered;
       return React.createElement("button", {
