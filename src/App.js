@@ -14232,8 +14232,10 @@ function StudentCommentView({ responseId, userId, onCommentSeen }) {
 function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existingResponse }) {
   const lang = useLang();
   // path: null | "direct" | "korean_type" | "korean_voice"
-  const [path, setPath] = useState(null);
-  const [step, setStep] = useState("main"); // main | practice | posting
+  const [path, setPath] = useState("direct");
+  // Enter straight at the record step so students can answer immediately in one window.
+  // The "main" menu (Korean help, practice-a-phrase) is still reachable via the help link.
+  const [step, setStep] = useState("practice"); // main | practice | posting
 
   // Translation
   const [koreanTranslation, setKoreanTranslation] = useState(null);
@@ -14660,9 +14662,13 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
               </div>
             )}
 
-            <button onClick={() => { setStep("main"); setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); setAttempts([]); }} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "12px", marginTop: "4px" }}>
-              ← 처음으로
-            </button>
+            {/* Only show the help affordance before recording (no feedback yet) — once they've
+                recorded, the submit/redo controls are the focus. Leads to the Korean-help menu. */}
+            {!currentFeedback && !loadingFeedback && (
+              <button onClick={() => { setStep("main"); setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); setAttempts([]); }} style={{ width: "100%", background: "transparent", border: "none", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "12px", marginTop: "4px", textDecoration: "underline", textDecorationColor: C.border, textUnderlineOffset: "3px" }}>
+                {lang === "zh" ? "需要帮助？用中文回答 →" : "도움이 필요해요? 한국어로 답하기 →"}
+              </button>
+            )}
           </div>
         )}
 
