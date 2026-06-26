@@ -13666,7 +13666,6 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
   const [hasAnsweredToday, setHasAnsweredToday] = useState(false);
   const [myResponse, setMyResponse] = useState(null);
   const [history, setHistory] = useState([]); // [{prompt, responses, date}]
-  const [expandedDay, setExpandedDay] = useState(null);
   const today = localToday();
 
   useEffect(() => {
@@ -13716,27 +13715,21 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         setResponses([]);
       }
 
-      // Past Thankful Thursday weeks for the history feed. Query TT-tagged prompts directly
-      // (ordered by week) — this (a) only ever shows Thankful Thursday content, so old
-      // Daily-Question responses from before the rebrand never appear, and (b) fetches each
-      // week's responses by prompt_id so all-week (open-window) responses are included, not
-      // just ones posted on the Thursday itself. Exclude the current/live week (shown above).
-      const ttDate = currentThankfulThursdayDate();
-      const pastPrompts = (await db.get("qod_prompts",
-        `tag=eq.${encodeURIComponent(THANKFUL_THURSDAY_TAG)}&scheduled_date=lt.${ttDate}&order=scheduled_date.desc&limit=6`
-      ).catch(() => [])).filter(p => !prompt || p.id !== prompt.id);
-      const historyData = await Promise.all(pastPrompts.map(async (p) => {
-        try {
-          const dayResp = await db.get("qod_responses",
-            `prompt_id=eq.${p.id}&city_group_id=eq.${city.id}&is_private=eq.false&order=created_at.asc`
-          ).catch(() => []);
-          return { date: p.scheduled_date, prompt: p, responses: dayResp };
-        } catch(e) { return null; }
-      }));
-      const hist = historyData.filter(Boolean).filter(d => d.responses.length > 0);
-      setHistory(hist);
-      // If there's no live prompt (rare fallback), surface the most recent past batch expanded.
-      if (!prompt && hist.length > 0) setExpandedDay(hist[0].date);
+      // Recent community voices — a flat, trailing list of the last few public responses
+      // across recent Thankful Thursday weeks (the prompt is evergreen, so per-week grouping
+      // adds nothing). Always shows only Thankful Thursday content; excludes the current/live
+      // week (shown above). Self-bounding regardless of how active the room is.
+      const ttPrompts = await db.get("qod_prompts",
+        `tag=eq.${encodeURIComponent(THANKFUL_THURSDAY_TAG)}&order=scheduled_date.desc&limit=12&select=id`
+      ).catch(() => []);
+      const pastIds = ttPrompts.map(p => p.id).filter(id => !prompt || id !== prompt.id);
+      let recent = [];
+      if (pastIds.length) {
+        recent = await db.get("qod_responses",
+          `prompt_id=in.(${pastIds.join(",")})&city_group_id=eq.${city.id}&is_private=eq.false&order=created_at.desc&limit=8`
+        ).catch(() => []);
+      }
+      setHistory(recent);
     } catch(e) {}
     setLoading(false);
   };
@@ -13945,46 +13938,14 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
           </div>
         </div>
       ))}
-      {/* ── Previous days ── */}
+      {/* ── Recent community voices — flat trailing list of past Thankful Thursday responses ── */}
       {history.length > 0 && (
         <div style={{ marginTop: "24px" }}>
-          {/* Quiet label — no decorative lines */}
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px", paddingLeft: "2px" }}>{lang === "zh" ? "过去的回答" : "지난 답변들"}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {history.map(({ date, prompt, responses: dayResponses }, histIdx) => {
-              const isOpen = expandedDay === date;
-              const d = new Date(date + "T12:00:00Z");
-              const dayLabel = d.toLocaleDateString(lang === "zh" ? "zh-CN" : "ko-KR", { month: "long", day: "numeric", weekday: "short" });
-              const opacity = histIdx === 0 ? 1 : histIdx === 1 ? 0.85 : 0.7;
-              return (
-                <div key={date} style={{ borderRadius: "14px", border: `1px solid ${isOpen ? C.navy : C.border}`, overflow: "hidden", transition: "border-color 0.2s, opacity 0.2s", opacity }}>
-                  <button onClick={() => setExpandedDay(isOpen ? null : date)} style={{ width: "100%", padding: "13px 16px", background: isOpen ? C.bgSoft : C.bg, border: "none", cursor: "pointer", fontFamily: FONT, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "11px", fontWeight: "700", color: isOpen ? C.navy : histIdx === 0 ? C.textMid : C.textLight, letterSpacing: "0.5px", marginBottom: "2px" }}>{dayLabel}</div>
-                      <div style={{ fontSize: "13px", fontWeight: isOpen ? "600" : "500", color: C.text, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>"{prompt.prompt}"</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                      <div style={{ fontSize: "11px", color: C.textLight, fontWeight: "600" }}>{dayResponses.length}{lang === "zh" ? "人" : "명"}</div>
-                      <div style={{ fontSize: "12px", color: C.textLight, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</div>
-                    </div>
-                  </button>
-                  {isOpen && (
-                    <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "8px 12px 12px" }} className="fade-in">
-                      <div style={{ fontSize: "13px", fontStyle: "italic", color: C.textMid, padding: "10px 4px 14px", lineHeight: 1.5, borderBottom: `0.5px solid ${C.border}`, marginBottom: "12px" }}>"{prompt.prompt}"</div>
-                      {dayResponses.length === 0 ? (
-                        <div style={{ textAlign: "center", padding: "16px", fontSize: "13px", color: C.textLight }}>{lang === "zh" ? "当天没有回答。" : "이 날은 답변이 없어요."}</div>
-                      ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                          {dayResponses.map(r => (
-                            <HistoryResponseCard key={r.id} r={r} user={user} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "12px", paddingLeft: "2px" }}>{lang === "zh" ? "最近的分享" : "최근 이야기"}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {history.map(r => (
+              <HistoryResponseCard key={r.id} r={r} user={user} />
+            ))}
           </div>
         </div>
       )}
