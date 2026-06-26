@@ -4682,7 +4682,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         const tabs = [
           ["home",      "🏠", T("nav_home",      lang)],
           ["practice",  "🎯", T("nav_practice",  lang)],
-          ["community", "❓", T("nav_community", lang)],
+          ["community", "👥", T("nav_community", lang)],
           ["freetalk",  "🎙", T("nav_freetalk",  lang)],
           ["myphrases", "⭐", T("nav_myphrases", lang)],
         ];
@@ -4708,7 +4708,9 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
             tabs.map(([id, icon, label], idx) => {
               const active = id === "home" ? tab === null : tab === id;
               const showBadge = id === "community" && unreadCommentIds.size > 0;
-              const showDQDot = id === "community" && !submittedToday;
+              // Thursday "event is live" signal — the dot only appears on Thankful Thursday
+              // (the weekly event), not every day. Drives students to the Community room.
+              const showDQDot = id === "community" && isQodDay() && !submittedToday;
               return React.createElement("button", { key: id, className: "nav-btn", onClick: () => { haptic.light(); setTab(id === "home" ? null : id); },
                 style: { flex: 1, padding: "10px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" } },
                 React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative", opacity: active ? 1 : 0.38, transition: "opacity 0.2s" } },
@@ -21914,6 +21916,22 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       )
     ),
 
+    // ── 🙏 Thankful Thursday banner — the weekly event's "arrival" moment on the home.
+    //    Only on Thursdays (todayQod is Thursday-gated); taps through to the Community room. ──
+    todayQod && (() => {
+      const T = WAYVE_TOKENS;
+      const answered = !!todayQod.answered;
+      return React.createElement("button", {
+        onClick: () => onNavigate("community"),
+        style: { display: "block", width: "100%", textAlign: "left", border: "none", cursor: "pointer", fontFamily: FONT, background: "linear-gradient(160deg, #9A5A2E 0%, #4E2C16 100%)", borderRadius: T.rCard, padding: "16px 18px", marginBottom: "12px", boxShadow: "0 8px 24px rgba(78,44,22,0.22)", position: "relative", overflow: "hidden" },
+      },
+        React.createElement("div", { style: { position: "absolute", top: "-12px", right: "-4px", fontSize: "72px", opacity: 0.12 } }, "🙏"),
+        React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: "#fff", marginBottom: "5px" } }, "🙏 Thankful Thursday"),
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: "#fff", lineHeight: 1.45, marginBottom: "4px", wordBreak: "keep-all" } }, answered ? "감사한 일을 나눴어요 ✓" : "이번 주, 감사한 일 한 가지를 나눠요"),
+        React.createElement("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.75)", fontWeight: "600" } }, answered ? "친구들의 이야기 들으러 가기 →" : "지금 나누러 가기 →")
+      );
+    })(),
+
     // ── 오늘 수업 정리 (same-evening class recap) — priority on class days ──
     (classRecap && classRecap.length > 0) && (() => {
       const T = WAYVE_TOKENS;
@@ -21931,12 +21949,13 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     })(),
 
     // ── 오늘의 연습 (Daily Focus) ──
-    (dailyFocus && (dailyFocus.today || dailyFocus.resurfaced || todayQod)) && (() => {
+    (dailyFocus && (dailyFocus.today || dailyFocus.resurfaced)) && (() => {
       const T = WAYVE_TOKENS;
       const rows = [];
       if (dailyFocus.today) rows.push({ key: "today", label: "오늘의 표현", phrase: dailyFocus.today, done: dailyFocus.todayDone, onClick: () => playPhrase(dailyFocus.today) });
       if (dailyFocus.resurfaced) rows.push({ key: "resurf", label: "다시 만나는 표현", phrase: dailyFocus.resurfaced, done: dailyFocus.resurfDone, onClick: () => playPhrase(dailyFocus.resurfaced) });
-      if (todayQod) rows.push({ key: "qod", label: "🙏 Thankful Thursday", qod: true, text: todayQod.prompt, done: !!todayQod.answered, onClick: () => onNavigate("community") });
+      // Thankful Thursday is no longer a Daily Focus row — on Thursdays it gets its own
+      // dedicated banner below (the "event arrived" moment), so it isn't buried in this list.
       if (!rows.length) return null;
       const allDone = rows.every(r => r.done);
       return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
