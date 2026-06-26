@@ -18064,7 +18064,11 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       const missingCount = (evaluation.missing && evaluation.missing.length) || 0;
 
       // Compute word coverage — what fraction of the target's key words did the student say?
-      const targetKeyWords = evalTarget.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
+      // Short-word fallback: phrases made entirely of ≤2-char words (e.g. "Is it me?") would
+      // otherwise yield zero key words → coverage 0 → no local pass path, leaving the decision
+      // entirely to the flaky 8B evaluator. Fall back to all words so coverage stays meaningful.
+      let targetKeyWords = evalTarget.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
+      if (targetKeyWords.length === 0) targetKeyWords = evalTarget.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 0);
       const saidWords = cleaned.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 0);
       const saidWordsSet = new Set(saidWords);
       const coveredCount = targetKeyWords.filter(w => saidWordsSet.has(w)).length;
@@ -18088,12 +18092,19 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       // Coverage is the primary signal — student must cover at least 85% of key words AND keep them in order.
       // The LLM's word_order flag is a hard veto: if it says order is wrong, no automatic pass via coverage.
       const orderFlagged = evaluation.errorType === "word_order";
+      // High-confidence local override: orderFidelity is LCS-derived straight from the transcription, so a
+      // near-perfect coverage+order means the student DID say it right, in order. In that case the 8B
+      // evaluator's word_order flag (a frequent false positive) is factually wrong — don't let it veto a
+      // correct repetition into an endless "let's try again" loop. This is the fix for students reporting
+      // "I said it correctly but Wavi keeps trying to fix it."
+      const localPerfect = coverage >= 0.9 && orderFidelity >= 0.9;
       const passed =
         evaluation.match === "exact" ||
+        localPerfect ||
         (!orderFlagged && coverage >= 0.85 && orderFidelity >= 0.8) ||
         (evaluation.match === "close" && coverage >= 0.75 && evaluation.confidence >= 80 && orderFidelity >= 0.7);
 
-      console.log("[WAVY] decision — passed:", passed, "match:", evaluation.match, "conf:", evaluation.confidence, "errors:", errorCount, "missing:", missingCount, "coverage:", Math.round(coverage * 100) + "%", "order:", Math.round(orderFidelity * 100) + "%", "orderFlagged:", orderFlagged);
+      console.log("[WAVY] decision — passed:", passed, "match:", evaluation.match, "conf:", evaluation.confidence, "errors:", errorCount, "missing:", missingCount, "coverage:", Math.round(coverage * 100) + "%", "order:", Math.round(orderFidelity * 100) + "%", "orderFlagged:", orderFlagged, "localPerfect:", localPerfect);
 
       const inChunkMode = chunkState.stage !== "full";
 
