@@ -545,15 +545,23 @@ const isNewUI = (u) => !!(u && (u.new_ui_enabled || TEACHER_NAMES.includes(u.nam
 // declaration is only invoked at runtime, so referencing it here is fine).
 const THANKFUL_THURSDAY_TAG = "Thankful Thursday";
 const THANKFUL_THURSDAY_PROMPT = "What's one thing you're thankful for this week?";
+// The current Thankful Thursday "week" is anchored to the most recent Thursday (today if it
+// IS Thursday, else the Thursday earlier this week). getDay(): Thu=4.
+const currentThankfulThursdayDate = (now = new Date()) => {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() - ((d.getDay() - 4 + 7) % 7));
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+// Open window (model #2): the current week's prompt is answerable ALL week, not just on
+// Thursday. Returns/creates the prompt scheduled to the most recent Thursday on any day.
 async function ensureThankfulThursdayPrompt() {
-  if (!isQodDay()) return null;
-  const today = localToday();
-  const existing = await db.get("qod_prompts", `scheduled_date=eq.${today}&limit=1`).catch(() => []);
+  const ttDate = currentThankfulThursdayDate();
+  const existing = await db.get("qod_prompts", `scheduled_date=eq.${ttDate}&limit=1`).catch(() => []);
   if (existing[0]) return existing[0];
   try {
-    const r = await db.insert("qod_prompts", { prompt: THANKFUL_THURSDAY_PROMPT, tag: THANKFUL_THURSDAY_TAG, spark: "Thankful Thursday", category: "weekly", difficulty: "easy", scheduled_date: today });
+    const r = await db.insert("qod_prompts", { prompt: THANKFUL_THURSDAY_PROMPT, tag: THANKFUL_THURSDAY_TAG, spark: "Thankful Thursday", category: "weekly", difficulty: "easy", scheduled_date: ttDate });
     return Array.isArray(r) ? r[0] : r;
-  } catch (e) { return { prompt: THANKFUL_THURSDAY_PROMPT, tag: THANKFUL_THURSDAY_TAG, id: "tt_" + today, scheduled_date: today }; }
+  } catch (e) { return { prompt: THANKFUL_THURSDAY_PROMPT, tag: THANKFUL_THURSDAY_TAG, id: "tt_" + ttDate, scheduled_date: ttDate }; }
 }
 // Returns ISO timestamps for start/end of the local calendar day in UTC
 const localDayRange = () => {
@@ -13683,26 +13691,23 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
 
       if (!city) { setLoading(false); return; }
 
-      // Today's responses + "already answered" only make sense when there's a prompt (Thursday).
+      // Open window (model #2): responses to this week's prompt can be posted any day, so the
+      // feed + "already answered" are keyed by prompt_id for the whole week, not a single day.
       if (prompt) {
-        // Get responses for this city + prompt — today only, public only for the board
-        const { start: todayStart, end: todayEnd } = localDayRange();
         const resp = await db.get("qod_responses",
-          `prompt_id=eq.${prompt.id}&city_group_id=eq.${city.id}&created_at=gte.${todayStart}&created_at=lte.${todayEnd}&is_private=eq.false&order=created_at.asc`
+          `prompt_id=eq.${prompt.id}&city_group_id=eq.${city.id}&is_private=eq.false&order=created_at.asc`
         ).catch(() => []);
         setResponses(resp);
 
-        // Check if user already answered today — includes private submissions
+        // Has the student answered this week's prompt yet? (any day this week; includes private)
         const myAny = await db.get("qod_responses",
-          `prompt_id=eq.${prompt.id}&student_id=eq.${user.id}&created_at=gte.${todayStart}&created_at=lte.${todayEnd}&limit=1`
+          `prompt_id=eq.${prompt.id}&student_id=eq.${user.id}&limit=1`
         ).catch(() => []);
-        // Fallback: check localStorage for stored response ID (handles RLS blocking private rows).
-        // Key uses localToday() to match the write site (QodEntryScreen) — slicing todayStart would
-        // shift by a day for users east of UTC (e.g. KST after local midnight but before UTC midnight).
+        // Fallback: localStorage stored response ID (handles RLS blocking private rows).
         let mine = resp.find(r => r.student_id === user.id) || myAny[0] || null;
         if (!mine) {
           try {
-            const storedId = localStorage.getItem(`wayve_qod_response_id_${user.id}_${today}`);
+            const storedId = localStorage.getItem(`wayve_qod_response_id_${user.id}_${prompt.id}`);
             if (storedId) mine = { id: storedId, student_id: user.id, prompt_id: prompt.id };
           } catch(e) {}
         }
@@ -13711,36 +13716,26 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         setResponses([]);
       }
 
-      // Load the recent feed — past prompts + responses. 14 days so the last Thursday's
-      // batch always shows between weekly events (the room stays alive on non-Thursdays).
-      // Use local date arithmetic (not toISOString which returns UTC) so
-      // Korea UTC+9 dates are correct — e.g. midnight KST is still yesterday UTC
-      const days = [];
-      for (let i = 1; i <= 14; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        days.push(dateStr);
-      }
-      const historyData = await Promise.all(days.map(async (dateStr) => {
+      // Past Thankful Thursday weeks for the history feed. Query TT-tagged prompts directly
+      // (ordered by week) — this (a) only ever shows Thankful Thursday content, so old
+      // Daily-Question responses from before the rebrand never appear, and (b) fetches each
+      // week's responses by prompt_id so all-week (open-window) responses are included, not
+      // just ones posted on the Thursday itself. Exclude the current/live week (shown above).
+      const ttDate = currentThankfulThursdayDate();
+      const pastPrompts = (await db.get("qod_prompts",
+        `tag=eq.${encodeURIComponent(THANKFUL_THURSDAY_TAG)}&scheduled_date=lt.${ttDate}&order=scheduled_date.desc&limit=6`
+      ).catch(() => [])).filter(p => !prompt || p.id !== prompt.id);
+      const historyData = await Promise.all(pastPrompts.map(async (p) => {
         try {
-          const prompts = await db.get("qod_prompts", `scheduled_date=eq.${dateStr}&limit=1`).catch(() => []);
-          const p = prompts[0];
-          if (!p) return null;
-          // Use local day boundaries — localDayRange() for a specific past date
-          const [year, month, day] = dateStr.split("-").map(Number);
-          const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
-          const dayEnd   = new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
           const dayResp = await db.get("qod_responses",
-            `prompt_id=eq.${p.id}&city_group_id=eq.${city.id}&created_at=gte.${dayStart}&created_at=lte.${dayEnd}&is_private=eq.false&order=created_at.asc`
+            `prompt_id=eq.${p.id}&city_group_id=eq.${city.id}&is_private=eq.false&order=created_at.asc`
           ).catch(() => []);
-          return { date: dateStr, prompt: p, responses: dayResp };
+          return { date: p.scheduled_date, prompt: p, responses: dayResp };
         } catch(e) { return null; }
       }));
       const hist = historyData.filter(Boolean).filter(d => d.responses.length > 0);
       setHistory(hist);
-      // On non-Thursday the history feed IS the room's content — auto-expand the most
-      // recent batch (last Thursday) so it reads as a live feed, not a collapsed archive.
+      // If there's no live prompt (rare fallback), surface the most recent past batch expanded.
       if (!prompt && hist.length > 0) setExpandedDay(hist[0].date);
     } catch(e) {}
     setLoading(false);
@@ -15679,10 +15674,15 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
       }
       const insertedRow = await db.insert("qod_responses", { prompt_id: qodPrompt.id, student_id: user.id, nickname: user.name, audio_url: audioUrl, transcript: finalTranscript, city_group_id: cityGroup?.id || null, is_private: isPrivate });
       const insertedId = (Array.isArray(insertedRow) ? insertedRow[0] : insertedRow)?.id;
-      // Store response ID so resubmit can delete it even if RLS blocks private row reads
+      // Store response ID so resubmit can delete it even if RLS blocks private row reads.
+      // Keyed by prompt id (the week) so the "answered" fallback holds for the whole open
+      // window, not just the calendar day it was shared on (model #2). Day key kept for back-compat.
       try {
         localStorage.setItem(`wayve_qod_submitted_${user.id}_${today}`, qodPrompt.id);
-        if (insertedId) localStorage.setItem(`wayve_qod_response_id_${user.id}_${today}`, insertedId);
+        if (insertedId) {
+          localStorage.setItem(`wayve_qod_response_id_${user.id}_${today}`, insertedId);
+          localStorage.setItem(`wayve_qod_response_id_${user.id}_${qodPrompt.id}`, insertedId);
+        }
       } catch(e) {}
       // Fetch fresh public responses to show on celebration screen
       let celebResponses = [];
@@ -21709,20 +21709,23 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           resurfDone: resurfaced ? practicedToday(resurfaced.id) : false,
         });
 
-        // ── Thankful Thursday QoD (weekly; null on other days via ensure helper) ──
-        const todayStr = localToday();
-        const [todayPrompt, responseRows, noteRows] = await Promise.all([
+        // ── Thankful Thursday (open window) — the current week's prompt, answerable all week ──
+        const [todayPrompt, noteRows] = await Promise.all([
           ensureThankfulThursdayPrompt().catch(() => null),
-          db.get("qod_responses", `student_id=eq.${user.id}&order=created_at.desc&limit=1&select=created_at`).catch(() => []),
           // ── Session notes (gated on render) — fetch always so archive opens instantly
           notesEnabled
             ? db.get("session_notes", `student_id=eq.${user.id}&select=*&order=session_date.desc,created_at.desc`).catch(() => [])
             : Promise.resolve([]),
         ]);
         if (todayPrompt && !cancelled) {
-          const lastResp = responseRows[0]?.created_at;
-          const answered = lastResp && lastResp.startsWith(todayStr);
-          setTodayQod({ prompt: todayPrompt.prompt, tag: todayPrompt.tag || null, answered });
+          // "Answered" = responded to THIS week's prompt (any day this week), not just today.
+          let answered = false;
+          if (todayPrompt.id && !String(todayPrompt.id).startsWith("tt_")) {
+            const mine = await db.get("qod_responses", `prompt_id=eq.${todayPrompt.id}&student_id=eq.${user.id}&limit=1&select=id`).catch(() => []);
+            answered = mine.length > 0;
+          }
+          if (!answered) { try { answered = !!localStorage.getItem(`wayve_qod_response_id_${user.id}_${todayPrompt.id}`); } catch(e) {} }
+          if (!cancelled) setTodayQod({ prompt: todayPrompt.prompt, tag: todayPrompt.tag || null, answered });
         }
         if (!cancelled) {
           setAllNotes(noteRows || []);
