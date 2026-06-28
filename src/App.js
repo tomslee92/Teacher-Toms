@@ -21631,16 +21631,18 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     // ── 오늘 수업 정리 (same-evening class recap) — priority on class days ──
     (classRecap && classRecap.length > 0) && (() => {
       const T = WAYVE_TOKENS;
-      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px", marginBottom: "12px", boxShadow: T.shadowCard } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" } }, "오늘 수업 정리"),
-        React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T.ink, marginBottom: "12px", wordBreak: "keep-all" } }, "오늘 수업에서 다룬 표현이에요"),
-        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" } },
-          classRecap.slice(0, 8).map((p, i) => React.createElement("div", { key: i, style: { paddingBottom: "8px", borderBottom: i < Math.min(classRecap.length, 8) - 1 ? `1px solid ${T.hairline}` : "none" } },
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, wordBreak: "keep-all" } }, p.english),
-            p.korean && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "2px", wordBreak: "keep-all" } }, p.korean)
-          ))
-        ),
-        React.createElement("button", { onClick: () => reviewRecap(classRecap), style: { background: T.wave, border: "none", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "10px 18px", borderRadius: T.rPill } }, "지금 복습하기 →")
+      return React.createElement("div", { style: { marginBottom: "12px" } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: T.wave, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" } }, "오늘 수업 정리"),
+        React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px", boxShadow: T.shadowCard } },
+          React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T.ink, marginBottom: "12px", wordBreak: "keep-all" } }, "오늘 수업에서 다룬 표현이에요"),
+          React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" } },
+            classRecap.slice(0, 8).map((p, i) => React.createElement("div", { key: i, style: { paddingBottom: "8px", borderBottom: i < Math.min(classRecap.length, 8) - 1 ? `1px solid ${T.hairline}` : "none" } },
+              React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: T.ink, wordBreak: "keep-all" } }, p.english),
+              p.korean && React.createElement("div", { style: { fontSize: "14px", color: T.ink2, marginTop: "2px", wordBreak: "keep-all" } }, p.korean)
+            ))
+          ),
+          React.createElement("button", { onClick: () => reviewRecap(classRecap), style: { background: T.wave, border: "none", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "10px 18px", borderRadius: T.rPill } }, "지금 복습하기 →")
+        )
       );
     })(),
 
@@ -21654,16 +21656,18 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       // dedicated banner below (the "event arrived" moment), so it isn't buried in this list.
       if (!rows.length) return null;
       const allDone = rows.every(r => r.done);
-      return React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px 6px", marginBottom: "16px", boxShadow: T.shadowCard } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: allDone ? T.green : T.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, allDone ? "오늘 연습 완료 ✓" : "오늘의 연습"),
-        rows.map((r, i) => React.createElement("button", { key: r.key, onClick: r.onClick, style: { display: "flex", alignItems: "center", gap: "12px", width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid ${T.hairline}` : "none", padding: "12px 0", cursor: "pointer", fontFamily: FONT } },
-          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-            React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "3px" } }, r.label),
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.qod ? `"${r.text}"` : `"${r.phrase.english}"`),
-            (!r.qod && r.phrase.korean) && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.phrase.korean)
-          ),
-          React.createElement("div", { style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: r.done ? T.greenSoft : "transparent", border: r.done ? "none" : `1px solid ${T.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", color: r.done ? T.green : T.ink3, fontSize: "12px", fontWeight: "800" } }, r.done ? "✓" : (r.qod ? "→" : "▶"))
-        ))
+      return React.createElement("div", { style: { marginBottom: "16px" } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: allDone ? T.green : T.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" } }, allDone ? "오늘 연습 완료 ✓" : "오늘의 연습"),
+        React.createElement("div", { style: { background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "6px 18px", boxShadow: T.shadowCard } },
+          rows.map((r, i) => React.createElement("button", { key: r.key, onClick: r.onClick, style: { display: "flex", alignItems: "center", gap: "12px", width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: i > 0 ? `1px solid ${T.hairline}` : "none", padding: "12px 0", cursor: "pointer", fontFamily: FONT } },
+            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: T.ink3, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "3px" } }, r.label),
+              React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.qod ? `"${r.text}"` : `"${r.phrase.english}"`),
+              (!r.qod && r.phrase.korean) && React.createElement("div", { style: { fontSize: "14px", color: T.ink2, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, r.phrase.korean)
+            ),
+            React.createElement("div", { style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", background: r.done ? T.greenSoft : "transparent", border: r.done ? "none" : `1px solid ${T.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", color: r.done ? T.green : T.ink3, fontSize: "12px", fontWeight: "800" } }, r.done ? "✓" : (r.qod ? "→" : "▶"))
+          ))
+        )
       );
     })(),
 
@@ -21774,7 +21778,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         style: { display: "block", margin: "-4px 0 16px auto", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }
       }, `🗂 보관함 (${allNotes.length})`),
 
-      // ── Stats card ─────────────────────────────────────────────────────────
+      // ── Stats card (label outside, per the home card rule) ───────────────────
+      React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" } }, "나의 진행"),
       React.createElement("div", {
         style: {
           background: WAYVE_TOKENS.card,
@@ -21785,7 +21790,6 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           boxShadow: WAYVE_TOKENS.shadowCard,
         }
       },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "14px" } }, "나의 진행"),
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: "12px" } },
           React.createElement("div", { style: { flex: 1, textAlign: "center" } },
             React.createElement("div", { style: { fontSize: "26px", marginBottom: "4px", lineHeight: 1 } }, "🔥"),
