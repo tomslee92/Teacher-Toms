@@ -6260,10 +6260,10 @@ Return ONLY this JSON array, no markdown:
   };
 
   const toolCardStyle = (tool) => ({
-    borderRadius: "16px",
-    border: `1px solid ${openTool === tool ? C.navy : C.border}`,
-    background: C.bg,
-    boxShadow: openTool === tool ? "0 4px 16px rgba(26,58,110,0.10)" : "0 2px 8px rgba(0,0,0,0.06)",
+    borderRadius: newUI ? WAYVE_TOKENS.rCard : "16px",
+    border: `1px solid ${openTool === tool ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`,
+    background: newUI ? WAYVE_TOKENS.card : C.bg,
+    boxShadow: newUI ? WAYVE_TOKENS.shadowCard : (openTool === tool ? "0 4px 16px rgba(26,58,110,0.10)" : "0 2px 8px rgba(0,0,0,0.06)"),
     transition: "all 0.15s",
     overflow: "visible",
     marginBottom: "10px",
@@ -6293,14 +6293,14 @@ Return ONLY this JSON array, no markdown:
               <div style={{ fontSize: "20px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", lineHeight: 1.3, marginBottom: "6px" }}>{lang === "zh" ? "用英语说说看" : "영어로 말해보세요"}</div>
               <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>{lang === "zh" ? "说什么都可以 — 说完马上获得语法反馈" : "자유롭게 말해보세요 — AI가 바로 문법을 체크해드려요"}</div>
             </div>
-            {React.createElement(RecordButton, { isRec: false, time: 0, onStart: () => { setFeedback(null); setTranscript(""); setRecordingUrl(null); setFlagged(false); rec.start(); }, onStop: rec.stop, idleLabel: lang === "zh" ? "开始说话" : "영어로 말해보기", size: "lg", darkBg: true })}
+            {React.createElement(RecordButton, { isRec: false, time: 0, onStart: () => { setFeedback(null); setTranscript(""); setRecordingUrl(null); setFlagged(false); rec.start(); }, onStop: rec.stop, idleLabel: lang === "zh" ? "开始说话" : "영어로 말해보기", size: "lg", darkBg: true, accent: newUI ? WAYVE_TOKENS.wave : null })}
             {React.createElement(RotatingPrompt)}
           </div>
         )}
 
         {/* Recording state */}
         {rec.isRec && (
-          React.createElement(RecordButton, { isRec: true, time: rec.time, onStart: rec.start, onStop: rec.stop, size: "lg", darkBg: true })
+          React.createElement(RecordButton, { isRec: true, time: rec.time, onStart: rec.start, onStop: rec.stop, size: "lg", darkBg: true, accent: newUI ? WAYVE_TOKENS.wave : null })
         )}
 
         {/* Loading */}
@@ -6343,7 +6343,7 @@ Return ONLY this JSON array, no markdown:
           {feedback.score && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", paddingBottom: "14px", borderBottom: `1px solid ${C.border}` }}>
               <div>
-                <div style={{ fontSize: "13px", fontWeight: "700", letterSpacing: "0.5px", textTransform: "uppercase", color: C.navy, marginBottom: "4px" }}>{lang === "zh" ? "语法分数" : "문법 점수"}</div>
+                <div style={{ fontSize: "13px", fontWeight: "700", letterSpacing: "0.5px", textTransform: "uppercase", color: newUI ? WAYVE_TOKENS.wave : C.navy, marginBottom: "4px" }}>{lang === "zh" ? "语法分数" : "문법 점수"}</div>
                 <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>{typeof feedback.scoreLabel === "string" ? feedback.scoreLabel : ""}</div>
               </div>
               <div style={{ textAlign: "center" }}>
@@ -6525,7 +6525,7 @@ Return ONLY this JSON array, no markdown:
             </div>
 
             <button onClick={handleHowToSay} disabled={loadingHowTo || !koreanText.trim()}
-              style={{ width: "100%", padding: "11px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: loadingHowTo || !koreanText.trim() ? "default" : "pointer", fontFamily: FONT, opacity: loadingHowTo || !koreanText.trim() ? 0.5 : 1, letterSpacing: "0.2px" }}>
+              style={{ width: "100%", padding: "11px", borderRadius: "100px", border: "none", background: newUI ? WAYVE_TOKENS.wave : C.navy, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: loadingHowTo || !koreanText.trim() ? "default" : "pointer", fontFamily: FONT, opacity: loadingHowTo || !koreanText.trim() ? 0.5 : 1, letterSpacing: "0.2px" }}>
               {loadingHowTo ? (lang === "zh" ? "翻译中…" : "번역 중…") : (lang === "zh" ? "转换成英语 ->" : "영어로 변환하기 ->")}
             </button>
             {howToError && <div style={{ color: C.error, fontSize: "13px", marginTop: "8px", textAlign: "center" }}>{howToError}</div>}
@@ -6696,7 +6696,7 @@ Return ONLY this JSON array, no markdown:
                       {/* 🙋🏻 Request for next class */}
                       <button onClick={() => handlePinExpr(expr)}
                         title={pinnedExprIds.has(expr.expression) ? "다음 수업 요청됨" : "다음 수업에서 선생님과 함께 연습해요"}
-                        style={{ background: pinnedExprIds.has(expr.expression) ? "#EEF2FF" : "transparent", border: `1px solid ${pinnedExprIds.has(expr.expression) ? C.navy : C.border}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", color: pinnedExprIds.has(expr.expression) ? C.navy : C.textLight, fontWeight: pinnedExprIds.has(expr.expression) ? "700" : "500", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s", whiteSpace: "nowrap" }}>
+                        style={{ background: pinnedExprIds.has(expr.expression) ? (newUI ? WAYVE_TOKENS.waveSoft : "#EEF2FF") : "transparent", border: `1px solid ${pinnedExprIds.has(expr.expression) ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", color: pinnedExprIds.has(expr.expression) ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.ink3 : C.textLight), fontWeight: pinnedExprIds.has(expr.expression) ? "700" : "500", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s", whiteSpace: "nowrap" }}>
                         {pinnedExprIds.has(expr.expression) ? "✅ 요청됨" : "🙋🏻 수업 요청"}
                       </button>
                       <button onClick={async () => { if (isSaved) return; try { await db.insert("student_phrases", { student_id: user.id, english: expr.expression, korean: expr.korean || expr.explanation || "", context: expr.example || "", hidden: false }); setSavedIds(prev => new Set([...prev, expr.expression])); haptic.success(); onPhraseSaved && onPhraseSaved(); } catch(e) {} }}
@@ -13682,6 +13682,7 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
 
 // ── HistoryResponseCard — compact card for past days with reactions ────────────
 function HistoryResponseCard({ r, user }) {
+  const newUI = isNewUI(user);
   const [reactions, setReactions] = useState({ counts: {}, mine: new Set() });
 
   useEffect(() => {
@@ -13729,10 +13730,10 @@ function HistoryResponseCard({ r, user }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       {/* Name row */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: isMe ? C.navy : C.bgMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "700", color: isMe ? "#fff" : C.textMid, flexShrink: 0 }}>
+        <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: isMe ? (newUI ? WAYVE_TOKENS.wave : C.navy) : C.bgMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "700", color: isMe ? "#fff" : C.textMid, flexShrink: 0 }}>
           {(r.nickname || "?")[0].toUpperCase()}
         </div>
-        <div style={{ fontSize: "12px", fontWeight: "600", color: isMe ? C.navy : C.text }}>
+        <div style={{ fontSize: "12px", fontWeight: "600", color: isMe ? (newUI ? WAYVE_TOKENS.wave : C.navy) : C.text }}>
           {r.nickname || "Student"}{isMe ? " (나)" : ""}
         </div>
       </div>
@@ -13751,7 +13752,7 @@ function HistoryResponseCard({ r, user }) {
           if (count === 0 && isMe) return null;
           return (
             <button key={emoji} onClick={() => handleReact(emoji)} className="reaction-btn"
-              style={{ background: isMine ? C.bgDark : C.bgSoft, color: isMine ? "#fff" : C.text, border: `1px solid ${isMine ? C.text : C.border}`, borderRadius: "100px", padding: "3px 8px", fontSize: "12px", cursor: isMe ? "default" : "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "3px", fontWeight: isMine ? "700" : "400", opacity: isMe ? 0.6 : 1 }}>
+              style={{ background: isMine ? (newUI ? WAYVE_TOKENS.wave : C.bgDark) : (newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft), color: isMine ? "#fff" : (newUI ? WAYVE_TOKENS.ink : C.text), border: `1px solid ${isMine ? (newUI ? WAYVE_TOKENS.wave : C.text) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`, borderRadius: "100px", padding: "3px 8px", fontSize: "12px", cursor: isMe ? "default" : "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "3px", fontWeight: isMine ? "700" : "400", opacity: isMe ? 0.6 : 1 }}>
               {emoji}{count > 0 && <span style={{ fontSize: "10px" }}>{count}</span>}
             </button>
           );
@@ -13798,13 +13799,13 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onComm
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: isMe ? C.text : C.bgSoft, color: isMe ? "#fff" : C.textMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", border: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: isMe ? (newUI ? WAYVE_TOKENS.wave : C.text) : (newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft), color: isMe ? "#fff" : (newUI ? WAYVE_TOKENS.ink2 : C.textMid), display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, flexShrink: 0 }}>
             {(response.nickname || "?")[0].toUpperCase()}
           </div>
           <div>
             <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, display: "flex", alignItems: "center", gap: "6px" }}>
               {response.nickname || "Anonymous"}
-              {isMe && <span style={{ fontSize: "10px", background: C.text, color: "#fff", padding: "1px 7px", borderRadius: "100px", fontWeight: "600" }}>Me</span>}
+              {isMe && <span style={{ fontSize: "10px", background: newUI ? WAYVE_TOKENS.wave : C.text, color: "#fff", padding: "1px 7px", borderRadius: "100px", fontWeight: "600" }}>Me</span>}
             </div>
             <div style={{ fontSize: "11px", color: C.textLight }}>{timeAgo(response.created_at)}</div>
           </div>
@@ -13831,7 +13832,7 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onComm
             if (count === 0 && isMe) return null;
             return (
               <button key={emoji} onClick={() => onReact(emoji)} className="reaction-btn"
-                style={{ background: isMine ? C.bgDark : C.bgSoft, color: isMine ? "#fff" : C.text, border: `1px solid ${isMine ? C.text : C.border}`, borderRadius: "100px", padding: "4px 10px", fontSize: "13px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px", fontWeight: isMine ? "700" : "400" }}>
+                style={{ background: isMine ? (newUI ? WAYVE_TOKENS.wave : C.bgDark) : (newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft), color: isMine ? "#fff" : (newUI ? WAYVE_TOKENS.ink : C.text), border: `1px solid ${isMine ? (newUI ? WAYVE_TOKENS.wave : C.text) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`, borderRadius: "100px", padding: "4px 10px", fontSize: "13px", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px", fontWeight: isMine ? "700" : "400" }}>
                 {emoji}{count > 0 && <span style={{ fontSize: "11px" }}>{count}</span>}
               </button>
             );
