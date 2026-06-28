@@ -18957,7 +18957,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
                 )
               )
             : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-                React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: shadowMode && wavyState === "listening" ? T.green : scShadowPraise ? T.wave : T.ink3, minHeight: "16px" } }, shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "따라 들어보세요"),
+                React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: shadowMode && wavyState === "listening" ? T.wave : scShadowPraise ? T.wave : T.ink3, minHeight: "16px" } }, shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "따라 들어보세요"),
                 !shadowMode && !scenarioVideoUrl && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
                   React.createElement("button", { onClick: togglePause, style: { background: paused ? T.waveSoft : T.bgGrouped, border: `1px solid ${T.hairline}`, color: paused ? T.wave : T.ink, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 16px", borderRadius: T.rPill } }, paused ? "▶ 계속하기" : "⏸ 잠깐 멈춤"),
                   React.createElement("div", { style: { display: "flex", borderRadius: T.rPill, overflow: "hidden", border: `1px solid ${T.hairline}` } },
@@ -19080,7 +19080,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           alignItems: "center",
           gap: "10px",
           boxShadow: `0 0 ${20 + micLevel * 30}px rgba(62,123,250,${0.3 + micLevel * 0.3})`,
-          animation: "wavyListenPulse 1.4s ease-in-out infinite",
+          animation: "wavyListenPulse 3.6s ease-in-out infinite",
           transition: "box-shadow 0.15s, background 0.15s",
         }
       },
@@ -19091,7 +19091,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
             position: "absolute", inset: 0,
             borderRadius: "50%",
             border: "2px solid rgba(62,123,250,0.6)",
-            animation: "wavyListenRing 1.4s ease-out infinite",
+            animation: "wavyListenRing 3.6s ease-out infinite",
           }}),
           // Inner solid mic circle
           React.createElement("div", { style: {
