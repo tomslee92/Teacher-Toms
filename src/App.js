@@ -5067,7 +5067,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       {React.createElement(TourTabTooltip, { tabKey: "practice" })}
 
       {/* Practice header + random */}
-      <div style={{ background: "#1E1E1E", borderRadius: "20px", padding: "22px 24px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: newUI ? `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)` : "#1E1E1E", borderRadius: newUI ? WAYVE_TOKENS.rCard : "20px", padding: "22px 24px", marginBottom: "16px", boxShadow: newUI ? WAYVE_TOKENS.shadowHero : "none", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
           <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
@@ -5306,11 +5306,11 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           {showNewBadge && (
-            <span style={{ background: C.text, color: "#fff", fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "100px", letterSpacing: "0.5px" }}>NEW</span>
+            <span style={{ background: newUI ? WAYVE_TOKENS.wave : C.text, color: "#fff", fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "100px", letterSpacing: "0.5px" }}>NEW</span>
           )}
-          <div style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" }}>{title}</div>
-          <div style={{ fontSize: "11px", color: C.textLight }}>{titleKo}</div>
-          <span style={{ fontSize: "11px", fontWeight: "700", color: allDone ? C.success : C.textMid, background: allDone ? C.successBg : C.bgSoft, borderRadius: "100px", padding: "3px 10px", border: `1px solid ${allDone ? C.successBorder : C.border}` }}>
+          <div style={{ fontSize: newUI ? "20px" : "15px", fontWeight: "800", color: newUI ? WAYVE_TOKENS.ink : C.text, letterSpacing: "-0.3px" }}>{title}</div>
+          <div style={{ fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight }}>{titleKo}</div>
+          <span style={{ fontSize: "11px", fontWeight: "700", color: allDone ? (newUI ? WAYVE_TOKENS.green : C.success) : (newUI ? WAYVE_TOKENS.ink2 : C.textMid), background: allDone ? (newUI ? WAYVE_TOKENS.greenSoft : C.successBg) : (newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft), borderRadius: "100px", padding: "3px 10px", border: `1px solid ${allDone ? (newUI ? WAYVE_TOKENS.greenSoft : C.successBorder) : (newUI ? WAYVE_TOKENS.hairline : C.border)}` }}>
             {passed}/{total}{allDone ? " ✓" : ""}
           </span>
         </div>
