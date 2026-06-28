@@ -4486,14 +4486,14 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       )}
 
       {/* Frosted-glass header — flex child, always visible above the scroll area.
-          New UI: tint the frosted glass to the grouped grey (not white) so there's no
-          hard white/grey seam against the grey page below. */}
+          New UI: the scrollport top fades white→grey (see body background below), so the
+          frosted header reads white and blends into that fade in both states — no hard seam. */}
       <div style={{
         flexShrink: 0,
         zIndex: 10,
         background: studentScrolled
-          ? (isNewUI(user) ? "rgba(231,234,240,0.85)" : "rgba(255,255,255,0.92)")
-          : (isNewUI(user) ? "rgba(231,234,240,0)" : "rgba(255,255,255,0)"),
+          ? (isNewUI(user) ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.92)")
+          : (isNewUI(user) ? "rgba(255,255,255,0)" : "rgba(255,255,255,0)"),
         backdropFilter: studentScrolled ? "blur(20px) saturate(180%)" : "none",
         WebkitBackdropFilter: studentScrolled ? "blur(20px) saturate(180%)" : "none",
         borderBottom: studentScrolled ? `0.5px solid rgba(0,0,0,0.08)` : "0.5px solid transparent",
@@ -4534,7 +4534,10 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
           // New grouped-card UI (Toms rollout): grey grouped page so white cards lift off it.
           // Deeper than the #F2F3F7 token — that near-white read as plain white on device,
           // so the card-on-grey effect was invisible everywhere except the rebuilt cards.
-          background: isNewUI(user) ? "#E7EAF0" : undefined,
+          // Top ~120px fades from the white header (C.bg) into the grey page so there's no
+          // hard white→grey seam under the nav bar. The gradient is anchored to the scrollport
+          // top (background-attachment defaults to scroll), so the fade stays put as content scrolls.
+          background: isNewUI(user) ? `linear-gradient(180deg, ${C.bg} 0px, #E7EAF0 120px)` : undefined,
         }}>
         <div style={{
           maxWidth: "600px", margin: "0 auto",
@@ -5112,6 +5115,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           pinnedIds={pinnedPhraseIds}
           onDismiss={isPreview ? null : (p) => setDismissTarget(p)}
           onMoveToLibrary={isPreview ? null : moveToLibrary}
+          newUI={newUI}
         />
       )}
 
