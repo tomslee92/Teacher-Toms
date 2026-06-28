@@ -21684,8 +21684,9 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
 
       // ── Curated sessions — teacher-built scenarios for Listen Mode ────────
       scenariosVisible && scenarios.length > 0 && React.createElement("div", { style: { marginBottom: "16px" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "10px" } }, "추천 세션"),
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" } }, "추천 세션"),
         (() => {
+          const T = WAYVE_TOKENS;
           // Group scenarios under their category header (uncategorized render with no header).
           const order = [];
           const byCat = new Map();
@@ -21697,12 +21698,12 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           const renderCard = (sc) => React.createElement("button", {
             key: sc.id,
             onClick: () => onStartScenario && onStartScenario(sc),
-            style: { textAlign: "left", width: "100%", background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", border: "none", borderRadius: "18px", padding: "16px 18px", cursor: "pointer", fontFamily: FONT, boxShadow: "0 6px 18px rgba(49,46,129,0.25)", display: "flex", alignItems: "center", gap: "12px" } },
+            style: { textAlign: "left", width: "100%", background: T.card, border: `1px solid ${T.hairline}`, borderRadius: T.rCard, padding: "16px 18px", cursor: "pointer", fontFamily: FONT, boxShadow: T.shadowCard, display: "flex", alignItems: "center", gap: "12px" } },
             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-              React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: "#fff", marginBottom: sc.context_description ? "3px" : 0 } }, sc.title),
-              sc.context_description && React.createElement("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, sc.context_description)
+              React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: T.ink, marginBottom: sc.context_description ? "3px" : 0 } }, sc.title),
+              sc.context_description && React.createElement("div", { style: { fontSize: "12px", color: T.ink2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, sc.context_description)
             ),
-            React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: "#c7d2fe", flexShrink: 0 } }, "듣기 →")
+            React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: T.wave, flexShrink: 0 } }, "듣기 →")
           );
           return order.map((cat, gi) => {
             const collapsed = !!cat && !!collapsedCats[cat];
@@ -21710,8 +21711,8 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
               cat && React.createElement("button", {
                 onClick: () => setCollapsedCats(p => ({ ...p, [cat]: !p[cat] })),
                 style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, padding: "2px 0", marginBottom: collapsed ? 0 : "8px" } },
-                React.createElement("span", { style: { fontSize: "14px", fontWeight: "800", color: C.text, letterSpacing: "-0.2px" } }, `${cat} · ${byCat.get(cat).length}`),
-                React.createElement("span", { style: { fontSize: "13px", color: C.textLight, fontWeight: "700" } }, collapsed ? "▸" : "▾")
+                React.createElement("span", { style: { fontSize: "14px", fontWeight: "800", color: T.ink, letterSpacing: "-0.2px" } }, `${cat} · ${byCat.get(cat).length}`),
+                React.createElement("span", { style: { fontSize: "13px", color: T.ink3, fontWeight: "700" } }, collapsed ? "▸" : "▾")
               ),
               (!cat || !collapsed) && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } }, byCat.get(cat).map(renderCard))
             );
