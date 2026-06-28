@@ -19002,7 +19002,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
 
     // Background pulse
     React.createElement("div", { style: { position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" } },
-      React.createElement("div", { style: { position: "absolute", top: "30%", left: "50%", transform: `translate(-50%, -50%) scale(${1 + micLevel * 0.5})`, width: "300px", height: "300px", borderRadius: "50%", background: wavyState === "speaking" ? "radial-gradient(circle, rgba(111,160,255,0.18) 0%, transparent 70%)" : wavyState === "listening" ? `radial-gradient(circle, rgba(34,197,94,${0.25 + micLevel * 0.35}) 0%, transparent 70%)` : "radial-gradient(circle, rgba(62,123,250,0.08) 0%, transparent 70%)", animation: wavyState === "speaking" ? "wavyBgPulse 2s ease-in-out infinite" : "none", transition: "background 0.3s, transform 0.1s" } })
+      React.createElement("div", { style: { position: "absolute", top: "30%", left: "50%", transform: `translate(-50%, -50%) scale(${1 + micLevel * 0.5})`, width: "300px", height: "300px", borderRadius: "50%", background: wavyState === "speaking" ? "radial-gradient(circle, rgba(111,160,255,0.18) 0%, transparent 70%)" : wavyState === "listening" ? `radial-gradient(circle, rgba(62,123,250,${0.25 + micLevel * 0.35}) 0%, transparent 70%)` : "radial-gradient(circle, rgba(62,123,250,0.08) 0%, transparent 70%)", animation: wavyState === "speaking" ? "wavyBgPulse 2s ease-in-out infinite" : "none", transition: "background 0.3s, transform 0.1s" } })
     ),
 
     // Top bar
@@ -19065,21 +19065,21 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     // Status indicator at bottom — voice-first with strong visual signal when listening
     React.createElement("div", { style: { padding: "20px 20px 36px", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", position: "relative", zIndex: 2 } },
 
-      // LISTENING STATE: large, unmissable green indicator
+      // LISTENING STATE: large, unmissable wave-blue indicator (matches the app's mic accent)
       wavyState === "listening" && React.createElement("div", {
         style: {
           width: "100%",
           maxWidth: "360px",
           padding: "18px 20px",
           marginBottom: "8px",
-          background: `linear-gradient(180deg, rgba(34,197,94,${0.18 + micLevel * 0.12}) 0%, rgba(34,197,94,${0.08 + micLevel * 0.08}) 100%)`,
-          border: "2px solid rgba(34,197,94,0.5)",
+          background: `linear-gradient(180deg, rgba(62,123,250,${0.18 + micLevel * 0.12}) 0%, rgba(62,123,250,${0.08 + micLevel * 0.08}) 100%)`,
+          border: "2px solid rgba(62,123,250,0.5)",
           borderRadius: "20px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: "10px",
-          boxShadow: `0 0 ${20 + micLevel * 30}px rgba(34,197,94,${0.3 + micLevel * 0.3})`,
+          boxShadow: `0 0 ${20 + micLevel * 30}px rgba(62,123,250,${0.3 + micLevel * 0.3})`,
           animation: "wavyListenPulse 1.4s ease-in-out infinite",
           transition: "box-shadow 0.15s, background 0.15s",
         }
@@ -19090,17 +19090,17 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           React.createElement("div", { style: {
             position: "absolute", inset: 0,
             borderRadius: "50%",
-            border: "2px solid rgba(34,197,94,0.6)",
+            border: "2px solid rgba(62,123,250,0.6)",
             animation: "wavyListenRing 1.4s ease-out infinite",
           }}),
           // Inner solid mic circle
           React.createElement("div", { style: {
             width: "44px", height: "44px",
             borderRadius: "50%",
-            background: "rgba(34,197,94,0.95)",
+            background: "rgba(62,123,250,0.95)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "22px",
-            boxShadow: "0 4px 12px rgba(34,197,94,0.5)",
+            boxShadow: "0 4px 12px rgba(62,123,250,0.5)",
           }}, "🎙️")
         ),
         // Live amplitude bars
@@ -19108,10 +19108,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
           [0, 1, 2, 3, 4, 5, 6].map(i => React.createElement("div", { key: i, style: {
             width: "5px",
             height: `${8 + micLevel * 24 + (Math.sin(Date.now() / 180 + i * 0.7) * 8)}px`,
-            background: "#22c55e",
+            background: "#3E7BFA",
             borderRadius: "100px",
             transition: "height 0.08s ease",
-            boxShadow: "0 0 4px rgba(34,197,94,0.6)",
+            boxShadow: "0 0 4px rgba(62,123,250,0.6)",
           }}))
         ),
         // Big clear text
