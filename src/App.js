@@ -233,7 +233,7 @@ const TRANSLATIONS = {
   nav_practice:       { ko: "Practice",           zh: "练习" },
   nav_community:      { ko: "Community",          zh: "Community" },
   nav_freetalk:       { ko: "Solo Practice",      zh: "自由练习" },
-  nav_myphrases:      { ko: "Practice List",      zh: "练习列表" },
+  nav_myphrases:      { ko: "My List",            zh: "我的列表" },
 
   // Home screen
   home_greeting:      { ko: "안녕하세요!",          zh: "你好！" },
@@ -4108,8 +4108,8 @@ const TOUR_STEPS = [
   // Step 7: My Practice List card spotlight
   {
     location: "home", cardKey: "myphrases",
-    titleKo: "⭐ My Practice List",
-    titleZh: "⭐ My Practice List",
+    titleKo: "⭐ My List",
+    titleZh: "⭐ My List",
     bodyKo: "Solo Practice에서 저장한 표현들이 여기 모여요. 탭해보세요!",
     bodyZh: "你在Solo Practice中保存的表达都在这里。点击看看！",
     ctaKo: "탭해서 열어보세요 →", ctaZh: "点击打开 →",
@@ -4663,7 +4663,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
               randomModal.phrase.korean && React.createElement("div", { style: { fontSize: "14px", color: C.textMid, marginBottom: "6px" } }, applyPhraseTokens(lang === "zh" && randomModal.phrase.chinese ? randomModal.phrase.chinese : randomModal.phrase.korean)),
               randomModal.phrase.context && React.createElement("div", { style: { background: C.goldBg, borderLeft: `3px solid ${C.gold}`, padding: "8px 12px", marginBottom: "12px", fontSize: "13px", color: C.textMid } }, lang === "zh" ? (randomModal.phrase.context_zh || randomModal.phrase.context) : randomModal.phrase.context),
               React.createElement(ErrorBoundary, null,
-                React.createElement(PhraseCard, { key: randomModalKey, phrase: randomModal.phrase, user, prog: randomModal.prog, isPreview, onUpdate: randomModal.onUpdate, onPracticed: updateStreak, hideContext: true })
+                React.createElement(PhraseCard, { key: randomModalKey, phrase: randomModal.phrase, user, prog: randomModal.prog, isPreview, onUpdate: randomModal.onUpdate, onPracticed: updateStreak, hideContext: true, newUI: isNewUI(user) })
               )
             ),
             // Footer close button — always visible at bottom
@@ -6597,7 +6597,7 @@ Return ONLY this JSON array, no markdown:
                       <div style={{ fontSize: "12px", color: C.textLight, lineHeight: 1.7, textAlign: "left", background: C.bg, borderRadius: "10px", padding: "10px 14px" }}>
                         그동안 이런 기능은 계속 쓸 수 있어요:<br/>
                         🎯 <strong>Practice</strong> — 문장 듣기 & 복습<br/>
-                        ⭐ <strong>Practice List</strong> — 저장된 표현 보기<br/>
+                        ⭐ <strong>My List</strong> — 저장된 표현 보기<br/>
                         🙏 <strong>Thankful Thursday</strong> — 매주 목요일 감사한 일 나누기
                       </div>
                     </>
@@ -14493,6 +14493,7 @@ function SkipPhraseStep({ user, group, lang, onBack, onDone }) {
       onPracticed: () => {},
       onClose: onDone,
       onGraduate: null,
+      newUI: isNewUI(user),
     })
   );
 }
@@ -19695,10 +19696,10 @@ const ONBOARDING_SLIDES = [
   },
   {
     emoji: "⭐",
-    titleKo: "My Practice List — 나만의 문장 모음",
-    titleZh: "My Practice List — 我的句子收藏",
-    bodyKo: "「🎙 Solo Practice」에서 저장한 문장들이 「⭐ My Practice List」에 모여요. 언제든지 꺼내서 연습할 수 있어요. 다음 수업에서 배우고 싶은 문장은 🙋🏻 버튼으로 선생님에게 요청할 수도 있어요!",
-    bodyZh: "你在「🎙 Solo Practice」中保存的句子都在「⭐ My Practice List」里。随时可以拿出来练习。想在下节课学习的句子，还可以用🙋🏻按钮向老师申请！",
+    titleKo: "My List — 나만의 문장 모음",
+    titleZh: "My List — 我的句子收藏",
+    bodyKo: "「🎙 Solo Practice」에서 저장한 문장들이 「⭐ My List」에 모여요. 언제든지 꺼내서 연습할 수 있어요. 다음 수업에서 배우고 싶은 문장은 🙋🏻 버튼으로 선생님에게 요청할 수도 있어요!",
+    bodyZh: "你在「🎙 Solo Practice」中保存的句子都在「⭐ My List」里。随时可以拿出来练习。想在下节课学习的句子，还可以用🙋🏻按钮向老师申请！",
   },
   {
     emoji: "📅",
@@ -20035,7 +20036,7 @@ function HomeGrid({ user, group, isPreview, onNavigate, streak, submittedToday, 
         {/* 4. My Practice List — neutral, no redundant label */}
         <button ref={tourCardRefs?.myphrases} onClick={() => onNavigate("myphrases")} className="primary-card" style={neutralCard(0.12)}>
           <div>
-            <div style={{ fontSize: "21px", fontWeight: "900", color: "#111", letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My Practice List</div>
+            <div style={{ fontSize: "21px", fontWeight: "900", color: "#111", letterSpacing: "-0.4px", marginBottom: "5px" }}>⭐ My List</div>
             <div style={{ fontSize: "12px", color: "#777" }}>{stats.myPhrases > 0 ? `${stats.myPhrases}${T("myphrases_count", lang)}` : T("myphrases_sub", lang)}</div>
           </div>
           <div style={{ fontSize: "22px", opacity: 0.2, color: "#111" }}>-></div>
