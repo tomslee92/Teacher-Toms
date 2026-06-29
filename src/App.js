@@ -19496,6 +19496,7 @@ function HelpModal({ lang, onClose, user }) {
 
 function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false }) {
   const lang = useLang();
+  const newUI = isNewUI(user);
   const [hometown, setHometown] = useState(user?.hometown || "");
   const [job, setJob] = useState(user?.job || "");
   const [userLang, setUserLang] = useState(user?.language || "ko");
@@ -19538,8 +19539,8 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
     setSaving(false);
   };
 
-  const inputStyle = { width: "100%", padding: "11px 14px", border: `1px solid ${C.border}`, borderRadius: "10px", fontSize: "14px", fontFamily: FONT, outline: "none", background: C.bg, color: C.text };
-  const labelStyle = { fontSize: "12px", fontWeight: "700", color: C.textMid, display: "block", marginBottom: "5px" };
+  const inputStyle = { width: "100%", padding: "11px 14px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: newUI ? "12px" : "10px", fontSize: "14px", fontFamily: FONT, outline: "none", background: newUI ? WAYVE_TOKENS.card : C.bg, color: newUI ? WAYVE_TOKENS.ink : C.text };
+  const labelStyle = { fontSize: "12px", fontWeight: "700", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, display: "block", marginBottom: "5px" };
 
   return React.createElement("div", {
     style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center" }
@@ -19590,27 +19591,27 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
       style: { background: C.bg, borderRadius: "24px 24px 0 0", padding: "28px 24px 40px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflowY: "auto" },
       onClick: e => e.stopPropagation()
     },
-      React.createElement("div", { style: { width: "36px", height: "4px", background: C.border, borderRadius: "100px", margin: "0 auto 20px" } }),
+      React.createElement("div", { style: { width: "36px", height: "4px", background: newUI ? WAYVE_TOKENS.hairline : C.border, borderRadius: "100px", margin: "0 auto 20px" } }),
       // Avatar + name header
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px" } },
         React.createElement("div", { style: { position: "relative", cursor: "pointer", flexShrink: 0 }, onClick: () => setShowAvatarPicker(true) },
           React.createElement(StudentAvatar, { student: localUser, size: 56 }),
-          React.createElement("div", { style: { position: "absolute", bottom: 0, right: 0, width: "20px", height: "20px", borderRadius: "50%", background: C.navy, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#fff" } }, "✏️")
+          React.createElement("div", { style: { position: "absolute", bottom: 0, right: 0, width: "20px", height: "20px", borderRadius: "50%", background: newUI ? WAYVE_TOKENS.wave : C.navy, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#fff" } }, "✏️")
         ),
         React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: "20px", fontWeight: "900", color: C.text } }, T("profile_title", lang)),
-          React.createElement("button", { onClick: () => setShowAvatarPicker(true), style: { background: "none", border: "none", color: C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: 0, marginTop: "2px" } },
+          React.createElement("div", { style: { fontSize: "20px", fontWeight: "900", color: newUI ? WAYVE_TOKENS.ink : C.text } }, T("profile_title", lang)),
+          React.createElement("button", { onClick: () => setShowAvatarPicker(true), style: { background: "none", border: "none", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: 0, marginTop: "2px" } },
             lang === "zh" ? "更换头像 →" : "Change Profile photo →"
           )
         )
       ),
-      React.createElement("button", { onClick: () => setShowHelp(true), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bgSoft, color: C.textMid, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, marginBottom: "20px" } },
+      React.createElement("button", { onClick: () => setShowHelp(true), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "100%", padding: "10px", borderRadius: "100px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, background: newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft, color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, marginBottom: "20px" } },
         "❓ ", lang === "zh" ? "帮助 & 자주 묻는 질문" : "도움말 & 자주 묻는 질문"
       ),
       React.createElement(StudentTeacherComms, { user: localUser }),
       React.createElement("div", { style: { marginBottom: "16px" } },
         React.createElement("label", { style: labelStyle }, lang === "zh" ? "姓名" : "이름"),
-        React.createElement("div", { style: { ...inputStyle, background: C.bgSoft, color: C.textMid } }, user?.name)
+        React.createElement("div", { style: { ...inputStyle, background: newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft, color: newUI ? WAYVE_TOKENS.ink2 : C.textMid } }, user?.name)
       ),
       React.createElement("div", { style: { marginBottom: "16px" } },
         React.createElement("label", { style: labelStyle }, T("profile_hometown", lang)),
@@ -19621,12 +19622,12 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
         React.createElement("input", { value: job, onChange: e => setJob(e.target.value), onBlur: async e => { const v = e.target.value.trim(); if (!v) return; const isNative = lang === "zh" ? /[\u4E00-\u9FFF]/.test(v) : /[\uAC00-\uD7A3]/.test(v); if (isNative) { try { const t = await groqTranslate(v, "Translate this job/occupation into natural English, 1-3 words."); if (t && t.trim()) setJob(t.trim()); } catch(_) {} } }, placeholder: lang === "zh" ? "예: 护士、教师 (한국어도 가능해요)" : "예: 간호사, 선생님 (영어로 자동 번역돼요)", style: inputStyle })
       ),
       // Language is set by teacher only — not shown to students
-      React.createElement("div", { style: { background: C.bgSoft, borderRadius: "14px", padding: "14px 16px", marginBottom: "20px", border: `1px solid ${C.border}` } },
+      React.createElement("div", { style: { background: newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft, borderRadius: "14px", padding: "14px 16px", marginBottom: "20px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}` } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" } },
           React.createElement("div", { style: { fontSize: "20px" } }, "🔔"),
-          React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.text } }, lang === "zh" ? "Thankful Thursday 알림" : lang === "ko" ? "Thankful Thursday 알림" : "Thankful Thursday Reminder"),
+          React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: newUI ? WAYVE_TOKENS.ink : C.text } }, lang === "zh" ? "Thankful Thursday 알림" : lang === "ko" ? "Thankful Thursday 알림" : "Thankful Thursday Reminder"),
         ),
-        React.createElement("div", { style: { fontSize: "12px", color: C.textMid, lineHeight: 1.6, marginBottom: "12px" } },
+        React.createElement("div", { style: { fontSize: "12px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, lineHeight: 1.6, marginBottom: "12px" } },
           notifState === "granted"
             ? T("notif_desc_on", lang)
             : notifState === "denied"
@@ -19640,15 +19641,15 @@ function ProfileModal({ user, onClose, onSave, showTourNotifSpotlight = false })
             "data-tour-notif-btn": "true",
             onClick: handleEnableNotifications,
             disabled: enablingNotif || notifState === "unsupported",
-            style: { width: "100%", padding: "10px", borderRadius: "100px", border: "none", background: notifState === "unsupported" ? C.bgMid : C.navy, color: notifState === "unsupported" ? C.textLight : "#fff", fontSize: "13px", fontWeight: "700", cursor: enablingNotif || notifState === "unsupported" ? "default" : "pointer", fontFamily: FONT }
+            style: { width: "100%", padding: "10px", borderRadius: "100px", border: "none", background: notifState === "unsupported" ? C.bgMid : (newUI ? WAYVE_TOKENS.wave : C.navy), color: notifState === "unsupported" ? C.textLight : "#fff", fontSize: "13px", fontWeight: "700", cursor: enablingNotif || notifState === "unsupported" ? "default" : "pointer", fontFamily: FONT }
           }, enablingNotif ? (lang === "zh" ? "设置中…" : "설정 중…") : T("notif_btn", lang))
         )
       ),
       React.createElement("button", {
         onClick: handleSave, disabled: saving,
-        style: { width: "100%", padding: "14px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "14px", fontWeight: "800", cursor: saving ? "default" : "pointer", fontFamily: FONT, marginBottom: "10px" }
+        style: { width: "100%", padding: "14px", borderRadius: "100px", border: "none", background: newUI ? WAYVE_TOKENS.wave : C.navy, color: "#fff", fontSize: "14px", fontWeight: "800", cursor: saving ? "default" : "pointer", fontFamily: FONT, marginBottom: "10px" }
       }, saving ? (lang === "zh" ? "保存中…" : "Saving…") : T("profile_save", lang)),
-      React.createElement("button", { onClick: onClose, style: { width: "100%", padding: "12px", borderRadius: "100px", border: "none", background: "transparent", color: C.textLight, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, T("profile_later", lang))
+      React.createElement("button", { onClick: onClose, style: { width: "100%", padding: "12px", borderRadius: "100px", border: "none", background: "transparent", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT } }, T("profile_later", lang))
     ),
     // Avatar picker renders on top of profile modal
     showHelp && React.createElement(HelpModal, { lang, user, onClose: () => setShowHelp(false) }),
