@@ -7075,6 +7075,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
 
 // ── Chat Tab (full screen) ────────────────────────────────────────────────────
 function ChatTab({ user, group, isPreview }) {
+  const newUI = isNewUI(user);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -7110,7 +7111,7 @@ function ChatTab({ user, group, isPreview }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 160px)" }}>
       {/* Header */}
-      <div style={{ background: C.bgDark, borderRadius: "16px", padding: "16px 20px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px" }}>
+      <div style={{ background: newUI ? `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)` : C.bgDark, borderRadius: newUI ? WAYVE_TOKENS.rCard : "16px", padding: "16px 20px", marginBottom: "16px", boxShadow: newUI ? WAYVE_TOKENS.shadowCard : "none", display: "flex", alignItems: "center", gap: "12px" }}>
         <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>👨‍🏫</div>
         <div>
           <div style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>{getTeacherName(group)}</div>
@@ -7125,8 +7126,8 @@ function ChatTab({ user, group, isPreview }) {
         ) : messages.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 20px" }}>
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>💬</div>
-            <div style={{ fontSize: "14px", fontWeight: "600", color: C.text, marginBottom: "4px" }}>Start the conversation</div>
-            <div style={{ fontSize: "12px", color: C.textLight }}>Say hi to your group or ask {getTeacherName(group)} anything</div>
+            <div style={{ fontSize: "14px", fontWeight: "600", color: newUI ? WAYVE_TOKENS.ink : C.text, marginBottom: "4px" }}>Start the conversation</div>
+            <div style={{ fontSize: "12px", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight }}>Say hi to your group or ask {getTeacherName(group)} anything</div>
           </div>
         ) : messages.map((msg, i) => {
           const isMe = msg.sender_id === user.id;
@@ -7134,14 +7135,14 @@ function ChatTab({ user, group, isPreview }) {
           return (
             <div key={msg.id || i} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
               {!isMe && (
-                <div style={{ fontSize: "10px", color: C.textLight, marginBottom: "2px", marginLeft: "4px" }}>
+                <div style={{ fontSize: "10px", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight, marginBottom: "2px", marginLeft: "4px" }}>
                   {isTeacher ? `👨‍🏫 ${getTeacherName(group)}` : msg.sender_name}
                 </div>
               )}
-              <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: isMe ? C.bgDark : isTeacher ? C.goldBg : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacher ? `1px solid ${C.goldBorder}` : "none" }}>
+              <div style={{ maxWidth: "78%", padding: "10px 14px", borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px", background: isMe ? (newUI ? WAYVE_TOKENS.wave : C.bgDark) : isTeacher ? C.goldBg : (newUI ? WAYVE_TOKENS.card : C.bgSoft), color: isMe ? "#fff" : (newUI ? WAYVE_TOKENS.ink : C.text), fontSize: "14px", lineHeight: 1.5, border: isTeacher ? `1px solid ${C.goldBorder}` : (newUI && !isMe ? `1px solid ${WAYVE_TOKENS.hairline}` : "none") }}>
                 {msg.text}
               </div>
-              <div style={{ fontSize: "10px", color: C.textLight, marginTop: "2px", marginLeft: "4px", marginRight: "4px" }}>
+              <div style={{ fontSize: "10px", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight, marginTop: "2px", marginLeft: "4px", marginRight: "4px" }}>
                 {fmt(msg.created_at)}
               </div>
             </div>
@@ -7151,17 +7152,17 @@ function ChatTab({ user, group, isPreview }) {
       </div>
 
       {/* Input */}
-      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", paddingTop: "8px", borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", paddingTop: "8px", borderTop: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}` }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder="메시지 입력…"
           disabled={isPreview}
-          style={{ flex: 1, padding: "11px 16px", border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "14px", fontFamily: FONT, outline: "none", background: C.bgSoft }}
+          style={{ flex: 1, padding: "11px 16px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: "100px", fontSize: "14px", fontFamily: FONT, outline: "none", background: newUI ? WAYVE_TOKENS.card : C.bgSoft }}
         />
         <button onClick={send} disabled={!input.trim() || sending || isPreview}
-          style={{ width: "40px", height: "40px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", fontSize: "16px", cursor: input.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+          style={{ width: "40px", height: "40px", borderRadius: "50%", background: input.trim() ? (newUI ? WAYVE_TOKENS.wave : C.text) : C.bgMid, border: "none", color: "#fff", fontSize: "16px", cursor: input.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
           ↑
         </button>
       </div>
