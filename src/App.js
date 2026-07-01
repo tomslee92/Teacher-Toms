@@ -534,10 +534,10 @@ const localToday = () => {
 // the passive daily appearances (home Daily Focus row, Community tab) to Thursday only.
 // getDay(): 0=Sun … 4=Thu. The opt-in Wavi "full" mode QoD is left untouched.
 const isQodDay = (d = new Date()) => d.getDay() === 4;
-// New grouped-card toolkit UI — rolling out per student. On for the new_ui_enabled flag
-// or always for Toms (safety/testing fallback, mirrors the home_v2/wavy pattern). The
-// column may not exist yet; undefined is falsy so the name fallback still works.
-const isNewUI = (u) => !!(u && (u.new_ui_enabled || TEACHER_NAMES.includes(u.name)));
+// New grouped-card toolkit UI — now rolled out to all students. Kept as a function
+// (rather than inlining `true`) so every call site stays untouched and the rollout can
+// be narrowed again by restoring the per-student/name gate if ever needed.
+const isNewUI = (u) => !!u;
 // Thankful Thursday — the weekly QoD is now a gratitude ritual: every Thursday all
 // students share one thing they're thankful for. The prompt is auto-created so the
 // experience runs without the teacher scheduling one (a teacher-scheduled Thursday
@@ -3033,6 +3033,7 @@ function BalloonsEffect() {
 // ── QoD Celebration — shown after every QOD submission ───────────────────────
 function QodCelebration({ isFirst, responses, user, onDone }) {
   const lang = useLang();
+  const newUI = isNewUI(user);
   const [phase, setPhase] = useState("celebrate");
   const others = (responses || []).filter(r => r.student_id !== user.id).slice(0, 3);
   const hasOthers = others.length > 0;
@@ -3121,7 +3122,7 @@ function QodCelebration({ isFirst, responses, user, onDone }) {
               {/* Footer hint */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center", padding: "8px 0 4px", animation: `communitySlideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${0.26 + others.length * 0.07}s both`, opacity: 0 }}>
                 <div style={{ fontSize: "11px", color: C.textLight }}>{lang === "zh" ? "在" : "전체 답변은"}</div>
-                <div style={{ fontSize: "11px", fontWeight: "700", color: C.navy }}>Thankful Thursday</div>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: newUI ? WAYVE_TOKENS.wave : C.navy }}>Thankful Thursday</div>
                 <div style={{ fontSize: "11px", color: C.textLight }}>{lang === "zh" ? "标签查看全部" : "탭에서 볼 수 있어요"}</div>
               </div>
             </div>
@@ -3871,7 +3872,7 @@ function TourSpotlight({ step, cardRefs, lang, onAdvance, onBack, canGoBack, onS
 // ── TourTabTooltip ────────────────────────────────────────────────────────────
 // Shown inside a tab when the tour step location matches.
 // Renders as a sticky banner at the top of the tab content.
-function TourTabTooltip({ tabKey }) {
+function TourTabTooltip({ tabKey, newUI = false }) {
   const tour = useTour();
   const [phraseRect, setPhraseRect] = React.useState(null);
   const [fingerDone, setFingerDone] = React.useState(false);
@@ -3971,7 +3972,7 @@ function TourTabTooltip({ tabKey }) {
             Array.from({ length: TOUR_STEPS.filter(s => s.location === "home").length + 1 }).map((_, i) => {
               const homeSteps = TOUR_STEPS.map((s, idx) => s.location === "home" ? idx : -1).filter(i => i >= 0);
               const currentDot = homeSteps.indexOf(tour.tourStep);
-              return React.createElement("div", { key: i, style: { width: i === currentDot ? 18 : 5, height: 5, borderRadius: 3, background: i === currentDot ? (useTop ? "#fff" : C.navy) : (useTop ? "rgba(255,255,255,0.35)" : C.border), transition: "all 0.3s ease" } });
+              return React.createElement("div", { key: i, style: { width: i === currentDot ? 18 : 5, height: 5, borderRadius: 3, background: i === currentDot ? (useTop ? "#fff" : (newUI ? WAYVE_TOKENS.wave : C.navy)) : (useTop ? "rgba(255,255,255,0.35)" : C.border), transition: "all 0.3s ease" } });
             })
           )
         );
@@ -3981,7 +3982,7 @@ function TourTabTooltip({ tabKey }) {
             )
           : React.createElement("div", { style: { fontSize: 14, color: useTop ? "rgba(255,255,255,0.85)" : C.textMid, lineHeight: 1.65, marginBottom: 14 } }, body);
         const btns = React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
-          React.createElement("button", { onClick: () => { haptic.medium(); setTooltipVisible(false); setTimeout(() => tour.advanceTour(), 80); }, style: { width: "100%", padding: "13px", borderRadius: 100, border: "none", background: useTop ? "#fff" : C.navy, color: useTop ? C.navy : "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT, animation: "tourCtaPulse 1.8s ease-in-out infinite" } }, cta),
+          React.createElement("button", { onClick: () => { haptic.medium(); setTooltipVisible(false); setTimeout(() => tour.advanceTour(), 80); }, style: { width: "100%", padding: "13px", borderRadius: 100, border: "none", background: useTop ? "#fff" : (newUI ? WAYVE_TOKENS.wave : C.navy), color: useTop ? (newUI ? WAYVE_TOKENS.wave : C.navy) : "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT, animation: "tourCtaPulse 1.8s ease-in-out infinite" } }, cta),
           React.createElement("button", { onClick: () => { haptic.light(); tour.endTour(); }, style: { width: "100%", padding: "8px", border: "none", background: "transparent", color: useTop ? "rgba(255,255,255,0.5)" : "#aaa", fontSize: 13, cursor: "pointer", fontFamily: FONT, textDecoration: "underline", textDecorationColor: useTop ? "rgba(255,255,255,0.3)" : "#e0e0e0" } }, lang === "zh" ? "건너뛰기" : "건너뛰기")
         );
         return useTop
@@ -13921,6 +13922,7 @@ function StudentCommentView({ responseId, userId, onCommentSeen }) {
 // ── QoD Answer Flow ─────────────────────────────────────────────────────────
 function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existingResponse }) {
   const lang = useLang();
+  const newUI = isNewUI(user);
   // path: null | "direct" | "korean_type" | "korean_voice"
   const [path, setPath] = useState("direct");
   // Enter straight at the record step so students can answer immediately in one window.
@@ -14298,7 +14300,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
             {/* Record button */}
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               {!loadingFeedback && (
-                React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: () => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.start(); }, onStop: rec.stop, idleLabel: T("tap_to_record", lang), size: "lg" })
+                React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: () => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.start(); }, onStop: rec.stop, idleLabel: T("tap_to_record", lang), size: "lg", accent: newUI ? WAYVE_TOKENS.wave : null })
               )}
               {loadingFeedback && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", color: C.textMid, fontSize: "14px" }}>
@@ -15141,6 +15143,7 @@ function QodTourOverlay({ lang, onDismiss, onSkip, onStepChange = () => {} }) {
 }
 
 function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = false, onTourOverlayDismiss = () => {}, forceShowHelp = false }) {
+  const newUI = isNewUI(user);
   // Prompt + city group
   const [qodPrompt, setQodPrompt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15502,7 +15505,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
             )}
 
             {recordingState === "idle" && (
-              <button data-tour-qod-answer="true" onClick={startRecording} style={{ width: "100%", padding: "15px", background: C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, animation: showTourOverlay ? "none" : "answerBreathe 2.5s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+              <button data-tour-qod-answer="true" onClick={startRecording} style={{ width: "100%", padding: "15px", background: newUI ? WAYVE_TOKENS.wave : C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, animation: showTourOverlay ? "none" : "answerBreathe 2.5s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="9" y="2" width="6" height="12" rx="3" fill="white" opacity="0.9"/>
                   <path d="M5 11C5 14.866 8.13401 18 12 18C15.866 18 19 14.866 19 11" stroke="white" strokeWidth="2" strokeLinecap="round"/>
@@ -15515,7 +15518,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
 
             {recordingState === "recording" && (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                {React.createElement(RecordButton, { isRec: true, time: recTime, onStart: startRecording, onStop: stopRecording, idleLabel: "Answer Now", size: "lg" })}
+                {React.createElement(RecordButton, { isRec: true, time: recTime, onStart: startRecording, onStop: stopRecording, idleLabel: "Answer Now", size: "lg", accent: newUI ? WAYVE_TOKENS.wave : null })}
                 <div style={{ fontSize: "12px", color: C.textMid, fontWeight: "500", letterSpacing: "0.2px" }}>{lang === "zh" ? "再次点击停止" : "버튼을 다시 누르면 멈춰요"}</div>
               </div>
             )}
@@ -15561,7 +15564,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
                 </div>
 
                 {/* Submit + re-record */}
-                <button onClick={handleSubmit} disabled={posting} style={{ width: "100%", padding: "14px", background: C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "15px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                <button onClick={handleSubmit} disabled={posting} style={{ width: "100%", padding: "14px", background: newUI ? WAYVE_TOKENS.wave : C.text, color: "#fff", border: "none", borderRadius: "100px", fontSize: "15px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
                   {posting
                     ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, lang === "zh" ? "提交中…" : "제출 중…"))
                     : isPrivate
