@@ -21309,6 +21309,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const notesEnabled = !!(SESSION_NOTES_ENABLED && (user?.session_notes_enabled || user?.name === "Toms Lee"));
   const [allNotes, setAllNotes] = useState([]); // all notes for this student, newest first
   const [notesEntered, setNotesEntered] = useState(false); // entrance animation
+  const [noteDismissing, setNoteDismissing] = useState(false); // dismiss-out animation flag
   const [duesStatus, setDuesStatus] = useState(null); // 'upcoming' | 'due' | 'overdue' | null
   const [duesDismissed, setDuesDismissed] = useState(false);
 
@@ -21554,6 +21555,20 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     db.update("session_notes", `id=eq.${latestNote.id}`, { seen_at: now }).catch(() => {});
     setAllNotes(prev => prev.map(x => x.id === latestNote.id ? { ...x, seen_at: now } : x));
   }, [latestNote?.id, latestNote?.seen_at, notesEnabled, isPreview]);
+
+  // Student-initiated dismiss — soft (sets dismissed_at). Hides the card from the
+  // student's home but keeps the note in the teacher's dashboard record. Animate
+  // out first, then commit so the exit reads as intentional.
+  const handleDismissNote = () => {
+    if (!latestNote || noteDismissing) return;
+    setNoteDismissing(true);
+    setTimeout(() => {
+      const now = new Date().toISOString();
+      setAllNotes(prev => prev.map(x => x.id === latestNote.id ? { ...x, dismissed_at: now } : x));
+      setNoteDismissing(false);
+      if (!isPreview) db.update("session_notes", `id=eq.${latestNote.id}`, { dismissed_at: now }).catch(() => {});
+    }, 280);
+  };
 
   return React.createElement("div", { style: { paddingBottom: "20px" } },
     React.createElement("style", null, `
@@ -21827,12 +21842,20 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           marginBottom: "16px",
           overflow: "hidden",
           boxShadow: WAYVE_TOKENS.shadowCard,
-          animation: notesEntered ? "noteRise 460ms cubic-bezier(0.16,1,0.3,1) both" : "none",
+          animation: noteDismissing
+            ? "noteDismiss 280ms cubic-bezier(0.16,1,0.3,1) forwards"
+            : (notesEntered ? "noteRise 460ms cubic-bezier(0.16,1,0.3,1) both" : "none"),
         }
       },
         // Left accent rule — action blue
         React.createElement("div", { style: { position: "absolute", top: 0, left: 0, bottom: 0, width: "3px", background: WAYVE_TOKENS.wave } }),
-        React.createElement("div", { style: { fontSize: "15px", fontWeight: "500", color: WAYVE_TOKENS.ink, lineHeight: 1.65, wordBreak: "keep-all", whiteSpace: "pre-wrap" } },
+        // Dismiss — subtle, top-right. Soft-hides for the student; teacher keeps the record.
+        React.createElement("button", {
+          onClick: handleDismissNote,
+          "aria-label": "메모 닫기", title: "닫기",
+          style: { position: "absolute", top: "10px", right: "10px", width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: WAYVE_TOKENS.ink3, fontSize: "15px", lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, opacity: 0.55 }
+        }, "×"),
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "500", color: WAYVE_TOKENS.ink, lineHeight: 1.65, wordBreak: "keep-all", whiteSpace: "pre-wrap", paddingRight: "18px" } },
           latestNote.text_content || latestNote.structured?.wentWell || ""
         ),
         React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: WAYVE_TOKENS.ink3, textAlign: "right", marginTop: "12px" } },
