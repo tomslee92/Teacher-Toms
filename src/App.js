@@ -9022,10 +9022,12 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
       </div>
 
       {/* Personal session notes — teacher entry + past notes to this student.
-          Text-only, un-shelved under SESSION_NOTES_ENABLED. The richer voice/AI
-          composer (SessionNoteComposer) and the student→teacher feedback list
-          (StudentNotesReceived) stay dormant under NOTES_FEATURES_ENABLED. */}
-      {teacher && SESSION_NOTES_ENABLED && (
+          Text-only, un-shelved under SESSION_NOTES_ENABLED. Rendered whenever the
+          switch is on (StudentDetailView is teacher-only), NOT gated on the `teacher`
+          prop — that prop is null when logging straight into the teacher portal, which
+          was hiding this section (SessionNoteEntry resolves the teacher itself). The
+          richer voice/AI composer + student→teacher feedback stay under NOTES_FEATURES_ENABLED. */}
+      {SESSION_NOTES_ENABLED && (
         <div style={{ marginBottom: "28px" }}>
           <SessionNoteEntry
             student={localStudent}
@@ -20702,10 +20704,13 @@ function SessionNoteEntry({ student, teacher, pastNotes, onChanged, showMsg }) {
     if (!body) return;
     setSaving(true);
     try {
+      // teacher prop is null on a direct teacher-portal login — resolve a real
+      // teacher identity so teacher_id (NOT NULL) is always populated.
+      const t = (teacher && teacher.id) ? teacher : await resolveTeacherAccount();
       await db.insert("session_notes", {
         student_id: student.id,
-        teacher_id: teacher.id,
-        teacher_name: teacher.name,
+        teacher_id: t.id,
+        teacher_name: t.name,
         session_date: new Date().toISOString().slice(0, 10),
         note_type: "text",
         text_content: body,
