@@ -21309,6 +21309,32 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const notesEnabled = !!(SESSION_NOTES_ENABLED && (user?.session_notes_enabled || user?.name === "Toms Lee"));
   const [allNotes, setAllNotes] = useState([]); // all notes for this student, newest first
   const [notesEntered, setNotesEntered] = useState(false); // entrance animation
+  const [duesStatus, setDuesStatus] = useState(null); // 'upcoming' | 'due' | 'overdue' | null
+  const [duesDismissed, setDuesDismissed] = useState(false);
+
+  // ── Dues nudge — ported from V1 HomeGrid. Soft, non-blocking reminder of this
+  //    month's tuition when unpaid; same upcoming/due/overdue thresholds as V1.
+  useEffect(() => {
+    if (isPreview || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const now = new Date();
+        const dayOfMonth = now.getDate();
+        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+        const nextFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const daysUntilNext = Math.ceil((nextFirst - now) / 86400000);
+        const dues = await db.get("student_dues", `student_id=eq.${user.id}&due_date=eq.${firstOfMonth}&limit=1`).catch(() => []);
+        if (cancelled) return;
+        if (!dues[0]?.paid_at) {
+          if (daysUntilNext <= 2)                      setDuesStatus("upcoming"); // ~2 days before the 1st
+          else if (dayOfMonth >= 1 && dayOfMonth <= 7) setDuesStatus("due");      // 1st–7th
+          else if (dayOfMonth > 7)                     setDuesStatus("overdue");  // 8th+
+        }
+      } catch(e) {}
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isPreview]);
   // ── Wavi card expansion transition ──────────────────────────────────────────
   const waviCardRef = useRef(null);
   const [waviExpansion, setWaviExpansion] = useState(null);
@@ -21813,6 +21839,23 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           `— ${latestNote.teacher_name || "Toms"}`
         )
       ),
+
+      // ── Dues nudge — this month's tuition reminder (ported from V1 HomeGrid) ──
+      !isPreview && !duesDismissed && duesStatus && (() => {
+        const config = {
+          upcoming: { bg: "#FFFBEB", border: "#FDE68A", icon: "📅", title: lang === "zh" ? "月费提醒" : "이번 달 수업료 안내", msg: lang === "zh" ? "本月学费将于1日到期，感谢您的支持！" : "이번 달 수업료 납부일이 다가오고 있어요. 감사합니다 😊", color: "#92400E" },
+          due:      { bg: "#FFF7ED", border: "#FDBA74", icon: "💛", title: lang === "zh" ? "本月学费" : "이번 달 수업료", msg: lang === "zh" ? "本月学费已到期，请完成支付，谢谢！" : "이번 달 수업료 납부 부탁드려요 🙏", color: "#9A3412" },
+          overdue:  { bg: "#FEF2F2", border: "#FCA5A5", icon: "🙏", title: lang === "zh" ? "学费提醒" : "수업료 안내", msg: lang === "zh" ? "本月学费尚未收到，请尽快完成支付。" : "아직 이번 달 수업료가 확인되지 않았어요. 선생님께 문의해 주세요.", color: "#991B1B" },
+        }[duesStatus];
+        return React.createElement("div", { style: { background: config.bg, border: `1px solid ${config.border}`, borderRadius: "16px", padding: "16px 18px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "12px" } },
+          React.createElement("div", { style: { fontSize: "22px", flexShrink: 0 } }, config.icon),
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: config.color, marginBottom: "3px" } }, config.title),
+            React.createElement("div", { style: { fontSize: "12px", color: config.color, opacity: 0.8, lineHeight: 1.5, wordBreak: "keep-all" } }, config.msg)
+          ),
+          React.createElement("button", { onClick: () => setDuesDismissed(true), "aria-label": "닫기", style: { background: "none", border: "none", color: config.color, opacity: duesStatus === "overdue" ? 0.3 : 0.4, fontSize: "16px", cursor: "pointer", padding: "0 2px", flexShrink: 0, lineHeight: 1, fontFamily: FONT } }, "×")
+        );
+      })(),
 
       // ── Stats card (label outside, per the home card rule) ───────────────────
       React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" } }, "나의 진행"),
