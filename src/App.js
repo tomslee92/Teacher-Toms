@@ -156,6 +156,14 @@ const TEACHER_NAMES = ["Toms Lee", "Toms"]; // Names that see the Teacher View b
 // fully reversible. See commit 329cd37 for the feature itself.
 const NOTES_FEATURES_ENABLED = false;
 
+// Personal session notes (teacher → student) — the *text-only* subset of the notes
+// feature, un-shelved on its own (2026-07). Independent of NOTES_FEATURES_ENABLED,
+// which still gates the richer voice/AI composer and the student → teacher feedback
+// channel (both remain shelved). Rollout is Toms-only via the existing per-student
+// session_notes_enabled flag + "Toms Lee" name fallback — no separate rollout gate
+// is needed because absence of a note = the feature is invisible.
+const SESSION_NOTES_ENABLED = true;
+
 // Curated scenarios (Listen/Shadowing Mode) — student-facing rollout switch, INDEPENDENT
 // of the V2 home flag (all students have V2, so V2 is not a safe gate). false = Toms only
 // (the student home card is hidden for everyone else); flip to true to roll out to all
@@ -8864,13 +8872,14 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
-          {/* Session Notes + Student Feedback toggles — shelved (NOTES_FEATURES_ENABLED).
-              Hidden so the modal stays focused; flip the constant to bring them back. */}
-          {NOTES_FEATURES_ENABLED && (<>
+          {/* Session Notes rollout toggle — controls whether THIS student sees the
+              personal note card on their home (session_notes_enabled). Mirrors the
+              home_v2 toggle pattern; Toms Lee always sees it via name fallback. */}
+          {SESSION_NOTES_ENABLED && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
             <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>📝</span>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>Session Notes (Beta)</span>
+              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>노트 (home 카드)</span>
               <button onClick={async () => {
                 const newVal = !localStudent.session_notes_enabled;
                 await db.update("students", `id=eq.${localStudent.id}`, { session_notes_enabled: newVal }).catch(() => {});
@@ -8880,6 +8889,9 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
+          )}
+          {/* Student Feedback toggle — still shelved under NOTES_FEATURES_ENABLED. */}
+          {NOTES_FEATURES_ENABLED && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
             <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>💬</span>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -8893,7 +8905,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </button>
             </div>
           </div>
-          </>)}
+          )}
         </div>
       </div>
 
@@ -9009,55 +9021,19 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         </div>
       </div>
 
-      {/* Session notes — teacher composer + past notes to this student.
-          Framed as "occasional, when worth saying" rather than per-session feedback.
-          Shelved via NOTES_FEATURES_ENABLED — flip the constant to restore. */}
-      {teacher && NOTES_FEATURES_ENABLED && (
+      {/* Personal session notes — teacher entry + past notes to this student.
+          Text-only, un-shelved under SESSION_NOTES_ENABLED. The richer voice/AI
+          composer (SessionNoteComposer) and the student→teacher feedback list
+          (StudentNotesReceived) stay dormant under NOTES_FEATURES_ENABLED. */}
+      {teacher && SESSION_NOTES_ENABLED && (
         <div style={{ marginBottom: "28px" }}>
-          <SessionNoteComposer
+          <SessionNoteEntry
             student={localStudent}
             teacher={teacher}
+            pastNotes={pastNotes}
+            onChanged={refreshPastNotes}
             showMsg={showMsg}
-            onSaved={() => { refreshPastNotes(); setReceivedRefresh(x => x + 1); }}
-            replyTo={noteReplyTo}
-            onReplyHandled={() => setNoteReplyTo(null)}
           />
-          <StudentNotesReceived
-            student={localStudent}
-            onReplyTo={setNoteReplyTo}
-            refreshSignal={receivedRefresh}
-            onSeen={onNotesSeen}
-          />
-          {pastNotes.length > 0 && (
-            <div style={{ marginTop: "14px" }}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>
-                지난 메모 · {pastNotes.length}
-              </div>
-              <div style={{ background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
-                {pastNotes.map((n, i) => {
-                  const isVoice = n.note_type === "voice" || n.note_type === "both";
-                  const isText = n.note_type === "text" || n.note_type === "both";
-                  const preview = n.text_content || n.structured?.wentWell || (isVoice && !isText ? "음성 메모" : "");
-                  return (
-                    <div key={n.id} style={{ padding: "11px 14px", borderBottom: i < pastNotes.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "11px", color: C.textLight, marginBottom: "2px" }}>{n.session_date} · {isVoice ? (isText ? "🎙 + 글" : "🎙 음성") : "글"}</div>
-                        <div style={{ fontSize: "13px", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</div>
-                      </div>
-                      <div style={{ display: "flex", gap: "5px", alignItems: "center", flexShrink: 0 }}>
-                        {n.dismissed_at
-                          ? <span style={{ fontSize: "10px", fontWeight: "600", color: C.textLight, background: C.bgSoft, padding: "2px 8px", borderRadius: "100px" }}>보관함</span>
-                          : n.seen_at
-                            ? <span title={`Seen ${new Date(n.seen_at).toLocaleString()}`} style={{ fontSize: "10px", fontWeight: "600", color: C.success, background: C.successBg, padding: "2px 8px", borderRadius: "100px" }}>👁 봤어요</span>
-                            : <span style={{ fontSize: "10px", fontWeight: "600", color: C.gold, background: C.goldBg, padding: "2px 8px", borderRadius: "100px" }}>안 봤어요</span>
-                        }
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -20711,6 +20687,91 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
   );
 }
 
+// ── Personal session note — teacher entry (text-only) ────────────────────────
+// The simplified, un-shelved notes UI (SESSION_NOTES_ENABLED). A short personal
+// message the teacher leaves for one student; no voice, no AI, no per-session form.
+// The richer SessionNoteComposer below stays dormant under NOTES_FEATURES_ENABLED.
+function SessionNoteEntry({ student, teacher, pastNotes, onChanged, showMsg }) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmId, setConfirmId] = useState(null); // note pending delete confirmation
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleSave = async () => {
+    const body = text.trim();
+    if (!body) return;
+    setSaving(true);
+    try {
+      await db.insert("session_notes", {
+        student_id: student.id,
+        teacher_id: teacher.id,
+        teacher_name: teacher.name,
+        session_date: new Date().toISOString().slice(0, 10),
+        note_type: "text",
+        text_content: body,
+      });
+      setText("");
+      showMsg && showMsg("✓ 노트를 남겼어요");
+      onChanged && onChanged();
+    } catch (e) { showMsg && showMsg("저장 실패: " + e.message, "error"); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id) => {
+    setDeletingId(id);
+    try {
+      await db.delete("session_notes", `id=eq.${id}`);
+      onChanged && onChanged();
+    } catch (e) { showMsg && showMsg("삭제 실패: " + e.message, "error"); }
+    setDeletingId(null);
+    setConfirmId(null);
+  };
+
+  const recent = (pastNotes || []).slice(0, 5);
+
+  return React.createElement("div", null,
+    React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" } }, "노트"),
+    React.createElement("div", { style: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "14px 16px" } },
+      React.createElement("textarea", {
+        value: text,
+        onChange: e => setText(e.target.value),
+        placeholder: "한두 문장이면 충분해요",
+        rows: 3,
+        style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", boxSizing: "border-box", lineHeight: 1.6, wordBreak: "keep-all" }
+      }),
+      React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: "10px" } },
+        React.createElement("button", {
+          onClick: handleSave, disabled: saving || !text.trim(),
+          style: { padding: "8px 20px", borderRadius: "100px", border: "none", background: C.navy, color: "#fff", fontSize: "12px", fontWeight: "800", cursor: (saving || !text.trim()) ? "default" : "pointer", fontFamily: FONT, opacity: (saving || !text.trim()) ? 0.5 : 1 }
+        }, saving ? "남기는 중…" : "남기기")
+      )
+    ),
+    recent.length > 0 && React.createElement("div", { style: { marginTop: "14px" } },
+      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" } }, `지난 노트 · ${pastNotes.length}`),
+      React.createElement("div", { style: { background: C.bg, borderRadius: "14px", border: `1px solid ${C.border}`, overflow: "hidden" } },
+        recent.map((n, i) => React.createElement("div", {
+          key: n.id,
+          style: { padding: "11px 14px", borderBottom: i < recent.length - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "flex-start", gap: "10px" }
+        },
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("div", { style: { fontSize: "13px", color: C.text, lineHeight: 1.5, wordBreak: "keep-all" } }, n.text_content || n.structured?.wentWell || (n.note_type !== "text" ? "음성 노트" : "")),
+            React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" } },
+              React.createElement("span", null, (n.created_at || n.session_date || "").slice(0, 10)),
+              n.seen_at && React.createElement("span", { title: `봤어요 · ${new Date(n.seen_at).toLocaleString()}`, style: { color: C.success, fontWeight: "700" } }, "✓")
+            )
+          ),
+          confirmId === n.id
+            ? React.createElement("div", { style: { display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 } },
+                React.createElement("button", { onClick: () => handleDelete(n.id), disabled: deletingId === n.id, style: { fontSize: "11px", fontWeight: "700", color: "#fff", background: C.error, border: "none", borderRadius: "100px", padding: "3px 10px", cursor: "pointer", fontFamily: FONT } }, deletingId === n.id ? "…" : "삭제"),
+                React.createElement("button", { onClick: () => setConfirmId(null), style: { fontSize: "11px", fontWeight: "600", color: C.textMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "3px 10px", cursor: "pointer", fontFamily: FONT } }, "취소")
+              )
+            : React.createElement("button", { onClick: () => setConfirmId(n.id), "aria-label": "삭제", title: "삭제", style: { flexShrink: 0, width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: C.textLight, fontSize: "13px", cursor: "pointer", fontFamily: FONT } }, "✕")
+        ))
+      )
+    )
+  );
+}
+
 function SessionNoteComposer({ student, teacher, showMsg, onSaved, replyTo, onReplyHandled }) {
   const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
@@ -21243,13 +21304,10 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   // Staggered-reveal: cards below stats appear together after data loads
   // (or after 600ms safety cap), creating a smooth choreographed entrance
   const [cardsReady, setCardsReady] = useState(false);
-  // Session notes — gated by session_notes_enabled (or Toms always-fallback), and
-  // by the NOTES_FEATURES_ENABLED master switch (shelved 2026-06).
-  const notesEnabled = !!(NOTES_FEATURES_ENABLED && (user?.session_notes_enabled || user?.name === "Toms Lee"));
+  // Personal session notes — gated by session_notes_enabled (or Toms always-fallback),
+  // under the SESSION_NOTES_ENABLED switch (text-only feature, un-shelved 2026-07).
+  const notesEnabled = !!(SESSION_NOTES_ENABLED && (user?.session_notes_enabled || user?.name === "Toms Lee"));
   const [allNotes, setAllNotes] = useState([]); // all notes for this student, newest first
-  const [openNote, setOpenNote] = useState(null); // currently-opened note (sheet)
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const [noteDismissing, setNoteDismissing] = useState(false); // animation flag
   const [notesEntered, setNotesEntered] = useState(false); // entrance animation
   // ── Wavi card expansion transition ──────────────────────────────────────────
   const waviCardRef = useRef(null);
@@ -21450,33 +21508,26 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   else if (hour >= 21)              greeting = "늦은 저녁이네요";        // 9pm–midnight: winding down
   else                              greeting = "늦은 시간이네요";        // 12am–5am: gentle late-night acknowledgment
 
-  // ── Session notes — derived + handlers ─────────────────────────────────────
-  // Surface the most recent NON-dismissed note. Subtle first-open framing only
-  // when no OTHER notes have ever been seen yet (true first contact, ever).
-  const latestNote = allNotes.find(n => !n.dismissed_at) || null;
-  const hasOtherSeen = allNotes.some(n => n.seen_at && (!latestNote || n.id !== latestNote.id));
-  const showFirstOpenFraming = !!latestNote && !hasOtherSeen && !latestNote.seen_at;
+  // ── Personal session note — derived + seen-tracking ────────────────────────
+  // Surface ONLY the single most recent note inside the 14-day window. Older notes
+  // expire quietly — no empty state, no placeholder, nothing renders when none is
+  // fresh. dismissed_at is a legacy column from the earlier rollout; still honored
+  // so any pre-dismissed note stays hidden. allNotes is newest-first from the fetch.
+  const NOTE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+  const latestNote = allNotes.find(n =>
+    !n.dismissed_at &&
+    n.created_at &&
+    (Date.now() - new Date(n.created_at).getTime()) < NOTE_TTL_MS &&
+    (n.text_content || n.structured?.wentWell) // text-only: ignore legacy voice-only rows
+  ) || null;
 
-  const handleOpenNote = (n) => {
-    setOpenNote(n);
-    if (!n.seen_at && !isPreview) {
-      const now = new Date().toISOString();
-      setAllNotes(prev => prev.map(x => x.id === n.id ? { ...x, seen_at: now } : x));
-      db.update("session_notes", `id=eq.${n.id}`, { seen_at: now }).catch(() => {});
-    }
-  };
-
-  const handleDismissNote = (e, id) => {
-    if (e) e.stopPropagation();
-    setNoteDismissing(true);
-    // Animate out, then commit. Match the 280ms dismiss animation.
-    setTimeout(() => {
-      const now = new Date().toISOString();
-      setAllNotes(prev => prev.map(x => x.id === id ? { ...x, dismissed_at: now } : x));
-      setNoteDismissing(false);
-      if (!isPreview) db.update("session_notes", `id=eq.${id}`, { dismissed_at: now }).catch(() => {});
-    }, 280);
-  };
+  // Mark the note seen the moment it renders (fire-and-forget — never blocks render).
+  useEffect(() => {
+    if (!notesEnabled || isPreview || !latestNote || latestNote.seen_at) return;
+    const now = new Date().toISOString();
+    db.update("session_notes", `id=eq.${latestNote.id}`, { seen_at: now }).catch(() => {});
+    setAllNotes(prev => prev.map(x => x.id === latestNote.id ? { ...x, seen_at: now } : x));
+  }, [latestNote?.id, latestNote?.seen_at, notesEnabled, isPreview]);
 
   return React.createElement("div", { style: { paddingBottom: "20px" } },
     React.createElement("style", null, `
@@ -21734,59 +21785,34 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         })()
       ),
 
-      // ── Note card — most recent non-dismissed note from the teacher ───────
+      // ── Personal note card — the single most recent note in the 14-day window ─
+      // Text renders inline exactly as the teacher wrote it (EN / KR / mixed, line
+      // breaks preserved), with a subtle action-blue accent rule and a right-aligned
+      // signature. No header, no tap-to-open, no archive — it appears, marks itself
+      // seen, then quietly expires. Renders nothing at all when no fresh note exists.
       notesEnabled && latestNote && React.createElement("div", {
         "data-anim-note": "1",
-        onClick: () => handleOpenNote(latestNote),
         style: {
           position: "relative",
-          background: latestNote.seen_at
-            ? "linear-gradient(135deg, #FFFFFF 0%, #F8F9FB 100%)"
-            : "linear-gradient(135deg, #FFF8E7 0%, #FFEFD0 100%)",
-          border: `1px solid ${latestNote.seen_at ? C.border : "#EFD89B"}`,
-          borderRadius: "20px",
-          padding: "18px 20px",
+          background: WAYVE_TOKENS.card,
+          border: `1px solid ${WAYVE_TOKENS.hairline}`,
+          borderRadius: WAYVE_TOKENS.rCard,
+          padding: "18px 20px 16px 22px",
           marginBottom: "16px",
-          cursor: "pointer",
-          boxShadow: latestNote.seen_at ? "0 1px 3px rgba(0,0,0,0.04)" : "0 6px 18px rgba(232,180,80,0.20)",
-          animation: noteDismissing
-            ? "noteDismiss 280ms cubic-bezier(0.16,1,0.3,1) forwards"
-            : (notesEntered ? `noteRise 460ms cubic-bezier(0.16,1,0.3,1) both` : "none"),
-          transition: "background 220ms ease, border-color 220ms ease, box-shadow 220ms ease",
+          overflow: "hidden",
+          boxShadow: WAYVE_TOKENS.shadowCard,
+          animation: notesEntered ? "noteRise 460ms cubic-bezier(0.16,1,0.3,1) both" : "none",
         }
       },
-        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } },
-          React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: latestNote.seen_at ? C.textLight : "#A77820", letterSpacing: "1.5px", textTransform: "uppercase" } },
-            `${latestNote.teacher_name || "선생님"} 선생님의 메모`
-          ),
-          !latestNote.seen_at && React.createElement("div", { style: { fontSize: "16px", lineHeight: 1 } }, "✉️")
+        // Left accent rule — action blue
+        React.createElement("div", { style: { position: "absolute", top: 0, left: 0, bottom: 0, width: "3px", background: WAYVE_TOKENS.wave } }),
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "500", color: WAYVE_TOKENS.ink, lineHeight: 1.65, wordBreak: "keep-all", whiteSpace: "pre-wrap" } },
+          latestNote.text_content || latestNote.structured?.wentWell || ""
         ),
-        React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: C.text, lineHeight: 1.5, marginBottom: "10px" } },
-          latestNote.note_type === "voice"
-            ? "🎙 음성 메모가 도착했어요"
-            : (() => {
-                const raw = latestNote.text_content || latestNote.structured?.wentWell || "메모가 도착했어요";
-                return raw.length > 90 ? raw.slice(0, 90) + "…" : raw;
-              })()
-        ),
-        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-          React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, latestNote.session_date),
-          React.createElement("div", { style: { fontSize: "11px", color: C.textMid, fontWeight: "600" } }, latestNote.seen_at ? "다시 보기 →" : "열어보기 →")
-        ),
-        // Dismiss affordance — only after seen
-        latestNote.seen_at && React.createElement("button", {
-          onClick: (e) => handleDismissNote(e, latestNote.id),
-          "aria-label": "보관함으로",
-          title: "보관함으로",
-          style: { position: "absolute", top: "10px", right: "10px", width: "24px", height: "24px", borderRadius: "50%", border: "none", background: "transparent", color: C.textLight, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT }
-        }, "✕")
+        React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: WAYVE_TOKENS.ink3, textAlign: "right", marginTop: "12px" } },
+          `— ${latestNote.teacher_name || "Toms"}`
+        )
       ),
-
-      // ── Archive entry — only show if there's any note history at all ──────
-      notesEnabled && allNotes.length > 0 && React.createElement("button", {
-        onClick: () => setArchiveOpen(true),
-        style: { display: "block", margin: "-4px 0 16px auto", padding: "4px 12px", borderRadius: "100px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }
-      }, `🗂 보관함 (${allNotes.length})`),
 
       // ── Stats card (label outside, per the home card rule) ───────────────────
       React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: WAYVE_TOKENS.ink3, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "10px" } }, "나의 진행"),
@@ -21963,20 +21989,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         from { opacity: 1; }
         to   { opacity: 0; }
       }
-    `),
-
-    // ── Session-note open sheet ─────────────────────────────────────────────
-    openNote && React.createElement(SessionNoteSheet, {
-      note: openNote,
-      onClose: () => setOpenNote(null),
-      showFirstOpenFraming: showFirstOpenFraming && openNote.id === latestNote?.id,
-    }),
-
-    // ── Session-note archive sheet ──────────────────────────────────────────
-    archiveOpen && React.createElement(SessionNoteArchiveSheet, {
-      notes: allNotes,
-      onClose: () => setArchiveOpen(false),
-    })
+    `)
   );
 }
 
