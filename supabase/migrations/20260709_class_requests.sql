@@ -19,6 +19,23 @@ CREATE TABLE IF NOT EXISTS public.class_requests (
 
 -- No indexes needed at this scale (a handful of students; teacher reads all rows).
 
+-- The app reaches PostgREST with the anon key, so a new table must be granted to
+-- anon/authenticated (same as scenario_assignments / session_notes) or every
+-- db.insert/get on it fails with "permission denied".
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.class_requests TO anon, authenticated;
+
+-- If RLS is enabled on the table, add a permissive policy (mirrors session_notes).
+-- Guarded so it's a no-op when RLS is off or the policy already exists.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='class_requests' AND rowsecurity) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='class_requests' AND policyname='class_requests_all') THEN
+      CREATE POLICY class_requests_all ON public.class_requests
+        FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+    END IF;
+  END IF;
+END $$;
+
 -- Group session timing — powers the "수요일 수업까지 3일" line on the request card.
 -- Nullable; the card degrades gracefully (omits the countdown) when unset.
 ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS session_day  int;   -- 0=Sun … 6=Sat
