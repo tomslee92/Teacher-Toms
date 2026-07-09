@@ -16925,6 +16925,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // === UI state ===
   const [wavyState, setWavyState] = useState("idle"); // idle | speaking | listening | thinking
   const [micLevel, setMicLevel] = useState(0); // 0-1 amplitude for visual feedback
+  const rv3 = isRedesignV3(user); // redesign v3 — calm session end (⑫) + pass chip (④)
+  const [recapNote, setRecapNote] = useState(undefined); // latest teacher session note surfaced on the v3 end screen (undefined=loading, null=none)
 
   // === Listen Mode (scenario) state ===
   const [scenario, setScenario] = useState(null);          // { id, title, context_description }
@@ -17041,6 +17043,24 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // Keep refs in sync with state — used by listener callbacks to avoid stale closures
   useEffect(() => { phrasesRef.current = phrases; }, [phrases]);
   useEffect(() => { if (phase === "scenario") { try { scenarioEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); } catch(_) {} } }, [scenarioIdx, phase]);
+  // v3 session end (⑫) — surface the latest un-dismissed teacher session note (the
+  // relational-continuity moment). Reuses the un-shelved session_notes table; gated by
+  // SESSION_NOTES_ENABLED + the per-student flag / Toms fallback, same as the home card.
+  useEffect(() => {
+    if (!rv3 || (phase !== "recap" && phase !== "scenario_done")) return;
+    if (recapNote !== undefined) return; // fetch once
+    const notesOn = !!(SESSION_NOTES_ENABLED && (user?.session_notes_enabled || TEACHER_NAMES.includes(user?.name)));
+    if (!notesOn || !user?.id) { setRecapNote(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await db.get("session_notes", `student_id=eq.${user.id}&dismissed_at=is.null&order=session_date.desc,created_at.desc&limit=1&select=text_content,teacher_name`).catch(() => []);
+        const n = (rows || []).find(r => (r.text_content || "").trim());
+        if (!cancelled) setRecapNote(n ? { text: n.text_content.trim(), teacher: n.teacher_name } : null);
+      } catch(e) { if (!cancelled) setRecapNote(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [rv3, phase, user?.id]);
   useEffect(() => { currentIdxRef.current = currentIdx; }, [currentIdx]);
   useEffect(() => { phraseStatusRef.current = phraseStatus; }, [phraseStatus]);
 
@@ -18976,6 +18996,37 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     const elapsedMin = Math.floor(elapsedMs / 60000);
     const elapsedSec = Math.floor((elapsedMs % 60000) / 1000);
     const timeStr = elapsedMin > 0 ? `${elapsedMin}분 ${elapsedSec}초` : `${elapsedSec}초`;
+
+    // ── v3 calm session end (⑫) — green ✓, one stats line, teacher note, 홈으로.
+    // Deliberately drops the trophy / mastery-% bar (restraint over the banned
+    // gamification list). Teacher note is the retention moment.
+    if (rv3) {
+      const minutesOnly = Math.max(0, Math.round(elapsedMs / 60000));
+      const statLine = `오늘 Wavi와 ${minutesOnly > 0 ? `${minutesOnly}분 ` : ""}함께했어요${masteredPhrases.length > 0 ? ` · 표현 ${masteredPhrases.length}개 통과` : ""}`;
+      const goHome = () => { if (manualExitRef.current && onManualExit) onManualExit(); else onClose(); };
+      return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 55%, #0B1F3A 100%)", display: "flex", flexDirection: "column", fontFamily: FONT_V3, paddingTop: "env(safe-area-inset-top)" } },
+        React.createElement("style", null, "html, body { background: #0B1F3A !important; } @keyframes recapFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }"),
+        React.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "80px 28px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "18px", animation: "recapFadeUp 0.5s ease both" } },
+          React.createElement("div", { style: { width: "72px", height: "72px", borderRadius: "50%", background: WAYVE_TOKENS.green, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "32px", fontWeight: "800", boxShadow: "0 12px 30px rgba(47,179,68,0.32)", marginTop: "20px" } }, "✓"),
+          React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", textAlign: "center" } },
+            React.createElement("div", { style: { fontSize: "24px", fontWeight: "800", color: "#fff", letterSpacing: "-0.4px" } }, "수고하셨어요!"),
+            React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.6)" } }, statLine)
+          ),
+          // Teacher note card
+          recapNote && React.createElement("div", { style: { width: "100%", background: "rgba(255,255,255,0.97)", borderRadius: "20px", padding: "18px", display: "flex", flexDirection: "column", gap: "10px", boxShadow: "0 12px 40px rgba(0,0,0,0.3)", marginTop: "14px" } },
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+              React.createElement("div", { style: { width: "34px", height: "34px", borderRadius: "50%", background: WAYVE_TOKENS.navy1, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "800" } }, (recapNote.teacher || "T").trim().charAt(0).toUpperCase()),
+              React.createElement("div", { style: { fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: WAYVE_TOKENS.ink2 } }, `${(recapNote.teacher || "TOMS").toUpperCase()} 선생님의 메모`)
+            ),
+            React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", color: WAYVE_TOKENS.ink, lineHeight: 1.6 } }, recapNote.text)
+          )
+        ),
+        React.createElement("div", { style: { padding: "0 28px 44px", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" } },
+          React.createElement("button", { onClick: goHome, style: { width: "100%", background: "#fff", color: WAYVE_TOKENS.navy1, fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", textAlign: "center", border: "none", cursor: "pointer", fontFamily: FONT_V3 } }, "홈으로")
+        )
+      );
+    }
+
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 100%)", display: "flex", flexDirection: "column", padding: "calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px)", overflowY: "auto" } },
       React.createElement("style", null, `
         html, body { background: #0B1F3A !important; }
@@ -19216,6 +19267,16 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
 
     // Wavi character — cross-fading expression stack (Toms-only rollout for now).
     renderWaviCharacter(waviExpression, characterVideoUrl),
+
+    // v3 pass moment (④) — quiet green ✓ chip when the current phrase is mastered.
+    // The expression already swaps to wavi-encouraging via waviExpression; this is the
+    // restrained confirmation (no confetti/trophy).
+    rv3 && _charPhraseId && phraseStatus[_charPhraseId] === "mastered" && React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "8px 0 0", position: "relative", zIndex: 2 }
+    },
+      React.createElement("div", { style: { width: "24px", height: "24px", borderRadius: "50%", background: WAYVE_TOKENS.green, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", fontWeight: "800" } }, "✓"),
+      React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: "#7ED892" } }, "이 표현은 통과했어요")
+    ),
 
     // Current phrase — shows differently in review mode
     currentPhrase && React.createElement("div", { style: { padding: "20px 24px 12px", position: "relative", zIndex: 2, textAlign: "center" } },
