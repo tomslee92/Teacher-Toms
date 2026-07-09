@@ -189,6 +189,49 @@ const WAYVE_TOKENS = {
   shadowHero: "0 8px 28px rgba(11,31,58,.28)",
 };
 
+// Dark-mode twin of WAYVE_TOKENS (redesign v3). Same keys as WAYVE_TOKENS so a
+// useTokens() helper can swap the whole set per render. Navy + wave-blue action
+// buttons stay saturated; surfaces darken, ink inverts, error/soft surfaces become
+// tinted translucent. See README "Dark tokens". Dark mode ships last (flag-gated).
+const DARK_TOKENS = {
+  bgGrouped: "#0E1116", card: "#171B22",
+  ink: "#F2F3F7", ink2: "#9DA0A8", ink3: "#6E7178",
+  hairline: "rgba(255,255,255,0.08)",
+  navy1: "#0B1F3A", navy2: "#16345C",
+  wave: "#6FA0FF", waveSoft: "rgba(111,160,255,0.12)",
+  coral: "#FF7A6E", coralSoft: "rgba(255,122,110,0.12)",
+  green: "#2FB344", greenSoft: "rgba(47,179,68,0.14)",
+  gold: "#C9A227",
+  rCard: 20, rPill: 100,
+  shadowCard: "0 1px 2px rgba(0,0,0,.30), 0 4px 16px rgba(0,0,0,.35)",
+  shadowHero: "0 8px 28px rgba(0,0,0,.50)",
+};
+
+// Pretendard (redesign v3) — Korean-first variable typeface. Loaded globally in
+// GlobalStyle but only APPLIED where a redesign-v3-gated component sets this as its
+// fontFamily, so non-v3 users see zero change (they keep Inter via FONT). Never swap
+// FONT itself — that would restyle every legacy screen for everyone.
+const FONT_V3 = "'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+// Bottom-nav line icons (redesign v3). 24px, stroke 1.8, round caps — paths copied
+// verbatim from the design board. Each is a fn of stroke color so active/inactive
+// state is just a color swap (wave when active, ink3 otherwise).
+const NavIconV3 = {
+  home: (color) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none" },
+    React.createElement("path", { d: "M4 11.5L12 5l8 6.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z", stroke: color, strokeWidth: 1.8, strokeLinejoin: "round" })),
+  practice: (color) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none" },
+    React.createElement("circle", { cx: 12, cy: 12, r: 8, stroke: color, strokeWidth: 1.8 }),
+    React.createElement("circle", { cx: 12, cy: 12, r: 3, stroke: color, strokeWidth: 1.8 })),
+  solo: (color) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none" },
+    React.createElement("rect", { x: 9.2, y: 3.5, width: 5.6, height: 10.5, rx: 2.8, stroke: color, strokeWidth: 1.8 }),
+    React.createElement("path", { d: "M6.2 11.5a5.8 5.8 0 0 0 11.6 0M12 17.5v3", stroke: color, strokeWidth: 1.8, strokeLinecap: "round" })),
+  community: (color) => React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none" },
+    React.createElement("circle", { cx: 9, cy: 8.5, r: 3.2, stroke: color, strokeWidth: 1.8 }),
+    React.createElement("path", { d: "M3.5 19c0-3 2.5-4.8 5.5-4.8S14.5 16 14.5 19", stroke: color, strokeWidth: 1.8, strokeLinecap: "round" }),
+    React.createElement("circle", { cx: 16.8, cy: 9.5, r: 2.4, stroke: color, strokeWidth: 1.8 }),
+    React.createElement("path", { d: "M16.8 14.6c2.4.3 3.9 1.9 3.9 4.2", stroke: color, strokeWidth: 1.8, strokeLinecap: "round" })),
+};
+
 // ── Teacher name resolution ───────────────────────────────────────────────────
 // Single source of truth for the default teacher display name.
 // When a group has its own teacher_name set (Supabase groups.teacher_name),
@@ -546,6 +589,12 @@ const isQodDay = (d = new Date()) => d.getDay() === 4;
 // (rather than inlining `true`) so every call site stays untouched and the rollout can
 // be narrowed again by restoring the per-student/name gate if ever needed.
 const isNewUI = (u) => !!u;
+
+// Redesign v3 rollout gate — per-student `redesign_v3_enabled` DB flag with the
+// standard Toms-Lee/teacher name fallback so only the test account sees the new IA,
+// tokens, Pretendard, tab bar, home, and session restyle until Toms rolls it out.
+// Rollback for the entire redesign = flag off. Never default this to true.
+const isRedesignV3 = (u) => !!(u && (u.redesign_v3_enabled || TEACHER_NAMES.includes(u.name)));
 // Thankful Thursday — the weekly QoD is now a gratitude ritual: every Thursday all
 // students share one thing they're thankful for. The prompt is auto-created so the
 // experience runs without the teacher scheduling one (a teacher-scheduled Thursday
@@ -999,6 +1048,8 @@ const C = {
 // ── Global Style ──────────────────────────────────────────────────────────────
 const GlobalStyle = () => React.createElement("style", null, `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  /* Pretendard (redesign v3) — applied only where FONT_V3 is set (v3-gated components). */
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{font-family:${FONT};background:${C.bg};color:${C.text};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-size:16px;overflow-x:hidden;width:100%;}
@@ -4158,6 +4209,7 @@ const TOUR_STEPS = [
 
 function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, fontSize = 'default', setFontSize = () => {}, qodCelebPending = null, onCelebShown = () => {}, onOpenDailyQuestion = () => {}, onGoToWavi = () => {}, initialTab = null }) {
   _tokenUser = user; _tokenGroup = group;
+  const rv3 = isRedesignV3(user); // redesign v3 — new IA/tokens/tab bar/profile sheet (Toms only)
   const [tab, setTab] = useState(initialTab);
   const [showWavy, setShowWavy] = useState(false);
   const [scenarioToLaunch, setScenarioToLaunch] = useState(null); // curated scenario chosen from the home card
@@ -4516,15 +4568,17 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
             {WayveLogo({ size: 10, color: C.text })}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {React.createElement(FontSizeToggle, { fontSize, setFontSize })}
+            {/* v3: 글자 크기 / Log out / Teacher all move into the Profile sheet (⑨) — the
+                header keeps only the avatar. Legacy keeps the inline buttons. */}
+            {!rv3 && React.createElement(FontSizeToggle, { fontSize, setFontSize })}
             <button data-tour-profile-btn="true" onClick={() => setShowProfile(true)} style={{ width: "32px", height: "32px", borderRadius: "50%", border: `1px solid ${C.border}`, background: profileUser?.hometown || profileUser?.job || profileUser?.hobby ? C.navy : C.bgSoft, color: profileUser?.hometown || profileUser?.job || profileUser?.hobby ? "#fff" : C.textMid, fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, overflow: "hidden", padding: 0 }}>
               {profileUser?.profile_photo
                 ? React.createElement("img", { src: profileUser.profile_photo, alt: profileUser.name, style: { width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" } })
                 : "👤"
               }
             </button>
-            <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500" }}>Log out</button>
-            {isTeacherName && (
+            {!rv3 && <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "500" }}>Log out</button>}
+            {!rv3 && isTeacherName && (
               <button onClick={() => { setShowTeacherPrompt(true); setTeacherPassInput(""); setTeacherPassError(""); }} style={{ background: C.navy, border: "none", color: "#fff", padding: "6px 14px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>Teacher</button>
             )}
           </div>
@@ -4622,12 +4676,26 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       onManualExit: () => { setShowWavy(false); setScenarioToLaunch(null); },
     })}
 
-    {showProfile && React.createElement(ProfileModal, { user: profileUser, showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep, onClose: () => {
+    {showProfile && (rv3
+      ? React.createElement(ProfileSheetV3, {
+          user: profileUser, group, lang, fontSize, setFontSize,
+          isTeacher: isTeacherName,
+          showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep,
+          onClose: () => {
+            setShowProfile(false);
+            if (tourActive && currentTourStep?.isNotifStep) { setTimeout(() => advanceTour(), 300); }
+          },
+          onSave: handleProfileSave,
+          onLogout: onBack,
+          onOpenTeacher: () => { setShowProfile(false); setShowTeacherPrompt(true); setTeacherPassInput(""); setTeacherPassError(""); },
+          onRestartTour: () => { setShowProfile(false); resetTour && resetTour(); },
+        })
+      : React.createElement(ProfileModal, { user: profileUser, showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep, onClose: () => {
         setShowProfile(false);
         if (tourActive && currentTourStep?.isNotifStep) {
           setTimeout(() => advanceTour(), 300);
         }
-      }, onSave: handleProfileSave })}
+      }, onSave: handleProfileSave }))}
 
     {/* Tutorial prompt — shown once for new students */}
     {showTutorialPrompt && React.createElement(ModalPortal, null,
@@ -4690,7 +4758,14 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       )}
 
       {(() => {
-        const tabs = [
+        // Redesign v3: 4-tab IA (My List folds into Practice), inline SVG line icons,
+        // Home · Practice · Solo · Community order per the board. Legacy: 5 emoji tabs.
+        const tabs = rv3 ? [
+          ["home",      NavIconV3.home,      T("nav_home",      lang)],
+          ["practice",  NavIconV3.practice,  T("nav_practice",  lang)],
+          ["freetalk",  NavIconV3.solo,      T("nav_freetalk",  lang)],
+          ["community", NavIconV3.community, T("nav_community", lang)],
+        ] : [
           ["home",      "🏠", T("nav_home",      lang)],
           ["practice",  "🎯", T("nav_practice",  lang)],
           ["community", "👥", T("nav_community", lang)],
@@ -4702,14 +4777,15 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         const tabW = 100 / tabs.length; // kept for reference
         return React.createElement("div", { style: {
           position: "fixed", bottom: 0, left: 0, right: 0,
-          background: "rgba(255,255,255,0.85)",
+          background: rv3 ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.85)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           zIndex: 20,
           paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
-          borderTop: `0.5px solid rgba(0,0,0,0.08)`,
+          borderTop: rv3 ? `1px solid ${WAYVE_TOKENS.hairline}` : `0.5px solid rgba(0,0,0,0.08)`,
         } },
-          React.createElement("div", { style: { position: "relative", height: "0px" } },
+          // Legacy sliding indicator bar — v3 signals the active tab with icon color instead.
+          !rv3 && React.createElement("div", { style: { position: "relative", height: "0px" } },
             React.createElement("div", { className: "nav-indicator", style: {
               width: "28px",
               left: `calc(${safeIdx * tabW + tabW / 2}% - 14px)`
@@ -4722,16 +4798,17 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
               // Thursday "event is live" signal — the dot only appears on Thankful Thursday
               // (the weekly event), not every day. Drives students to the Community room.
               const showDQDot = id === "community" && isQodDay() && !submittedToday;
+              const iconColor = active ? WAYVE_TOKENS.wave : WAYVE_TOKENS.ink3;
               return React.createElement("button", { key: id, className: "nav-btn", onClick: () => { haptic.light(); setTab(id === "home" ? null : id); },
-                style: { flex: 1, padding: "10px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" } },
-                React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative", opacity: active ? 1 : 0.38, transition: "opacity 0.2s" } },
-                  icon,
+                style: { flex: 1, padding: "10px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: rv3 ? FONT_V3 : FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: rv3 ? "3px" : "4px" } },
+                React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative", opacity: rv3 ? 1 : (active ? 1 : 0.38), transition: "opacity 0.2s" } },
+                  rv3 ? icon(iconColor) : icon,
                   // Apple-spec badge — 20px min, 3px white border, bold contrast
                   showBadge && React.createElement("span", { style: { position: "absolute", top: "-5px", right: "-10px", minWidth: "20px", height: "20px", borderRadius: "100px", background: C.error, color: "#fff", fontSize: "11px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", border: `2.5px solid ${C.bg}`, lineHeight: 1, boxSizing: "border-box" } }, unreadCommentIds.size),
                   // Dot — larger and more visible when no number badge
                   !showBadge && showDQDot && React.createElement("span", { style: { position: "absolute", top: "-3px", right: "-5px", width: "10px", height: "10px", borderRadius: "50%", background: C.error, border: `2px solid ${C.bg}` } })
                 ),
-                React.createElement("div", { style: { fontSize: "10px", fontWeight: active ? "700" : "400", color: active ? C.navy : C.textLight, transition: "color 0.2s" } }, label)
+                React.createElement("div", { style: { fontSize: "10px", fontWeight: rv3 ? "700" : (active ? "700" : "400"), color: rv3 ? iconColor : (active ? C.navy : C.textLight), transition: "color 0.2s" } }, label)
               );
             })
           )
@@ -8869,6 +8946,21 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
                 setLocalStudent(prev => ({ ...prev, home_v2_enabled: newVal }));
               }} style={{ padding: "4px 12px", borderRadius: "100px", border: "none", background: localStudent.home_v2_enabled ? "#22c55e" : "rgba(255,255,255,0.1)", color: "#fff", fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>
                 {localStudent.home_v2_enabled ? "✓ On" : "Off"}
+              </button>
+            </div>
+          </div>
+          {/* Redesign v3 toggle — full redesign (new IA, tokens, Pretendard, tab bar,
+              home, sessions). Toms Lee always sees it via name fallback. Rollback = Off. */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+            <span style={{ fontSize: "13px", opacity: 0.6, flexShrink: 0 }}>🌊</span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)" }}>Redesign v3 (Beta)</span>
+              <button onClick={async () => {
+                const newVal = !localStudent.redesign_v3_enabled;
+                await db.update("students", `id=eq.${localStudent.id}`, { redesign_v3_enabled: newVal }).catch(() => {});
+                setLocalStudent(prev => ({ ...prev, redesign_v3_enabled: newVal }));
+              }} style={{ padding: "4px 12px", borderRadius: "100px", border: "none", background: localStudent.redesign_v3_enabled ? "#22c55e" : "rgba(255,255,255,0.1)", color: "#fff", fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>
+                {localStudent.redesign_v3_enabled ? "✓ On" : "Off"}
               </button>
             </div>
           </div>
@@ -15680,6 +15772,106 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
       </div>
       </div>
     </div>
+  );
+}
+
+// ── ProfileSheetV3 (redesign v3, screen ⑨) ────────────────────────────────────
+// The new home for the header's old buttons (글자 크기 / Log out / Teacher) plus
+// language, notifications, profile edit, and "앱 둘러보기 다시 하기". A bottom sheet;
+// deep profile/language edit defers to the existing ProfileModal (opened inline) so
+// all the avatar-picker + field-save logic is reused, not duplicated.
+function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, onClose, onSave, onLogout, onOpenTeacher, onRestartTour, showTourNotifSpotlight = false }) {
+  const [showFullEdit, setShowFullEdit] = useState(false);
+  const [notifState, setNotifState] = useState(() => getNotificationPermission());
+  const [enabling, setEnabling] = useState(false);
+  const T3 = WAYVE_TOKENS;
+
+  // During the tour's notification step, defer to the full ProfileModal — it owns the
+  // spotlight choreography. (The tour itself is re-mapped for v3 in a later phase.)
+  if (showTourNotifSpotlight) {
+    return React.createElement(ProfileModal, { user, onClose, onSave, showTourNotifSpotlight: true });
+  }
+  // Deep profile / language edit reuses the existing modal.
+  if (showFullEdit) {
+    return React.createElement(ProfileModal, { user, onClose: () => setShowFullEdit(false), onSave });
+  }
+
+  const handleNotif = async () => {
+    if (notifState === "granted" || enabling) return; // web can't revoke; toggle only enables
+    setEnabling(true);
+    const r = await subscribeToPush(user.id);
+    setNotifState(r === "granted" ? "granted" : r === "denied" ? "denied" : "unsupported");
+    setEnabling(false);
+  };
+
+  const notifOn = notifState === "granted";
+  const teacherName = getTeacherName(group);
+  const subtitle = `${group?.name ? group.name + " · " : ""}${teacherName} 선생님`;
+  const sizes = [["default", "기본"], ["large", "크게"], ["xlarge", "더 크게"]];
+  const rowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 4px", borderBottom: `1px solid ${T3.hairline}` };
+  const labelStyle = { fontSize: "15px", fontWeight: "600", color: T3.ink };
+  const chevStyle = { fontSize: "14px", color: T3.ink3 };
+
+  return React.createElement("div", {
+    style: { position: "fixed", inset: 0, background: "rgba(11,31,58,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center" },
+    onClick: onClose,
+  },
+    React.createElement("div", {
+      style: { background: T3.card, borderRadius: "28px 28px 0 0", padding: "12px 20px 44px", width: "100%", maxWidth: "500px", maxHeight: "92vh", overflowY: "auto", WebkitOverflowScrolling: "touch", boxShadow: "0 -12px 40px rgba(11,31,58,0.25)", fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "4px" },
+      onClick: e => e.stopPropagation(),
+    },
+      // Grabber
+      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: "rgba(22,24,29,0.15)", alignSelf: "center", margin: "0 0 10px" } }),
+      // Header: avatar + name + group·teacher
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "12px", padding: "4px 4px 14px", borderBottom: `1px solid ${T3.hairline}` } },
+        React.createElement(StudentAvatar, { student: user, size: 48 }),
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "1px" } },
+          React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: T3.ink } }, user?.name),
+          React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, subtitle)
+        )
+      ),
+      // 글자 크기 — segmented control (wired to the existing body[data-fontsize] zoom)
+      React.createElement("div", { style: rowStyle },
+        React.createElement("div", { style: labelStyle }, "글자 크기"),
+        React.createElement("div", { style: { background: "rgba(22,24,29,0.06)", borderRadius: "100px", padding: "3px", display: "flex" } },
+          sizes.map(([id, label]) => {
+            const on = fontSize === id;
+            return React.createElement("button", { key: id, onClick: () => { haptic.light(); setFontSize(id); },
+              style: { border: "none", cursor: "pointer", fontFamily: FONT_V3, background: on ? T3.card : "transparent", borderRadius: "100px", padding: "6px 14px", fontSize: on ? "12px" : "13px", fontWeight: on ? "800" : "700", color: on ? T3.ink : T3.ink2, boxShadow: on ? "0 1px 3px rgba(16,24,40,.1)" : "none" } }, label);
+          })
+        )
+      ),
+      // 언어 — opens the full editor (which holds the language selector)
+      React.createElement("button", { onClick: () => setShowFullEdit(true), style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
+        React.createElement("div", { style: labelStyle }, "언어"),
+        React.createElement("div", { style: { fontSize: "14px", color: T3.ink2 } }, (lang === "zh" ? "中文" : "한국어") + " ›")
+      ),
+      // 알림 — subscribeToPush toggle
+      React.createElement("div", { style: rowStyle },
+        React.createElement("div", { style: labelStyle }, "알림"),
+        React.createElement("button", { "data-tour-notif-btn": "true", onClick: handleNotif, disabled: notifOn || enabling,
+          style: { width: "46px", height: "28px", borderRadius: "100px", background: notifOn ? T3.green : "rgba(22,24,29,0.12)", position: "relative", border: "none", cursor: notifOn ? "default" : "pointer", padding: 0, transition: "background 0.2s ease" } },
+          React.createElement("div", { style: { position: "absolute", top: "2px", left: notifOn ? "20px" : "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s ease" } })
+        )
+      ),
+      // 내 프로필
+      React.createElement("button", { onClick: () => setShowFullEdit(true), style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
+        React.createElement("div", { style: labelStyle }, "내 프로필 (직업·취미)"),
+        React.createElement("div", { style: chevStyle }, "›")
+      ),
+      // Teacher View — teachers only
+      isTeacher && React.createElement("button", { onClick: onOpenTeacher, style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
+        React.createElement("div", { style: labelStyle }, "Teacher View"),
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", background: T3.waveSoft, color: T3.wave, padding: "4px 10px", borderRadius: "100px" } }, "선생님 전용")
+      ),
+      // 앱 둘러보기 다시 하기
+      React.createElement("button", { onClick: onRestartTour, style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
+        React.createElement("div", { style: labelStyle }, "앱 둘러보기 다시 하기"),
+        React.createElement("div", { style: chevStyle }, "›")
+      ),
+      // 로그아웃
+      React.createElement("button", { onClick: onLogout, style: { background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT_V3, textAlign: "left", padding: "16px 4px 0", fontSize: "15px", fontWeight: "700", color: T3.coral } }, "로그아웃")
+    )
   );
 }
 
