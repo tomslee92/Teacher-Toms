@@ -4612,7 +4612,19 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
             {/* V2 home layout — TEST FLAG: only for Toms Lee right now */}
             {/* HomeGridV2 — gated by per-student DB flag, toggleable from teacher dashboard.
                 Toms Lee always sees V2 as a safety fallback for testing/debugging. */}
-            {(user.home_v2_enabled || TEACHER_NAMES.includes(user.name)) ? (
+            {rv3 ? (
+              React.createElement(HomeGridV3, {
+                user: profileUser, group, isPreview,
+                onNavigate: (dest) => {
+                  if (dest === "wavy") { onGoToWavi(); return; }
+                  setTab(dest);
+                },
+                streak,
+                onOpenProfile: () => setShowProfile(true),
+                onStartScenario: (sc) => { setScenarioToLaunch(sc); setShowWavy(true); },
+                onOpenDailyQuestion,
+              })
+            ) : (user.home_v2_enabled || TEACHER_NAMES.includes(user.name)) ? (
               React.createElement(HomeGridV2, {
                 user: profileUser, group, isPreview,
                 onNavigate: (dest) => {
@@ -21476,6 +21488,214 @@ function StudentNotesInbox({ students, showMsg, onChanged, onReplyTo }) {
             );
           })
         )
+  );
+}
+
+// ── ModeSheetV3 (redesign v3, screen ②) ──────────────────────────────────────
+// Bottom sheet offering the two anxiety-reduced Wavi modes: 듣기 (Listen, no mic) and
+// 따라 말하기 (Shadowing, no scoring). Phase 2 launches the existing Wavi session for
+// both; the dedicated Listen/Shadowing players arrive in a later phase. Chosen mode is
+// remembered in localStorage so the session can branch once those players exist.
+function ModeSheetV3({ onClose, onPick }) {
+  const T3 = WAYVE_TOKENS;
+  const rows = [
+    { mode: "listen", title: "듣기", sub: "마이크를 쓰지 않아요", icon: React.createElement("svg", { width: 21, height: 21, viewBox: "0 0 24 24", fill: "none" },
+        React.createElement("path", { d: "M4 15v-3a8 8 0 0 1 16 0v3", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" }),
+        React.createElement("rect", { x: 3, y: 14, width: 4.5, height: 7, rx: 2.2, stroke: "currentColor", strokeWidth: 1.8 }),
+        React.createElement("rect", { x: 16.5, y: 14, width: 4.5, height: 7, rx: 2.2, stroke: "currentColor", strokeWidth: 1.8 })) },
+    { mode: "shadow", title: "따라 말하기", sub: "점수 없이 Wavi를 따라 말해요", icon: React.createElement("svg", { width: 21, height: 21, viewBox: "0 0 24 24", fill: "none" },
+        React.createElement("rect", { x: 9.2, y: 3.5, width: 5.6, height: 10.5, rx: 2.8, stroke: "currentColor", strokeWidth: 1.8 }),
+        React.createElement("path", { d: "M6.2 11.5a5.8 5.8 0 0 0 11.6 0M12 17.5v3", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" })) },
+  ];
+  const chevron = React.createElement("svg", { width: 8, height: 14, viewBox: "0 0 8 14" },
+    React.createElement("path", { d: "M1 1l6 6-6 6", stroke: T3.ink3, strokeWidth: 2, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }));
+  return React.createElement("div", {
+    style: { position: "fixed", inset: 0, background: "rgba(11,31,58,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center" },
+    onClick: onClose,
+  },
+    React.createElement("div", {
+      style: { background: T3.card, borderRadius: "28px 28px 0 0", padding: "12px 20px 44px", width: "100%", maxWidth: "500px", boxShadow: "0 -12px 40px rgba(11,31,58,0.25)", fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "14px", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)" },
+      onClick: e => e.stopPropagation(),
+    },
+      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: "rgba(22,24,29,0.15)", alignSelf: "center" } }),
+      // Header — Wavi + framing line
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "12px", padding: "4px 4px 0" } },
+        React.createElement("div", { style: { width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(11,31,58,0.12)", flexShrink: 0 } },
+          React.createElement("img", { src: "/wavi-neutral.png", alt: "Wavi", style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 18%" } })),
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "1px" } },
+          React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: T3.ink } }, "오늘은 어떻게 연습할까요?"),
+          React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, "어느 쪽이든 좋아요. 5분이면 충분해요.")
+        )
+      ),
+      ...rows.map(r => React.createElement("button", { key: r.mode, onClick: () => { haptic.medium(); try { localStorage.setItem("wayve_last_mode", r.mode); } catch(e) {} onPick(r.mode); },
+        style: { background: T3.bgGrouped, borderRadius: "20px", padding: "16px", display: "flex", alignItems: "center", gap: "14px", border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+        React.createElement("div", { style: { width: "42px", height: "42px", borderRadius: "13px", background: T3.waveSoft, display: "flex", alignItems: "center", justifyContent: "center", color: T3.wave, flexShrink: 0 } }, r.icon),
+        React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
+          React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: T3.ink } }, r.title),
+          React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, r.sub)
+        ),
+        chevron
+      )),
+      React.createElement("button", { onClick: onClose, style: { textAlign: "center", fontSize: "14px", fontWeight: "700", color: T3.ink2, paddingTop: "2px", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT_V3 } }, "다음에 할게요")
+    )
+  );
+}
+
+// ── HomeGridV3 (redesign v3, screen ①) — 오늘의 계획 home ──────────────────────
+// A daily-plan home: greeting → plan card (오늘의 표현 듣기 · Wavi와 연습 · 복습) →
+// streak line → Wavi resume card → Thankful Thursday (Thu) → 추천 세션 (curated,
+// gated). Plan state is derived from the same student_progress / session_phrases data
+// the legacy home reads — no new tables. "시작" / the Wavi card open the mode sheet (②).
+function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile, onStartScenario, onOpenDailyQuestion }) {
+  const T3 = WAYVE_TOKENS;
+  const firstName = (user?.name || "").trim().split(/\s+/)[0] || "친구";
+  const [plan, setPlan] = useState(null); // { waviTotal, waviRemaining, reviewCount, listenDone, todayExpr, hasLast }
+  const [scenarios, setScenarios] = useState([]);
+  const [todayQod, setTodayQod] = useState(null); // { prompt, answered } — Thankful Thursday
+  const [modeSheet, setModeSheet] = useState(false);
+  const scenariosVisible = SCENARIOS_STUDENT_ENABLED || user?.name === "Toms Lee" || user?.name === "Toms"
+    || SCENARIOS_ALLOW_GROUP_IDS.includes(group?.id) || SCENARIOS_ALLOW_GROUP_IDS.includes(user?.group_id);
+
+  useEffect(() => {
+    if (isPreview || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const progAll = await db.get("student_progress", `student_id=eq.${user.id}&select=phrase_id,passed,updated_at`).catch(() => []);
+        const passedSet = new Set(progAll.filter(p => p.passed).map(p => p.phrase_id));
+        const progMap = {}; progAll.forEach(p => { progMap[p.phrase_id] = p; });
+        const _mid = new Date(); _mid.setHours(0, 0, 0, 0); const todayStartISO = _mid.toISOString();
+        const practicedToday = (pid) => { const p = progMap[pid]; return !!(p && p.updated_at && p.updated_at >= todayStartISO); };
+
+        let waviTotal = 0, waviRemaining = 0, todayExpr = null;
+        if (group?.id) {
+          const scope = phraseScopeFilter(group.id, user.id);
+          const dismissedSet = await fetchDismissedPhraseIds(user.id);
+          const allSessionPhrases = (await db.get("session_phrases",
+            `${scope}&select=phrase_id,in_library,phrase_bank(id,english,korean,tag)`
+          ).catch(() => [])).filter(sp => !dismissedSet.has(sp.phrase_id));
+          const thisWeek = allSessionPhrases.filter(sp => !sp.in_library && sp.phrase_bank);
+          waviTotal = thisWeek.length;
+          waviRemaining = thisWeek.filter(sp => !passedSet.has(sp.phrase_id)).length;
+          const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+          todayExpr = thisWeek.length ? thisWeek[dayOfYear % thisWeek.length].phrase_bank : null;
+        }
+        // 복습 — mastered phrases untouched > 21 days (a light "come back to these" count)
+        const cutoffISO = new Date(Date.now() - 21 * 86400000).toISOString();
+        const resurfRows = await db.get("student_progress", `student_id=eq.${user.id}&passed=eq.true&updated_at=lt.${cutoffISO}&order=updated_at.asc&limit=5&select=phrase_id`).catch(() => []);
+        // Resume pointer — most recent Wavi attempt not from today (derive; no schema change)
+        const lastAttempt = await db.get("wavy_phrase_attempts", `student_id=eq.${user.id}&order=session_date.desc&limit=1&select=session_date`).catch(() => []);
+        const hasLast = !!(lastAttempt && lastAttempt[0]);
+        const listenDone = todayExpr ? practicedToday(todayExpr.id) : false;
+        if (!cancelled) setPlan({ waviTotal, waviRemaining, reviewCount: (resurfRows || []).length, listenDone, todayExpr, hasLast });
+
+        if (scenariosVisible) {
+          const aOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
+          if (group?.id) aOrs.push(`group_id.eq.${group.id}`);
+          const assigns = await db.get("scenario_assignments", `or=(${aOrs.join(",")})&select=scenario_id`).catch(() => []);
+          const ids = [...new Set((assigns || []).map(a => a.scenario_id))];
+          let scenarioRows = [];
+          if (ids.length) scenarioRows = await db.get("scenarios", `id=in.(${ids.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
+          if (!cancelled) setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
+        }
+        // Thankful Thursday — open all week; card only rendered on Thursday
+        const todayPrompt = await ensureThankfulThursdayPrompt().catch(() => null);
+        if (todayPrompt && !cancelled) {
+          let answered = false;
+          if (todayPrompt.id && !String(todayPrompt.id).startsWith("tt_")) {
+            const mine = await db.get("qod_responses", `prompt_id=eq.${todayPrompt.id}&student_id=eq.${user.id}&limit=1&select=id`).catch(() => []);
+            answered = mine.length > 0;
+          }
+          if (!answered) { try { answered = !!localStorage.getItem(`wayve_qod_response_id_${user.id}_${todayPrompt.id}`); } catch(e) {} }
+          if (!cancelled) setTodayQod({ prompt: todayPrompt.prompt, answered });
+        }
+      } catch(e) {}
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isPreview, group?.id]);
+
+  const openMode = () => { haptic.medium(); setModeSheet(true); };
+  const pickMode = (mode) => { setModeSheet(false); onNavigate("wavy"); };
+
+  // Derive plan steps
+  const p = plan || { waviTotal: 0, waviRemaining: 0, reviewCount: 0, listenDone: false, todayExpr: null, hasLast: false };
+  const steps = [];
+  steps.push({ key: "listen", label: "오늘의 표현 듣기", min: "1분", done: p.listenDone, action: null });
+  const waviDone = p.waviTotal > 0 && p.waviRemaining === 0;
+  steps.push({ key: "wavi", label: "Wavi와 연습", sub: p.waviRemaining > 0 ? `지난 수업 표현 ${p.waviRemaining}개` : "이번 주 표현을 다 익혔어요", min: null, done: waviDone, action: "시작" });
+  if (p.reviewCount > 0) steps.push({ key: "review", label: "복습 한 개", min: "2분", done: false, action: null });
+  const currentKey = (steps.find(s => !s.done) || {}).key;
+  const allDone = steps.every(s => s.done);
+  const remainMin = (p.listenDone ? 0 : 1) + (waviDone ? 0 : 5) + (p.reviewCount > 0 ? 2 : 0);
+  const subtitle = allDone ? "오늘 계획을 다 끝냈어요. 잘하셨어요." : `오늘 밤은 ${remainMin}분이면 충분해요.`;
+
+  // Plan-step status circle
+  const stepCircle = (status) => {
+    if (status === "done") return React.createElement("div", { style: { width: "26px", height: "26px", borderRadius: "50%", background: T3.green, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "13px", fontWeight: "800", flexShrink: 0 } }, "✓");
+    if (status === "current") return React.createElement("div", { style: { width: "26px", height: "26px", borderRadius: "50%", border: `2px solid ${T3.wave}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } },
+      React.createElement("div", { style: { width: "10px", height: "10px", borderRadius: "50%", background: T3.wave } }));
+    return React.createElement("div", { style: { width: "26px", height: "26px", borderRadius: "50%", border: "2px solid rgba(22,24,29,0.15)", flexShrink: 0 } });
+  };
+  const chevron = (color) => React.createElement("svg", { width: 8, height: 14, viewBox: "0 0 8 14" },
+    React.createElement("path", { d: "M1 1l6 6-6 6", stroke: color, strokeWidth: 2, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }));
+
+  return React.createElement("div", { style: { fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "16px", paddingTop: "8px" } },
+    // Greeting
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "2px" } },
+      React.createElement("div", { style: { fontSize: "30px", fontWeight: "800", letterSpacing: "-0.6px", color: T3.ink } }, firstName),
+      React.createElement("div", { style: { fontSize: "14px", color: T3.ink2 } }, subtitle)
+    ),
+    // Plan card
+    React.createElement("div", { style: { background: T3.card, borderRadius: "20px", padding: "6px 18px", boxShadow: T3.shadowCard } },
+      steps.map((s, i) => {
+        const status = s.done ? "done" : (s.key === currentKey ? "current" : "todo");
+        const isWaviStart = s.key === "wavi" && !s.done;
+        return React.createElement("div", { key: s.key, style: { display: "flex", alignItems: "center", gap: "14px", padding: "15px 0", borderBottom: i < steps.length - 1 ? `1px solid ${T3.hairline}` : "none" } },
+          stepCircle(status),
+          React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
+            React.createElement("div", { style: { fontSize: "15px", fontWeight: status === "current" ? "800" : "600", color: status === "done" ? T3.ink3 : (status === "current" ? T3.ink : T3.ink2), textDecoration: status === "done" ? "line-through" : "none" } }, s.label),
+            s.sub && status === "current" && React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, s.sub)
+          ),
+          isWaviStart
+            ? React.createElement("button", { onClick: openMode, style: { background: T3.wave, color: "#fff", fontSize: "13px", fontWeight: "800", padding: "9px 18px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT_V3, flexShrink: 0 } }, "시작")
+            : (s.min ? React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: T3.ink3, flexShrink: 0 } }, s.min) : null)
+        );
+      })
+    ),
+    // Streak line (text only, no fire — matches existing streakDisplay restraint)
+    streak >= 1 && React.createElement("div", { style: { fontSize: "12px", color: T3.ink3, padding: "0 4px", marginTop: "-4px" } }, `이번 주 ${streak}일째 함께하고 있어요.`),
+    // Wavi resume card (navy)
+    React.createElement("button", { onClick: openMode, style: { background: `linear-gradient(135deg, ${T3.navy1} 0%, ${T3.navy2} 100%)`, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 8px 28px rgba(11,31,58,.22)", border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+      React.createElement("div", { style: { width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0 } },
+        React.createElement("img", { src: "/wavi-encouraging.png", alt: "Wavi", style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 18%" } })),
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: "#fff" } }, "Wavi"),
+        React.createElement("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.6)" } }, p.hasLast ? "어제 하던 대화, 이어서 할까요?" : "오늘의 대화를 시작할까요?")
+      ),
+      chevron("rgba(255,255,255,0.5)")
+    ),
+    // Thankful Thursday (Thursdays only)
+    isQodDay() && todayQod && React.createElement("button", { onClick: () => onOpenDailyQuestion && onOpenDailyQuestion(), style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+      React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: T3.coralSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 } }, "🙏"),
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
+        React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", letterSpacing: "1.5px", color: T3.coral } }, "THANKFUL THURSDAY"),
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: T3.ink } }, todayQod.answered ? "오늘의 감사, 확인해볼까요" : "감사한 일 한 가지를 나눠요")
+      ),
+      chevron(T3.ink3)
+    ),
+    // 추천 세션 — curated Listen sessions (gated; only when assigned)
+    scenariosVisible && scenarios.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" } },
+      React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between" } },
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: T3.ink } }, "추천 세션"),
+        React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: T3.ink3 } }, `${scenarios.length}`)
+      ),
+      scenarios.slice(0, 3).map(sc => React.createElement("button", { key: sc.id, onClick: () => onStartScenario && onStartScenario(sc), style: { background: T3.card, borderRadius: "20px", padding: "16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+        React.createElement("div", { style: { flex: 1, fontSize: "16px", fontWeight: "800", color: T3.ink } }, sc.title || sc.name || "세션"),
+        React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: T3.wave } }, "듣기 →")
+      ))
+    ),
+    // Mode sheet
+    modeSheet && React.createElement(ModeSheetV3, { onClose: () => setModeSheet(false), onPick: pickMode })
   );
 }
 
