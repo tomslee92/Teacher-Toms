@@ -4210,7 +4210,11 @@ const TOUR_STEPS = [
 function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, fontSize = 'default', setFontSize = () => {}, qodCelebPending = null, onCelebShown = () => {}, onOpenDailyQuestion = () => {}, onGoToWavi = () => {}, initialTab = null }) {
   _tokenUser = user; _tokenGroup = group;
   const rv3 = isRedesignV3(user); // redesign v3 — new IA/tokens/tab bar/profile sheet (Toms only)
-  const [tab, setTab] = useState(initialTab);
+  // v3 has no My List tab — an old myphrases deep-link routes to Practice · My List.
+  const [tab, setTab] = useState(rv3 && initialTab === "myphrases" ? "practice" : initialTab);
+  // v3: My List folds into Practice as a segment (⑤⑭). Toggles which of the two
+  // already-mounted feature-screens (practice / myphrases) is visible under the Practice tab.
+  const [practiceSegment, setPracticeSegment] = useState(rv3 && initialTab === "myphrases" ? "mylist" : "week"); // "week" | "mylist"
   const [showWavy, setShowWavy] = useState(false);
   const [scenarioToLaunch, setScenarioToLaunch] = useState(null); // curated scenario chosen from the home card
   const [showProfile, setShowProfile] = useState(false);
@@ -4663,13 +4667,23 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         <div className="feature-screen" style={{ display: tab === "community" ? "block" : "none" }}>
           {React.createElement(ErrorBoundary, { key: "community" }, React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak, unreadCommentIds, refreshUnreadComments, onSubmitToday: (isFirst, responses) => { setSubmittedToday(true); triggerQodCelebration(isFirst, responses); } }))}
         </div>
-        <div className="feature-screen" style={{ display: tab === "practice" ? "block" : "none" }}>
+        {/* v3: Practice segmented control (⑤⑭) — 이번 주 / My List. Toggles the two
+            mounted feature-screens below. */}
+        {rv3 && tab === "practice" && (
+          <div style={{ background: "rgba(22,24,29,0.06)", borderRadius: "100px", padding: "3px", display: "flex", marginBottom: "16px", fontFamily: FONT_V3 }}>
+            {[["week", "이번 주"], ["mylist", "My List"]].map(([id, label]) => {
+              const on = practiceSegment === id;
+              return <button key={id} onClick={() => { haptic.light(); setPracticeSegment(id); }} style={{ flex: 1, background: on ? "#fff" : "transparent", borderRadius: "100px", padding: "9px 0", textAlign: "center", fontSize: "13px", fontWeight: on ? "800" : "700", color: on ? WAYVE_TOKENS.ink : WAYVE_TOKENS.ink2, boxShadow: on ? "0 1px 3px rgba(16,24,40,.1)" : "none", border: "none", cursor: "pointer", fontFamily: FONT_V3 }}>{label}</button>;
+            })}
+          </div>
+        )}
+        <div className="feature-screen" style={{ display: (tab === "practice" && (!rv3 || practiceSegment === "week")) ? "block" : "none" }}>
           {React.createElement(ErrorBoundary, { key: "practice" }, React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak, onGoHome: () => setTab(null), onCelebrate: () => setShowPracticeCelebration(true), onRandomPhrase: (data) => { setRandomModal(data); setRandomModalKey(k => k + 1); } }))}
         </div>
         <div className="feature-screen" style={{ display: tab === "freetalk" ? "block" : "none" }}>
           {React.createElement(ErrorBoundary, { key: "freetalk" }, React.createElement(FreeTalkTab, { user, group, isPreview, onPracticed: updateStreak, onPhraseSaved: () => setMyPhrasesKey(k => k + 1) }))}
         </div>
-        <div className="feature-screen" style={{ display: tab === "myphrases" ? "block" : "none" }}>
+        <div className="feature-screen" style={{ display: (tab === "myphrases" || (rv3 && tab === "practice" && practiceSegment === "mylist")) ? "block" : "none" }}>
           {React.createElement(ErrorBoundary, { key: "myphrases" }, React.createElement(MyPhrasesTab, { user, isPreview, refreshKey: myPhrasesKey }))}
         </div>
         <div className="feature-screen" style={{ display: tab === "chat" ? "block" : "none" }}>
@@ -5965,6 +5979,7 @@ function RotatingPrompt() {
 function FreeTalkTab({ user, group, isPreview, onPracticed, onPhraseSaved }) {
   const lang = useLang();
   const newUI = isNewUI(user);
+  const rv3 = isRedesignV3(user); // v3: Solo is production-only — discovery moves to Home (⑥)
   const feedbackRef = useRef(null);
   const heroRef = useRef(null);
   const [feedback, setFeedback] = useState(null);
@@ -6683,8 +6698,10 @@ Return ONLY this JSON array, no markdown:
           <div style={{ borderTop: `1px solid ${C.border}`, padding: "16px 18px 20px" }}>
 
 
-            {/* ── 오늘의 표현 ── auto-loaded idiom card */}
-            <div style={{ marginBottom: "24px" }}>
+            {/* ── 오늘의 표현 ── auto-loaded idiom card.
+                v3 (⑥): Solo's single job is production; discovery (오늘의 표현 + 추천 세션)
+                lives on Home, so this section is hidden for redesign users. */}
+            {!rv3 && <div style={{ marginBottom: "24px" }}>
               <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>오늘의 표현</div>
               {loadingTodays && !todaysExpr && (
                 <div style={{ background: C.bgSoft, borderRadius: "14px", padding: "24px", textAlign: "center" }}>{React.createElement(Spinner)}</div>
@@ -6748,7 +6765,7 @@ Return ONLY this JSON array, no markdown:
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* ── 상황별 표현 생성 ── */}
             <div style={{ fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "10px" }}>상황별 표현 생성</div>
