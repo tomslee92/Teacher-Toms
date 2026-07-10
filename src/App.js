@@ -21733,7 +21733,20 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
   const T3 = WAYVE_TOKENS;
   const [text, setText] = useState(presetText);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [justSent, setJustSent] = useState(false); // brief inline confirmation after a send
+  const [myRequests, setMyRequests] = useState([]); // this student's previous requests
+
+  // Load this student's request history (newest first). Fails soft if the table
+  // isn't migrated yet → empty list, composer still works.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await db.get("class_requests", `student_id=eq.${user.id}&order=created_at.desc&limit=20&select=id,content,status,created_at`).catch(() => []);
+      if (!cancelled) setMyRequests(Array.isArray(rows) ? rows : []);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // "N일 남음" until the group's session day, when known (nullable → omitted).
   let countdown = null;
@@ -21744,19 +21757,29 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
     countdown = `${dayNames[group.session_day]}요일 수업까지 ${diff}일 — 지금 보내면 이번 수업에 반영돼요.`;
   }
 
+  const STATUS = {
+    new:     { label: "접수됨",     color: T3.ink2,  bg: "rgba(22,24,29,0.06)" },
+    planned: { label: "수업에 반영", color: T3.wave,  bg: T3.waveSoft },
+    covered: { label: "완료",       color: T3.green, bg: T3.greenSoft },
+  };
+  const fmtDate = (iso) => { try { const d = new Date(iso); return `${d.getMonth() + 1}월 ${d.getDate()}일`; } catch(e) { return ""; } };
+
   const send = async () => {
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
-    // Fire-and-forget insert; the sent confirmation shows regardless so the moment
-    // never feels broken (the table may not exist until the migration is applied).
+    const created_at = new Date().toISOString();
+    let inserted = null;
     try {
-      await db.insert("class_requests", { student_id: user.id, group_id: group?.id || null, kind: "text", content: body, status: "new", created_at: new Date().toISOString() });
+      const res = await db.insert("class_requests", { student_id: user.id, group_id: group?.id || null, kind: "text", content: body, status: "new", created_at });
+      inserted = Array.isArray(res) ? res[0] : null;
     } catch(e) {}
     haptic.success();
     setSending(false);
-    setSent(true);
-    try { localStorage.setItem(`wayve_class_request_sent_${user.id}`, String(Date.now())); } catch(e) {}
+    setText("");
+    setJustSent(true);
+    // Optimistically prepend to the history so the student sees it land immediately.
+    setMyRequests(prev => [{ id: inserted?.id || `tmp_${created_at}`, content: body, status: "new", created_at }, ...prev]);
     if (onSent) onSent();
   };
 
@@ -21765,31 +21788,38 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
     onClick: onClose,
   },
     React.createElement("div", {
-      style: { background: T3.card, borderRadius: "28px 28px 0 0", padding: "12px 20px 44px", width: "100%", maxWidth: "500px", boxShadow: "0 -12px 40px rgba(11,31,58,0.25)", fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "14px", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)" },
+      style: { background: T3.card, borderRadius: "28px 28px 0 0", padding: "12px 20px 44px", width: "100%", maxWidth: "500px", maxHeight: "88vh", overflowY: "auto", WebkitOverflowScrolling: "touch", boxShadow: "0 -12px 40px rgba(11,31,58,0.25)", fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "14px", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)" },
       onClick: e => e.stopPropagation(),
     },
       React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: "rgba(22,24,29,0.15)", alignSelf: "center" } }),
-      sent
-        ? React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "16px 4px 8px", textAlign: "center" } },
-            React.createElement("div", { style: { width: "48px", height: "48px", borderRadius: "50%", background: T3.greenSoft, display: "flex", alignItems: "center", justifyContent: "center", color: T3.green, fontSize: "22px", fontWeight: "800" } }, "✓"),
-            React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: T3.ink } }, "리퀘스트를 보냈어요"),
-            React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, "수업에 반영할게요. 고마워요!"),
-            React.createElement("button", { onClick: onClose, style: { marginTop: "6px", width: "100%", background: T3.bgGrouped, color: T3.ink, fontSize: "15px", fontWeight: "800", padding: "14px 0", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT_V3 } }, "닫기")
-          )
-        : React.createElement(React.Fragment, null,
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "3px", padding: "4px 4px 0" } },
-              React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: T3.ink } }, "다음 수업에서 배우고 싶은 게 있어요?"),
-              React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, countdown || "지금 보내면 다음 수업에 반영돼요.")
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "3px", padding: "4px 4px 0" } },
+        React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: T3.ink } }, "다음 수업에서 배우고 싶은 게 있어요?"),
+        React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, countdown || "여러 개 보내도 좋아요 — Toms가 하나씩 확인해요.")
+      ),
+      // Previous requests
+      myRequests.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "0.5px", color: T3.ink3, padding: "4px 4px 0" } }, `보낸 리퀘스트 ${myRequests.length}개`),
+        myRequests.map(r => {
+          const st = STATUS[r.status] || STATUS.new;
+          return React.createElement("div", { key: r.id, style: { background: T3.bgGrouped, borderRadius: "14px", padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: "10px" } },
+            React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "3px" } },
+              React.createElement("div", { style: { fontSize: "14px", fontWeight: "600", color: T3.ink, lineHeight: 1.45 } }, r.content),
+              React.createElement("div", { style: { fontSize: "11px", color: T3.ink3 } }, fmtDate(r.created_at))
             ),
-            React.createElement("textarea", {
-              value: text, onChange: e => setText(e.target.value), autoFocus: true, rows: 4,
-              placeholder: '한국어로 편하게 — "병원 예약할 때 뭐라고 해요?"',
-              style: { width: "100%", background: T3.bgGrouped, border: "none", borderRadius: "16px", padding: "14px 16px", fontSize: "15px", color: T3.ink, fontFamily: FONT_V3, outline: "none", resize: "none", lineHeight: 1.5 },
-            }),
-            React.createElement("button", { onClick: send, disabled: !text.trim() || sending,
-              style: { width: "100%", background: text.trim() ? T3.wave : "rgba(22,24,29,0.12)", color: "#fff", fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", border: "none", cursor: text.trim() ? "pointer" : "default", fontFamily: FONT_V3 } }, sending ? "보내는 중…" : "보내기"),
-            React.createElement("button", { onClick: onClose, style: { textAlign: "center", fontSize: "14px", fontWeight: "700", color: T3.ink2, background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT_V3 } }, "다음에 할게요")
-          )
+            React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", color: st.color, background: st.bg, padding: "3px 9px", borderRadius: "100px", flexShrink: 0 } }, st.label)
+          );
+        })
+      ),
+      // Composer
+      justSent && React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: T3.green, padding: "0 4px" } }, "✓ 보냈어요. 더 보내도 좋아요."),
+      React.createElement("textarea", {
+        value: text, onChange: e => { setText(e.target.value); if (justSent) setJustSent(false); }, rows: 3,
+        placeholder: '한국어로 편하게 — "병원 예약할 때 뭐라고 해요?"',
+        style: { width: "100%", background: T3.bgGrouped, border: "none", borderRadius: "16px", padding: "14px 16px", fontSize: "15px", color: T3.ink, fontFamily: FONT_V3, outline: "none", resize: "none", lineHeight: 1.5 },
+      }),
+      React.createElement("button", { onClick: send, disabled: !text.trim() || sending,
+        style: { width: "100%", background: text.trim() ? T3.wave : "rgba(22,24,29,0.12)", color: "#fff", fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", border: "none", cursor: text.trim() ? "pointer" : "default", fontFamily: FONT_V3 } }, sending ? "보내는 중…" : (myRequests.length > 0 ? "하나 더 보내기" : "보내기")),
+      React.createElement("button", { onClick: onClose, style: { textAlign: "center", fontSize: "14px", fontWeight: "700", color: T3.ink2, background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT_V3 } }, "닫기")
     )
   );
 }
@@ -21862,7 +21892,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
   const [todayQod, setTodayQod] = useState(null); // { prompt, answered } — Thankful Thursday
   const [modeSheet, setModeSheet] = useState(false);
   const [requestSheet, setRequestSheet] = useState(false);
-  const [requestSent, setRequestSent] = useState(() => { try { return !!localStorage.getItem(`wayve_class_request_sent_${user?.id}`); } catch(e) { return false; } });
+  const [openRequests, setOpenRequests] = useState(0); // this student's not-yet-covered requests (for the card subtitle)
   const scenariosVisible = SCENARIOS_STUDENT_ENABLED || user?.name === "Toms Lee" || user?.name === "Toms"
     || SCENARIOS_ALLOW_GROUP_IDS.includes(group?.id) || SCENARIOS_ALLOW_GROUP_IDS.includes(user?.group_id);
 
@@ -21910,6 +21940,9 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         const lastAttempt = await db.get("wavy_phrase_attempts", `student_id=eq.${user.id}&order=session_date.desc&limit=1&select=session_date`).catch(() => []);
         const hasLast = !!(lastAttempt && lastAttempt[0]);
         if (!cancelled) setPlan({ waviTotal, waviRemaining, reviewCount: (resurfRows || []).length, listenDone, todayExpr, hasLast });
+        // Open (not-yet-covered) class requests — for the 다음 수업 리퀘스트 card subtitle.
+        const reqRows = await db.get("class_requests", `student_id=eq.${user.id}&status=neq.covered&select=id`).catch(() => []);
+        if (!cancelled) setOpenRequests((reqRows || []).length);
 
         if (scenariosVisible) {
           const aOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
@@ -22016,23 +22049,16 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       ),
       chevron("rgba(255,255,255,0.5)")
     ),
-    // 다음 수업 리퀘스트 (⑱⑲) — student→teacher input loop. Echoes a sent state.
-    requestSent
-      ? React.createElement("div", { style: { background: T3.greenSoft, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", border: `1px solid ${T3.green}22` } },
-          React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: T3.green, fontSize: "18px", fontWeight: "800", flexShrink: 0 } }, "✓"),
-          React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T3.ink } }, "리퀘스트를 보냈어요"),
-            React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, "수업에 반영돼요")
-          )
-        )
-      : React.createElement("button", { onClick: () => { haptic.medium(); setRequestSheet(true); }, style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
-          React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: T3.waveSoft, display: "flex", alignItems: "center", justifyContent: "center", color: T3.wave, fontSize: "18px", flexShrink: 0 } }, "💬"),
-          React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
-            React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T3.ink } }, "다음 수업 리퀘스트"),
-            React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, "배우고 싶은 걸 Toms에게 보내요")
-          ),
-          chevron(T3.ink3)
-        ),
+    // 다음 수업 리퀘스트 (⑱⑲) — student→teacher input loop. Always open (submit as many as
+    // you like); the sheet shows the full history + status. Subtitle shows the open count.
+    React.createElement("button", { onClick: () => { haptic.medium(); setRequestSheet(true); }, style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+      React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: T3.waveSoft, display: "flex", alignItems: "center", justifyContent: "center", color: T3.wave, fontSize: "18px", flexShrink: 0 } }, "💬"),
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T3.ink } }, "다음 수업 리퀘스트"),
+        React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, openRequests > 0 ? `보낸 리퀘스트 ${openRequests}개 · 새로 보내기` : "배우고 싶은 걸 Toms에게 보내요")
+      ),
+      chevron(T3.ink3)
+    ),
     // Thankful Thursday (Thursdays only)
     isQodDay() && todayQod && React.createElement("button", { onClick: () => onOpenDailyQuestion && onOpenDailyQuestion(), style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
       React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: T3.coralSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 } }, "🙏"),
@@ -22056,7 +22082,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     // Mode sheet
     modeSheet && React.createElement(ModeSheetV3, { onClose: () => setModeSheet(false), onPick: pickMode }),
     // Class request sheet
-    requestSheet && React.createElement(ClassRequestSheetV3, { user, group, onClose: () => setRequestSheet(false), onSent: () => setRequestSent(true) }),
+    requestSheet && React.createElement(ClassRequestSheetV3, { user, group, onClose: () => setRequestSheet(false), onSent: () => setOpenRequests(n => n + 1) }),
     // Listen player (⑩)
     listenOpen && plan?.todayExpr && React.createElement(ListenPlayerV3, { phrase: plan.todayExpr, onClose: () => setListenOpen(false), onDone: markListened })
   );
