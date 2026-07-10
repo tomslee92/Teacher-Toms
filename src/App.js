@@ -3093,14 +3093,15 @@ function BalloonsEffect() {
 function QodCelebration({ isFirst, responses, user, onDone }) {
   const lang = useLang();
   const newUI = isNewUI(user);
-  const [phase, setPhase] = useState("celebrate");
+  const rv3 = isRedesignV3(user); // v3 (⑬/㉕): skip the confetti burst — go straight to the calm voices screen
+  const [phase, setPhase] = useState(rv3 ? "community" : "celebrate");
   const others = (responses || []).filter(r => r.student_id !== user.id).slice(0, 3);
   const hasOthers = others.length > 0;
   const DELAY = 3500;
 
   useEffect(() => {
-    // Auto-transition unless truly first with no other responses
-    if (isFirst && !hasOthers) return;
+    // Auto-transition unless truly first with no other responses (v3 already starts calm)
+    if (rv3 || (isFirst && !hasOthers)) return;
     const t = setTimeout(() => setPhase("community"), DELAY);
     return () => clearTimeout(t);
   }, []);
@@ -3133,7 +3134,7 @@ function QodCelebration({ isFirst, responses, user, onDone }) {
           </div>
           {/* Title */}
           <div style={{ fontSize: "28px", fontWeight: "900", color: C.text, letterSpacing: "-0.6px", marginBottom: "8px", animation: "communitySlideUp 0.4s cubic-bezier(0.4,0,0.2,1) 0.1s both", opacity: 0 }}>
-            {lang === "zh" ? "做得好！🎉" : "잘했어요! 🎉"}
+            {rv3 ? (lang === "zh" ? "做得好" : "잘했어요") : (lang === "zh" ? "做得好！🎉" : "잘했어요! 🎉")}
           </div>
           {/* Subtitle */}
           <div style={{ fontSize: "15px", color: C.textMid, lineHeight: 1.6, animation: "communitySlideUp 0.4s cubic-bezier(0.4,0,0.2,1) 0.16s both", opacity: 0 }}>
@@ -13577,6 +13578,7 @@ const REACTION_EMOJIS = ["🔥", "👏", "💪", "😄", "🌊", "⭐"];
 function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = new Set(), refreshUnreadComments = () => {}, onSubmitToday = () => {} }) {
   const lang = useLang();
   const newUI = isNewUI(user);
+  const rv3 = isRedesignV3(user); // v3 Community/Thursday restyle (⑦⑬) — presentational only
   const [qodPrompt, setQodPrompt] = useState(null);
   const [cityGroup, setCityGroup] = useState(null);
   const [responses, setResponses] = useState([]);
@@ -13739,6 +13741,7 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         .reaction-btn:hover { transform: scale(1.15); }
       `}</style>
       {React.createElement(TourTabTooltip, { tabKey: "community" })}
+      {rv3 && <div style={{ fontSize: "30px", fontWeight: "800", letterSpacing: "-0.6px", color: WAYVE_TOKENS.ink, fontFamily: FONT_V3, marginBottom: "16px" }}>Community</div>}
       {unreadCommentIds.size > 0 && (
         <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: "12px", padding: "12px 14px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "10px", animation: "fadeIn 0.5s ease" }}>
           <div style={{ fontSize: "20px" }}>👨‍🏫</div>
@@ -13780,8 +13783,34 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         </div>
       )}
 
-      {/* Thankful Thursday card — the weekly event, only on Thursdays */}
-      {qodPrompt && (
+      {/* v3 Thankful Thursday card (⑦) — calm white card with the prompt + 말로 나누기.
+          Same handlers as the legacy card; presentational only. */}
+      {qodPrompt && rv3 && (
+        <div data-tour-phrase-first="true" style={{ background: WAYVE_TOKENS.card, borderRadius: "20px", padding: "20px", marginBottom: "20px", boxShadow: WAYVE_TOKENS.shadowCard, fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: WAYVE_TOKENS.coralSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>🙏</div>
+            <div style={{ fontSize: "11px", fontWeight: "800", letterSpacing: "1.5px", color: WAYVE_TOKENS.coral }}>THANKFUL THURSDAY</div>
+          </div>
+          <div style={{ fontSize: "19px", fontWeight: "800", color: WAYVE_TOKENS.ink, letterSpacing: "-0.3px", lineHeight: 1.4 }}>{qodPrompt.prompt}</div>
+          {!hasAnsweredToday ? (
+            <button onClick={() => setShowQodFlow(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: WAYVE_TOKENS.navy1, color: "#fff", fontSize: "14px", fontWeight: "800", padding: "13px 0", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <rect x="9.2" y="3.5" width="5.6" height="10.5" rx="2.8" stroke="currentColor" strokeWidth="2" />
+                <path d="M6.2 11.5a5.8 5.8 0 0 0 11.6 0M12 17.5v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              말로 나누기
+            </button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <div style={{ background: WAYVE_TOKENS.greenSoft, color: WAYVE_TOKENS.green, borderRadius: "100px", padding: "9px 16px", fontSize: "13px", fontWeight: "800" }}>✓ 감사한 일을 나눴어요</div>
+              <button onClick={() => setShowQodFlow(true)} style={{ background: "transparent", color: WAYVE_TOKENS.ink2, border: `1px solid ${WAYVE_TOKENS.hairline}`, borderRadius: "100px", padding: "9px 14px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT_V3 }}>다시 나누기</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Thankful Thursday card — the weekly event, only on Thursdays (legacy) */}
+      {qodPrompt && !rv3 && (
       <div data-tour-phrase-first="true" style={{ background: "linear-gradient(160deg, #9A5A2E 0%, #4E2C16 100%)", borderRadius: "16px", padding: "24px", marginBottom: "20px", color: "#fff", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-16px", right: "-6px", fontSize: "96px", opacity: 0.10 }}>🙏</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
@@ -13837,8 +13866,10 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
         </div>
       ) : (
         <div>
-          <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>
-            {cityGroup.emoji} {cityGroup.name} · {responses.length} voices
+          <div style={rv3
+            ? { fontSize: "13px", fontWeight: "800", color: WAYVE_TOKENS.ink2, marginBottom: "12px", fontFamily: FONT_V3 }
+            : { fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "3px", textTransform: "uppercase", marginBottom: "12px" }}>
+            {rv3 ? `이번 주 나눔 · ${responses.length}명 참여` : `${cityGroup.emoji} ${cityGroup.name} · ${responses.length} voices`}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {responses.map((r, i) => (
