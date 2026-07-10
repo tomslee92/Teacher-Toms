@@ -7156,14 +7156,18 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
     return (p.english || "").toLowerCase().includes(q) || (p.korean && p.korean.toLowerCase().includes(q));
   };
 
-  // Sort active: unmastered first (by attempts desc), mastered at bottom
-  const active = phrases.filter(p => !p.hidden && filterPhrase(p)).sort((a, b) => {
+  // Sort active: unmastered first (by attempts desc), mastered at bottom.
+  // v3 flattens 내 목록 to a single saved list (no 🎓 라이브러리 split), so graduated
+  // (hidden) phrases are included here and the library section below stays empty —
+  // avoids the naming clash with the 지난 표현 tab (which is the class's past-week phrases).
+  const rv3 = isRedesignV3(user);
+  const active = phrases.filter(p => (rv3 ? true : !p.hidden) && filterPhrase(p)).sort((a, b) => {
     const pa = getProgForPhrase(a), pb = getProgForPhrase(b);
     const aPassed = pa?.passed ? 1 : 0, bPassed = pb?.passed ? 1 : 0;
     if (aPassed !== bPassed) return aPassed - bPassed;
     return (pb?.attempts || 0) - (pa?.attempts || 0);
   });
-  const library = phrases.filter(p => p.hidden && filterPhrase(p));
+  const library = rv3 ? [] : phrases.filter(p => p.hidden && filterPhrase(p));
 
   // Tag lists for filter bars
   const activeTags = [...new Set(active.filter(p => p.tag).map(p => p.tag))];
@@ -7192,11 +7196,11 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
         </div>
       ) : (
         <div>
-          {/* ── Active section ── */}
+          {/* ── Active section ── (v3: this IS 내 목록 — one flat saved list, no sub-header) */}
           <div style={{ marginBottom: "28px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+            {!rv3 && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
               <div style={{ fontSize: newUI ? "20px" : "13px", fontWeight: "800", color: newUI ? W.ink : C.text, letterSpacing: newUI ? "-0.3px" : "0" }}>연습 중 <span style={{ fontSize: "11px", fontWeight: "600", color: newUI ? W.ink3 : C.textLight, marginLeft: "4px" }}>{active.length}개</span></div>
-            </div>
+            </div>}
             {/* Tag filter */}
             {activeTags.length >= 2 && (
               <div style={{ display: "flex", gap: "6px", overflowX: "auto", marginBottom: "10px", paddingBottom: "2px", WebkitOverflowScrolling: "touch" }}>
@@ -7220,7 +7224,7 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
                     onPracticed: () => {},
                     source: p.source || "mine",
                     openId, setOpenId,
-                    onGraduate: () => toggleHide(p.id, false),
+                    onGraduate: rv3 ? null : (() => toggleHide(p.id, false)), // v3: no graduate/library split
                     onDelete: () => deletePhrase(p.id),
                     inLibrary: false,
                     newUI,
