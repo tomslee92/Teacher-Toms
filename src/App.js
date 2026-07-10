@@ -6466,6 +6466,7 @@ Return ONLY this JSON array, no markdown:
     <div>
       <style>{`@keyframes ftReveal { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }`}</style>
       {React.createElement(TourTabTooltip, { tabKey: "freetalk" })}
+      {rv3 && !openTool && <div style={{ fontSize: "30px", fontWeight: "800", letterSpacing: "-0.6px", color: WAYVE_TOKENS.ink, fontFamily: FONT_V3, marginBottom: "16px" }}>Solo Practice</div>}
       <div ref={heroRef} data-tour-freetalk="record" style={{
         overflow: "hidden",
         maxHeight: openTool ? "0px" : "600px",
@@ -6474,6 +6475,37 @@ Return ONLY this JSON array, no markdown:
         transition: "max-height 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease, margin-bottom 0.3s ease",
         pointerEvents: openTool ? "none" : "auto",
       }}>
+      {rv3 ? (
+        /* v3 (⑥) — light mic-first card. Same rec/feedback machinery, presentational only. */
+        <div style={{ background: WAYVE_TOKENS.card, borderRadius: "20px", padding: "26px 20px", boxShadow: WAYVE_TOKENS.shadowCard, display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", fontFamily: FONT_V3, animation: "ftReveal 0.45s ease both" }}>
+        {!rec.isRec && !loadingFeedback && (
+          <>
+            <div style={{ fontSize: "17px", fontWeight: "800", color: WAYVE_TOKENS.ink, textAlign: "center" }}>무슨 말을 하고 싶어요?</div>
+            <button onClick={() => { setFeedback(null); setTranscript(""); setRecordingUrl(null); setFlagged(false); rec.start(); }}
+              style={{ width: "76px", height: "76px", borderRadius: "50%", background: WAYVE_TOKENS.wave, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 0 0 12px rgba(62,123,250,0.1), 0 8px 20px rgba(62,123,250,0.35)", border: "none", cursor: "pointer" }}>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                <rect x="9.2" y="3.5" width="5.6" height="10.5" rx="2.8" stroke="currentColor" strokeWidth="2" />
+                <path d="M6.2 11.5a5.8 5.8 0 0 0 11.6 0M12 17.5v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+            <div style={{ fontSize: "13px", color: WAYVE_TOKENS.ink2, textAlign: "center", lineHeight: 1.5 }}>한국어로 말해도 괜찮아요. 영어 표현을 찾아드려요.</div>
+          </>
+        )}
+        {rec.isRec && React.createElement(RecordButton, { isRec: true, time: rec.time, onStart: rec.start, onStop: rec.stop, size: "lg", darkBg: false, accent: WAYVE_TOKENS.wave })}
+        {loadingFeedback && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", color: WAYVE_TOKENS.ink2, fontSize: "13px" }}>
+            {React.createElement(Spinner)} {T("analyzing", lang)}
+          </div>
+        )}
+        {transcript && !loadingFeedback && (
+          <div style={{ background: WAYVE_TOKENS.bgGrouped, borderRadius: "12px", padding: "10px 14px", fontSize: "13px", color: WAYVE_TOKENS.ink2, lineHeight: 1.5, width: "100%", textAlign: "left" }}>🎙 "{transcript}"</div>
+        )}
+        {feedback && !rec.isRec && !loadingFeedback && (
+          <button onClick={() => { setFeedback(null); setTranscript(""); rec.start(); }}
+            style={{ padding: "8px 18px", borderRadius: "100px", background: WAYVE_TOKENS.bgGrouped, border: "none", color: WAYVE_TOKENS.ink2, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT_V3 }}>🔄 다시 말하기</button>
+        )}
+        </div>
+      ) : (
       <div style={{ background: newUI ? `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)` : C.navy, borderRadius: "20px", padding: "28px 22px 24px", boxShadow: newUI ? "0 8px 24px rgba(11,31,58,0.22)" : "0 4px 16px rgba(26,58,110,0.15)", textAlign: "center", animation: "ftReveal 0.45s ease both" }}>
         <div style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "16px" }}>Solo Practice</div>
 
@@ -6516,9 +6548,13 @@ Return ONLY this JSON array, no markdown:
           </button>
         )}
       </div>
+      )}
       </div>
 
       {/* ── FEEDBACK — clean white card below hero ───────────────────────── */}
+      {rv3 && feedback && !loadingFeedback && !openTool && (
+        <div style={{ fontSize: "13px", fontWeight: "800", color: WAYVE_TOKENS.ink2, fontFamily: FONT_V3, marginBottom: "10px" }}>방금 연습</div>
+      )}
       {feedback && !loadingFeedback && (
         <div ref={feedbackRef} style={{ background: C.bg, borderRadius: newUI ? WAYVE_TOKENS.rCard : "16px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, boxShadow: newUI ? WAYVE_TOKENS.shadowCard : "0 2px 8px rgba(0,0,0,0.06)", padding: "18px 18px", marginBottom: "16px", animation: "fadeIn 0.5s ease" }} className="fade-in">
 
