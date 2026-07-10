@@ -7707,8 +7707,11 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
       setStudents(s); setPhraseBank(p); setGroups(g); setLoading(false);
     });
     fetchRateLimitAlerts();
-    // Fetch unread inbox messages count
-    db.get("student_messages", "replied=eq.false&order=created_at.desc").catch(() => []).then(msgs => setInboxUnread(msgs.length));
+    // Inbox badge = unresolved messages + new (not-yet-actioned) class requests.
+    Promise.all([
+      db.get("student_messages", "replied=eq.false&select=id").catch(() => []),
+      db.get("class_requests", "status=eq.new&select=id").catch(() => []),
+    ]).then(([msgs, reqs]) => setInboxUnread((msgs?.length || 0) + (reqs?.length || 0)));
     refreshNotesUnread();
   }, []);
 
@@ -19674,6 +19677,10 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("unresolved");
   const [resolving, setResolving] = useState({});
+  const [section, setSection] = useState("messages"); // messages | requests
+  const [requests, setRequests] = useState([]); // 다음 수업 리퀘스트 (class_requests)
+  const [reqLoading, setReqLoading] = useState(true);
+  const [advancing, setAdvancing] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -19681,7 +19688,24 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
       setMessages(msgs);
       setLoading(false);
     })();
+    (async () => {
+      const reqs = await db.get("class_requests", "order=created_at.desc&limit=100").catch(() => []);
+      setRequests(Array.isArray(reqs) ? reqs : []);
+      setReqLoading(false);
+    })();
   }, []);
+
+  // Advance a request's status: new → planned (수업에 반영) → covered (완료). Setting
+  // covered is what surfaces "반영됐어요" on the student's home. Reversible.
+  const advanceRequest = async (req, toStatus) => {
+    setAdvancing(a => ({ ...a, [req.id]: true }));
+    try {
+      await db.update("class_requests", `id=eq.${req.id}`, { status: toStatus });
+      setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: toStatus } : r));
+      onReply && onReply();
+    } catch(e) { showMsg("Failed to update", "error"); }
+    setAdvancing(a => ({ ...a, [req.id]: false }));
+  };
 
   const handleResolve = async (msg) => {
     setResolving(r => ({ ...r, [msg.id]: true }));
@@ -19703,7 +19727,12 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
 
   if (loading) return React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner));
 
-  return React.createElement("div", null,
+  const newReqCount = requests.filter(r => r.status === "new").length;
+  const REQ_LABEL = { new: "\uC0C8 \uB9AC\uD018\uC2A4\uD2B8", planned: "\uC218\uC5C5\uC5D0 \uBC18\uC601\uB428", covered: "\uC644\uB8CC" };
+  const REQ_COLOR = { new: "#DC2626", planned: "#2563EB", covered: C.success };
+  const btn = (bg, brd, fg) => ({ padding: "6px 14px", borderRadius: "100px", border: `1px solid ${brd}`, background: bg, color: fg, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT });
+
+  const messagesView = React.createElement(React.Fragment, null,
     React.createElement("div", { style: { marginBottom: "16px" } },
       React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" } }, "Student Inbox"),
       React.createElement("div", { style: { fontSize: "13px", color: C.textMid, marginTop: "2px" } }, `${unresolvedCount} unresolved \u00b7 ${messages.length} total`),
@@ -19745,6 +19774,57 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
             );
           })
         )
+  );
+
+  const requestsView = reqLoading
+    ? React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner))
+    : React.createElement(React.Fragment, null,
+        React.createElement("div", { style: { marginBottom: "16px" } },
+          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" } }, "\uB2E4\uC74C \uC218\uC5C5 \uB9AC\uD018\uC2A4\uD2B8"),
+          React.createElement("div", { style: { fontSize: "13px", color: C.textMid, marginTop: "2px" } }, `${newReqCount} new \u00b7 ${requests.length} total`),
+          React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "4px" } }, "\uD559\uC0DD\uC774 \uBC30\uC6B0\uACE0 \uC2F6\uC740 \uAC83. '\uC218\uC5C5\uC5D0 \uBC18\uC601'\uD558\uBA74 \uD559\uC0DD \uD648\uC5D0 \uC0C1\uD0DC\uAC00 \uD45C\uC2DC\uB418\uACE0, '\uC644\uB8CC'\uB294 \uBC18\uC601\uB410\uB2E4\uACE0 \uC54C\uB824\uC918\uC694.")
+        ),
+        requests.length === 0
+          ? React.createElement("div", { style: { textAlign: "center", padding: "40px 20px", color: C.textLight, fontSize: "14px" } }, "\uC544\uC9C1 \uB9AC\uD018\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4\uC694")
+          : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } },
+              requests.map(req => {
+                const student = students.find(s => s.id === req.student_id);
+                const color = REQ_COLOR[req.status] || "#6B7280";
+                const done = req.status === "covered";
+                return React.createElement("div", { key: req.id,
+                  style: { border: `1px solid ${done ? C.border : color + "40"}`, borderLeft: `3px solid ${color}`, borderRadius: "12px", padding: "14px 16px", background: done ? C.bg : color + "08", opacity: done ? 0.7 : 1 }
+                },
+                  React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" } },
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+                      React.createElement("span", { style: { fontSize: "11px", fontWeight: "700", color, background: color + "15", padding: "2px 8px", borderRadius: "100px" } }, REQ_LABEL[req.status] || req.status),
+                      React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: C.text } }, student?.name || "Unknown")
+                    ),
+                    React.createElement("div", { style: { fontSize: "11px", color: C.textLight, flexShrink: 0 } },
+                      new Date(req.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                    )
+                  ),
+                  React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, marginBottom: "12px" } }, req.content),
+                  React.createElement("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+                    req.status === "new" && React.createElement("button", { onClick: () => advanceRequest(req, "planned"), disabled: advancing[req.id], style: btn("#EFF6FF", "#2563EB", "#2563EB") }, advancing[req.id] ? "\u2026" : "\uD83D\uDCCC \uC218\uC5C5\uC5D0 \uBC18\uC601"),
+                    req.status === "planned" && React.createElement("button", { onClick: () => advanceRequest(req, "covered"), disabled: advancing[req.id], style: btn(C.successBg, C.success, C.success) }, advancing[req.id] ? "\u2026" : "\u2705 \uC644\uB8CC\uB85C \uD45C\uC2DC"),
+                    req.status === "planned" && React.createElement("button", { onClick: () => advanceRequest(req, "new"), disabled: advancing[req.id], style: btn("transparent", C.border, C.textLight) }, "\uB418\uB3CC\uB9AC\uAE30"),
+                    req.status === "covered" && React.createElement("button", { onClick: () => advanceRequest(req, "planned"), disabled: advancing[req.id], style: btn("transparent", C.border, C.textLight) }, "\u21A9 \uB2E4\uC2DC \uC5F4\uAE30")
+                  )
+                );
+              })
+            )
+      );
+
+  return React.createElement("div", null,
+    // Section segment \u2014 \uBA54\uC2DC\uC9C0 (student_messages) / \uB9AC\uD018\uC2A4\uD2B8 (class_requests)
+    React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "16px" } },
+      [["messages", `\uBA54\uC2DC\uC9C0${unresolvedCount > 0 ? ` (${unresolvedCount})` : ""}`], ["requests", `\uB9AC\uD018\uC2A4\uD2B8${newReqCount > 0 ? ` (${newReqCount})` : ""}`]].map(([id, label]) =>
+        React.createElement("button", { key: id, onClick: () => setSection(id),
+          style: { padding: "7px 16px", borderRadius: "100px", border: `1.5px solid ${section === id ? C.text : C.border}`, background: section === id ? C.text : "transparent", color: section === id ? "#fff" : C.textMid, fontSize: "13px", fontWeight: section === id ? "700" : "500", cursor: "pointer", fontFamily: FONT }
+        }, label)
+      )
+    ),
+    section === "messages" ? messagesView : requestsView
   );
 }
 
