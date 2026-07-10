@@ -15811,8 +15811,23 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
 // all the avatar-picker + field-save logic is reused, not duplicated.
 function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, onClose, onSave, onLogout, onOpenTeacher, onRestartTour, showTourNotifSpotlight = false }) {
   const [showFullEdit, setShowFullEdit] = useState(false);
-  const [notifState, setNotifState] = useState(() => getNotificationPermission());
   const [enabling, setEnabling] = useState(false);
+  // 알림 — a persisted on/off preference (localStorage) so the toggle actually slides and
+  // sticks. Turning it ON requests browser permission + subscribes (a real effect); OFF
+  // records the preference. NOTE: a *server-honored* OFF (stop the daily push) would need a
+  // students.push_enabled column checked by the edge function — not added here (no unprompted
+  // schema change). Flagged in the summary.
+  const [notifPref, setNotifPref] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`wayve_notif_pref_${user?.id}`);
+      if (stored === "on") return true;
+      if (stored === "off") return false;
+    } catch(e) {}
+    return getNotificationPermission() === "granted";
+  });
+  // Teacher View row — teacher accounts only (TEACHER_NAMES), never real students. Computed
+  // here (not from a prop) so the gate can't be loosened by a caller.
+  const canSeeTeacherView = TEACHER_NAMES.includes(user?.name);
   const T3 = WAYVE_TOKENS;
 
   // During the tour's notification step, defer to the full ProfileModal — it owns the
@@ -15825,15 +15840,22 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
     return React.createElement(ProfileModal, { user, onClose: () => setShowFullEdit(false), onSave });
   }
 
-  const handleNotif = async () => {
-    if (notifState === "granted" || enabling) return; // web can't revoke; toggle only enables
-    setEnabling(true);
-    const r = await subscribeToPush(user.id);
-    setNotifState(r === "granted" ? "granted" : r === "denied" ? "denied" : "unsupported");
-    setEnabling(false);
+  const toggleNotif = async () => {
+    if (enabling) return;
+    if (!notifPref) {
+      setEnabling(true);
+      const r = await subscribeToPush(user.id); // requests permission + subscribes
+      setEnabling(false);
+      if (r === "denied" || r === "unsupported") return; // browser blocked — can't turn on
+      setNotifPref(true);
+      try { localStorage.setItem(`wayve_notif_pref_${user.id}`, "on"); } catch(e) {}
+    } else {
+      setNotifPref(false);
+      try { localStorage.setItem(`wayve_notif_pref_${user.id}`, "off"); } catch(e) {}
+    }
   };
 
-  const notifOn = notifState === "granted";
+  const notifOn = notifPref;
   const teacherName = getTeacherName(group);
   const subtitle = `${group?.name ? group.name + " · " : ""}${teacherName} 선생님`;
   const sizes = [["default", "기본"], ["large", "크게"], ["xlarge", "더 크게"]];
@@ -15870,16 +15892,11 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
           })
         )
       ),
-      // 언어 — opens the full editor (which holds the language selector)
-      React.createElement("button", { onClick: () => setShowFullEdit(true), style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
-        React.createElement("div", { style: labelStyle }, "언어"),
-        React.createElement("div", { style: { fontSize: "14px", color: T3.ink2 } }, (lang === "zh" ? "中文" : "한국어") + " ›")
-      ),
-      // 알림 — subscribeToPush toggle
+      // 알림 — persisted on/off preference (see toggleNotif). Slides both ways and sticks.
       React.createElement("div", { style: rowStyle },
         React.createElement("div", { style: labelStyle }, "알림"),
-        React.createElement("button", { "data-tour-notif-btn": "true", onClick: handleNotif, disabled: notifOn || enabling,
-          style: { width: "46px", height: "28px", borderRadius: "100px", background: notifOn ? T3.green : "rgba(22,24,29,0.12)", position: "relative", border: "none", cursor: notifOn ? "default" : "pointer", padding: 0, transition: "background 0.2s ease" } },
+        React.createElement("button", { "data-tour-notif-btn": "true", onClick: toggleNotif, disabled: enabling,
+          style: { width: "46px", height: "28px", borderRadius: "100px", background: notifOn ? T3.green : "rgba(22,24,29,0.12)", position: "relative", border: "none", cursor: enabling ? "default" : "pointer", padding: 0, opacity: enabling ? 0.6 : 1, transition: "background 0.2s ease" } },
           React.createElement("div", { style: { position: "absolute", top: "2px", left: notifOn ? "20px" : "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s ease" } })
         )
       ),
@@ -15888,8 +15905,8 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
         React.createElement("div", { style: labelStyle }, "내 프로필 (직업·취미)"),
         React.createElement("div", { style: chevStyle }, "›")
       ),
-      // Teacher View — teachers only
-      isTeacher && React.createElement("button", { onClick: onOpenTeacher, style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
+      // Teacher View — teacher accounts only (never real students)
+      canSeeTeacherView && React.createElement("button", { onClick: onOpenTeacher, style: { ...rowStyle, background: "transparent", border: "none", borderBottom: `1px solid ${T3.hairline}`, cursor: "pointer", fontFamily: FONT_V3, width: "100%" } },
         React.createElement("div", { style: labelStyle }, "Teacher View"),
         React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", background: T3.waveSoft, color: T3.wave, padding: "4px 10px", borderRadius: "100px" } }, "선생님 전용")
       ),
@@ -21689,6 +21706,61 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
   );
 }
 
+// ── ListenPlayerV3 (redesign v3, screen ⑩) — 오늘의 표현 듣기 ──────────────────
+// A calm, LIGHT listen screen (deliberately not the dark Wavi session): the phrase
+// (English + Korean), a play button that speaks it via the existing TTS, and a
+// 들었어요 ✓ button that marks the plan step done and returns home. No mic, no scoring —
+// it never touches the Wavi session or SCENARIOS. Auto-plays once on open.
+function ListenPlayerV3({ phrase, onClose, onDone }) {
+  const T3 = WAYVE_TOKENS;
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  const play = async () => {
+    if (playing) return;
+    setPlaying(true);
+    try {
+      const result = await wavyGenerateAudio(phrase.english);
+      if (result?.url) {
+        const a = new Audio(result.url); audioRef.current = a;
+        a.onended = () => setPlaying(false);
+        a.onerror = () => setPlaying(false);
+        const pr = a.play(); if (pr && pr.catch) pr.catch(() => setPlaying(false));
+      } else setPlaying(false);
+    } catch(e) { setPlaying(false); }
+  };
+  useEffect(() => { play(); return () => { try { audioRef.current?.pause(); } catch(e) {} }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 1000, background: T3.bgGrouped, fontFamily: FONT_V3, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)" } },
+    // Top bar — back
+    React.createElement("div", { style: { display: "flex", alignItems: "center", padding: "12px 16px" } },
+      React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT_V3, fontSize: "14px", fontWeight: "700", color: T3.ink2, padding: "8px 6px" } }, "← 나가기")
+    ),
+    // Center — phrase + play
+    React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px", padding: "0 28px", textAlign: "center" } },
+      React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "3px", color: T3.ink3 } }, "오늘의 표현"),
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
+        React.createElement("div", { style: { fontSize: "26px", fontWeight: "800", letterSpacing: "-0.4px", color: T3.ink, lineHeight: 1.35 } }, `"${phrase.english}"`),
+        phrase.korean && React.createElement("div", { style: { fontSize: "15px", color: T3.ink2, lineHeight: 1.5 } }, phrase.korean)
+      ),
+      // Play button
+      React.createElement("button", { onClick: play, disabled: playing,
+        style: { width: "76px", height: "76px", borderRadius: "50%", background: T3.wave, border: "none", cursor: playing ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(62,123,250,0.35)", marginTop: "8px" } },
+        playing
+          ? React.createElement("svg", { width: 22, height: 22, viewBox: "0 0 24 24", fill: "#fff" }, React.createElement("rect", { x: 6, y: 5, width: 4, height: 14, rx: 1 }), React.createElement("rect", { x: 14, y: 5, width: 4, height: 14, rx: 1 }))
+          : React.createElement("svg", { width: 26, height: 26, viewBox: "0 0 24 24", fill: "#fff" }, React.createElement("path", { d: "M8 5v14l11-7z" }))
+      ),
+      React.createElement("div", { style: { fontSize: "12px", color: T3.ink3, fontWeight: "600" } }, playing ? "듣는 중…" : "다시 듣기")
+    ),
+    // Bottom — done
+    React.createElement("div", { style: { padding: "0 24px calc(env(safe-area-inset-bottom) + 28px)" } },
+      React.createElement("button", { onClick: () => { haptic.success(); onDone(); },
+        style: { width: "100%", background: T3.wave, color: "#fff", fontSize: "15px", fontWeight: "800", padding: "16px 0", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT_V3, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" } },
+        "들었어요 ✓")
+    )
+  );
+}
+
 // ── HomeGridV3 (redesign v3, screen ①) — 오늘의 계획 home ──────────────────────
 // A daily-plan home: greeting → plan card (오늘의 표현 듣기 · Wavi와 연습 · 복습) →
 // streak line → Wavi resume card → Thankful Thursday (Thu) → 추천 세션 (curated,
@@ -21713,11 +21785,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       try {
         const progAll = await db.get("student_progress", `student_id=eq.${user.id}&select=phrase_id,passed,updated_at`).catch(() => []);
         const passedSet = new Set(progAll.filter(p => p.passed).map(p => p.phrase_id));
-        const progMap = {}; progAll.forEach(p => { progMap[p.phrase_id] = p; });
-        const _mid = new Date(); _mid.setHours(0, 0, 0, 0); const todayStartISO = _mid.toISOString();
-        const practicedToday = (pid) => { const p = progMap[pid]; return !!(p && p.updated_at && p.updated_at >= todayStartISO); };
-
-        let waviTotal = 0, waviRemaining = 0, todayExpr = null;
+        let waviTotal = 0, waviRemaining = 0, todayExpr = null, listenDone = false;
         if (group?.id) {
           const scope = phraseScopeFilter(group.id, user.id);
           const dismissedSet = await fetchDismissedPhraseIds(user.id);
@@ -21727,8 +21795,25 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           const thisWeek = allSessionPhrases.filter(sp => !sp.in_library && sp.phrase_bank);
           waviTotal = thisWeek.length;
           waviRemaining = thisWeek.filter(sp => !passedSet.has(sp.phrase_id)).length;
-          const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-          todayExpr = thisWeek.length ? thisWeek[dayOfYear % thisWeek.length].phrase_bank : null;
+          // 오늘의 표현 듣기 — the next unlearned this-week phrase: not yet passed (reuses the
+          // same passedSet as the Wavi step) and not already listened. Pinned to the calendar
+          // day (localStorage) so re-opening shows the same phrase; on the next date the pin
+          // expires, the listened phrase is excluded, and it rotates to the next one.
+          const today = localToday();
+          let listenedSet = new Set();
+          try { listenedSet = new Set(JSON.parse(localStorage.getItem(`wayve_listened_ids_${user.id}`) || "[]")); } catch(e) {}
+          let pin = null;
+          try { pin = JSON.parse(localStorage.getItem(`wayve_listen_pin_${user.id}`) || "null"); } catch(e) {}
+          const candidates = thisWeek.filter(sp => !passedSet.has(sp.phrase_id) && !listenedSet.has(sp.phrase_id));
+          if (pin && pin.date === today) {
+            const pinned = thisWeek.find(sp => sp.phrase_id === pin.phraseId);
+            todayExpr = pinned ? pinned.phrase_bank : (candidates[0]?.phrase_bank || null);
+            listenDone = !!pin.done;
+          } else {
+            todayExpr = candidates[0]?.phrase_bank || null;
+            if (todayExpr) { try { localStorage.setItem(`wayve_listen_pin_${user.id}`, JSON.stringify({ date: today, phraseId: todayExpr.id, done: false })); } catch(e) {} }
+          }
+          if (!todayExpr) listenDone = true; // nothing left to listen to today
         }
         // 복습 — mastered phrases untouched > 21 days (a light "come back to these" count)
         const cutoffISO = new Date(Date.now() - 21 * 86400000).toISOString();
@@ -21736,7 +21821,6 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         // Resume pointer — most recent Wavi attempt not from today (derive; no schema change)
         const lastAttempt = await db.get("wavy_phrase_attempts", `student_id=eq.${user.id}&order=session_date.desc&limit=1&select=session_date`).catch(() => []);
         const hasLast = !!(lastAttempt && lastAttempt[0]);
-        const listenDone = todayExpr ? practicedToday(todayExpr.id) : false;
         if (!cancelled) setPlan({ waviTotal, waviRemaining, reviewCount: (resurfRows || []).length, listenDone, todayExpr, hasLast });
 
         if (scenariosVisible) {
@@ -21764,16 +21848,36 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     return () => { cancelled = true; };
   }, [user?.id, isPreview, group?.id]);
 
+  const [listenOpen, setListenOpen] = useState(false);
   const openMode = () => { haptic.medium(); setModeSheet(true); };
   const pickMode = (mode) => { setModeSheet(false); onNavigate("wavy"); };
+  const openListen = () => { if (plan?.todayExpr) { haptic.medium(); setListenOpen(true); } };
+  // On listen-complete: record the phrase in the listened set + mark today's pin done, so
+  // the step reads done today and rotates to the next phrase tomorrow. Updates state inline
+  // so the plan reflects it without a refetch.
+  const markListened = () => {
+    const id = plan?.todayExpr?.id;
+    if (id) {
+      try {
+        const key = `wayve_listened_ids_${user.id}`;
+        const arr = JSON.parse(localStorage.getItem(key) || "[]");
+        if (!arr.includes(id)) arr.push(id);
+        localStorage.setItem(key, JSON.stringify(arr));
+        localStorage.setItem(`wayve_listen_pin_${user.id}`, JSON.stringify({ date: localToday(), phraseId: id, done: true }));
+      } catch(e) {}
+      setPlan(prev => prev ? { ...prev, listenDone: true } : prev);
+    }
+    setListenOpen(false);
+  };
 
-  // Derive plan steps
+  // Derive plan steps — sequential by done-state. Current = the first not-done step; only it
+  // renders 시작 (running that step's own action). Done = ✓ + strikethrough; todo = grey + min.
   const p = plan || { waviTotal: 0, waviRemaining: 0, reviewCount: 0, listenDone: false, todayExpr: null, hasLast: false };
-  const steps = [];
-  steps.push({ key: "listen", label: "오늘의 표현 듣기", min: "1분", done: p.listenDone, action: null });
   const waviDone = p.waviTotal > 0 && p.waviRemaining === 0;
-  steps.push({ key: "wavi", label: "Wavi와 연습", sub: p.waviRemaining > 0 ? `지난 수업 표현 ${p.waviRemaining}개` : "이번 주 표현을 다 익혔어요", min: null, done: waviDone, action: "시작" });
-  if (p.reviewCount > 0) steps.push({ key: "review", label: "복습 한 개", min: "2분", done: false, action: null });
+  const steps = [];
+  steps.push({ key: "listen", label: "오늘의 표현 듣기", min: "1분", done: p.listenDone, onStart: openListen });
+  steps.push({ key: "wavi", label: "Wavi와 연습", sub: p.waviRemaining > 0 ? `지난 수업 표현 ${p.waviRemaining}개` : "이번 주 표현을 다 익혔어요", min: "5분", done: waviDone, onStart: openMode });
+  if (p.reviewCount > 0) steps.push({ key: "review", label: "복습 한 개", min: "2분", done: false, onStart: openMode });
   const currentKey = (steps.find(s => !s.done) || {}).key;
   const allDone = steps.every(s => s.done);
   const remainMin = (p.listenDone ? 0 : 1) + (waviDone ? 0 : 5) + (p.reviewCount > 0 ? 2 : 0);
@@ -21799,15 +21903,15 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     React.createElement("div", { style: { background: T3.card, borderRadius: "20px", padding: "6px 18px", boxShadow: T3.shadowCard } },
       steps.map((s, i) => {
         const status = s.done ? "done" : (s.key === currentKey ? "current" : "todo");
-        const isWaviStart = s.key === "wavi" && !s.done;
         return React.createElement("div", { key: s.key, style: { display: "flex", alignItems: "center", gap: "14px", padding: "15px 0", borderBottom: i < steps.length - 1 ? `1px solid ${T3.hairline}` : "none" } },
           stepCircle(status),
           React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
             React.createElement("div", { style: { fontSize: "15px", fontWeight: status === "current" ? "800" : "600", color: status === "done" ? T3.ink3 : (status === "current" ? T3.ink : T3.ink2), textDecoration: status === "done" ? "line-through" : "none" } }, s.label),
             s.sub && status === "current" && React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, s.sub)
           ),
-          isWaviStart
-            ? React.createElement("button", { onClick: openMode, style: { background: T3.wave, color: "#fff", fontSize: "13px", fontWeight: "800", padding: "9px 18px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT_V3, flexShrink: 0 } }, "시작")
+          // Only the current (first not-done) step shows 시작; done/todo show the minute estimate.
+          status === "current"
+            ? React.createElement("button", { onClick: s.onStart, style: { background: T3.wave, color: "#fff", fontSize: "13px", fontWeight: "800", padding: "9px 18px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT_V3, flexShrink: 0 } }, "시작")
             : (s.min ? React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: T3.ink3, flexShrink: 0 } }, s.min) : null)
         );
       })
@@ -21864,7 +21968,9 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     // Mode sheet
     modeSheet && React.createElement(ModeSheetV3, { onClose: () => setModeSheet(false), onPick: pickMode }),
     // Class request sheet
-    requestSheet && React.createElement(ClassRequestSheetV3, { user, group, onClose: () => setRequestSheet(false), onSent: () => setRequestSent(true) })
+    requestSheet && React.createElement(ClassRequestSheetV3, { user, group, onClose: () => setRequestSheet(false), onSent: () => setRequestSent(true) }),
+    // Listen player (⑩)
+    listenOpen && plan?.todayExpr && React.createElement(ListenPlayerV3, { phrase: plan.todayExpr, onClose: () => setListenOpen(false), onDone: markListened })
   );
 }
 
