@@ -4667,18 +4667,21 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         <div className="feature-screen" style={{ display: tab === "community" ? "block" : "none" }}>
           {React.createElement(ErrorBoundary, { key: "community" }, React.createElement(CommunityTab, { user, group, isPreview, onPracticed: updateStreak, unreadCommentIds, refreshUnreadComments, onSubmitToday: (isFirst, responses) => { setSubmittedToday(true); triggerQodCelebration(isFirst, responses); } }))}
         </div>
-        {/* v3: Practice segmented control (⑤⑭) — 이번 주 / My List. Toggles the two
-            mounted feature-screens below. */}
+        {/* v3: Practice 3-segment control (⑤⑭) — 이번 주 / 지난 표현 / 내 목록. week+past
+            drive PracticeTab (via rv3Segment); mylist shows the MyPhrasesTab feature-screen. */}
         {rv3 && tab === "practice" && (
-          <div style={{ background: "rgba(22,24,29,0.06)", borderRadius: "100px", padding: "3px", display: "flex", marginBottom: "16px", fontFamily: FONT_V3 }}>
-            {[["week", "이번 주"], ["mylist", "My List"]].map(([id, label]) => {
-              const on = practiceSegment === id;
-              return <button key={id} onClick={() => { haptic.light(); setPracticeSegment(id); }} style={{ flex: 1, background: on ? "#fff" : "transparent", borderRadius: "100px", padding: "9px 0", textAlign: "center", fontSize: "13px", fontWeight: on ? "800" : "700", color: on ? WAYVE_TOKENS.ink : WAYVE_TOKENS.ink2, boxShadow: on ? "0 1px 3px rgba(16,24,40,.1)" : "none", border: "none", cursor: "pointer", fontFamily: FONT_V3 }}>{label}</button>;
-            })}
-          </div>
+          <>
+            <div style={{ fontSize: "30px", fontWeight: "800", letterSpacing: "-0.6px", color: WAYVE_TOKENS.ink, fontFamily: FONT_V3, marginBottom: "14px" }}>Practice</div>
+            <div style={{ background: "rgba(22,24,29,0.06)", borderRadius: "100px", padding: "3px", display: "flex", marginBottom: "16px", fontFamily: FONT_V3 }}>
+              {[["week", "이번 주"], ["past", "지난 표현"], ["mylist", "내 목록"]].map(([id, label]) => {
+                const on = practiceSegment === id;
+                return <button key={id} onClick={() => { haptic.light(); setPracticeSegment(id); }} style={{ flex: 1, background: on ? "#fff" : "transparent", borderRadius: "100px", padding: "9px 0", textAlign: "center", fontSize: "13px", fontWeight: on ? "800" : "700", color: on ? WAYVE_TOKENS.ink : WAYVE_TOKENS.ink2, boxShadow: on ? "0 1px 3px rgba(16,24,40,.1)" : "none", border: "none", cursor: "pointer", fontFamily: FONT_V3 }}>{label}</button>;
+              })}
+            </div>
+          </>
         )}
-        <div className="feature-screen" style={{ display: (tab === "practice" && (!rv3 || practiceSegment === "week")) ? "block" : "none" }}>
-          {React.createElement(ErrorBoundary, { key: "practice" }, React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak, onGoHome: () => setTab(null), onCelebrate: () => setShowPracticeCelebration(true), onRandomPhrase: (data) => { setRandomModal(data); setRandomModalKey(k => k + 1); } }))}
+        <div className="feature-screen" style={{ display: (tab === "practice" && (!rv3 || practiceSegment === "week" || practiceSegment === "past")) ? "block" : "none" }}>
+          {React.createElement(ErrorBoundary, { key: "practice" }, React.createElement(PracticeTab, { user, group, isPreview, onPracticed: updateStreak, onGoHome: () => setTab(null), onCelebrate: () => setShowPracticeCelebration(true), onRandomPhrase: (data) => { setRandomModal(data); setRandomModalKey(k => k + 1); }, rv3Segment: rv3 ? practiceSegment : null }))}
         </div>
         <div className="feature-screen" style={{ display: tab === "freetalk" ? "block" : "none" }}>
           {React.createElement(ErrorBoundary, { key: "freetalk" }, React.createElement(FreeTalkTab, { user, group, isPreview, onPracticed: updateStreak, onPhraseSaved: () => setMyPhrasesKey(k => k + 1) }))}
@@ -4877,10 +4880,11 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
 }
 
 // ── Practice Tab ──────────────────────────────────────────────────────────────
-function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {}, onCelebrate = () => {}, onRandomPhrase = () => {} }) {
+function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {}, onCelebrate = () => {}, onRandomPhrase = () => {}, rv3Segment = null }) {
   _tokenUser = user; _tokenGroup = group;
   const lang = useLang();
   const newUI = isNewUI(user);
+  const rv3 = isRedesignV3(user); // v3 Practice IA — segment-driven (이번 주 / 지난 표현), see rv3Segment
   // Tag-chip accent: wave in the new UI, legacy navy otherwise
   const navyA = newUI ? WAYVE_TOKENS.wave : C.navy;
   const navyTint = newUI ? WAYVE_TOKENS.waveSoft : "#EEF2FF";
@@ -4910,21 +4914,34 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       .catch(() => {});
   }, [user?.id]);
 
+  // Save/un-save a phrase to My List (student_phrases — the same store MyPhrasesTab and
+  // Solo write to). Toggles: re-tapping removes it. Optimistic; reverts on error via reload.
   const handleSaveClassPhrase = async (phrase) => {
+    const already = savedClassPhraseIds.has(phrase.id) || savedClassPhraseIds.has(phrase.english);
+    setSavedClassPhraseIds(prev => {
+      const next = new Set(prev);
+      if (already) { next.delete(phrase.id); next.delete(phrase.english); }
+      else { if (phrase.id) next.add(phrase.id); if (phrase.english) next.add(phrase.english); }
+      return next;
+    });
     try {
-      await db.insert("student_phrases", {
-        student_id: user.id,
-        english: phrase.english,
-        korean: phrase.korean || "",
-        context: phrase.context || "",
-        chinese: phrase.chinese || "",
-        context_zh: phrase.context_zh || "",
-        hidden: false,
-        source: "class",
-        phrase_id: phrase.id || null,
-      });
-      setSavedClassPhraseIds(prev => new Set([...prev, phrase.id, phrase.english].filter(Boolean)));
-    } catch(e) { console.error("Save class phrase error:", e); }
+      if (already) {
+        if (phrase.id) await db.delete("student_phrases", `student_id=eq.${user.id}&phrase_id=eq.${phrase.id}`);
+        else await db.delete("student_phrases", `student_id=eq.${user.id}&english=eq.${encodeURIComponent(phrase.english)}`);
+      } else {
+        await db.insert("student_phrases", {
+          student_id: user.id,
+          english: phrase.english,
+          korean: phrase.korean || "",
+          context: phrase.context || "",
+          chinese: phrase.chinese || "",
+          context_zh: phrase.context_zh || "",
+          hidden: false,
+          source: "class",
+          phrase_id: phrase.id || null,
+        });
+      }
+    } catch(e) { console.error("Save toggle error:", e); }
   };
 
   const handlePinPhrase = async (phrase) => {
@@ -5019,7 +5036,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       const library = [];
       sp.forEach(row => {
         if (!row.phrase_bank) return;
-        const enriched = { ...row.phrase_bank, sp_id: row.id, isPersonal: !!row.student_id };
+        const enriched = { ...row.phrase_bank, sp_id: row.id, isPersonal: !!row.student_id, created_at: row.created_at };
         if (row.in_library) library.push(enriched);
         else recent.push(enriched);
       });
@@ -5177,12 +5194,30 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
   const filteredLibrary = filterByTags(libraryPhrases);
   const activeFilterTag = activePracticeTags.size > 0 ? getTagById([...activePracticeTags][0]) : null;
 
+  // v3 Practice IA (⑤⑭): segments 이번 주 / 지난 표현 / 내 목록. 내 목록 is a sibling
+  // feature-screen (MyPhrasesTab) shown at the StudentScreen level; this component owns
+  // 이번 주 (recent) and 지난 표현 (library). Legacy shows both stacked (rv3Segment null).
+  const showWeekSeg = !rv3 || rv3Segment === "week"; // 이번 주 = recent
+  const showPastSeg = !rv3 || rv3Segment === "past"; // 지난 표현 = library
+  // Week-bucket label for a library phrase (지난주 / N주 전) from its session row created_at.
+  const weekLabelKo = (createdAt) => {
+    if (!createdAt) return "이전 표현";
+    const now = new Date();
+    const thisMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+    const d = new Date(createdAt);
+    const dMon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+    const weeksAgo = Math.round((thisMon - dMon) / (7 * 86400000));
+    if (weeksAgo <= 1) return "지난주";
+    return `${weeksAgo}주 전`;
+  };
+
   return (
     <div>
       {React.createElement(TourTabTooltip, { tabKey: "practice" })}
 
-      {/* Practice header + random */}
-      <div style={{ background: newUI ? `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)` : "#1E1E1E", borderRadius: newUI ? WAYVE_TOKENS.rCard : "20px", padding: "22px 24px", marginBottom: "16px", boxShadow: newUI ? WAYVE_TOKENS.shadowHero : "none", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* Practice header + random. v3 gets its title + 3-segment control at the StudentScreen
+          level, so it hides this navy hero and shows a quiet subtitle instead. */}
+      {!rv3 && <div style={{ background: newUI ? `linear-gradient(135deg, ${WAYVE_TOKENS.navy1} 0%, ${WAYVE_TOKENS.navy2} 100%)` : "#1E1E1E", borderRadius: newUI ? WAYVE_TOKENS.rCard : "20px", padding: "22px 24px", marginBottom: "16px", boxShadow: newUI ? WAYVE_TOKENS.shadowHero : "none", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: "11px", fontWeight: "600", color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "5px" }}>Daily Practice</div>
           <div style={{ fontSize: "22px", fontWeight: "900", color: "#fff", letterSpacing: "-0.4px", marginBottom: "5px" }}>🎙 Practice</div>
@@ -5197,13 +5232,18 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
           </div>
         </div>
         <button onClick={pickRandom} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "100px", padding: "8px 16px", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, flexShrink: 0 }}>🎲 Random</button>
-      </div>
+      </div>}
+      {rv3 && <div style={{ fontSize: "13px", color: WAYVE_TOKENS.ink2, padding: "0 4px", marginBottom: "16px", fontFamily: FONT_V3 }}>
+        {rv3Segment === "past"
+          ? "지난 수업에서 배운 표현들이에요."
+          : (() => { const done = recentPhrases.filter(p => progress[p.id]?.passed).length; const total = recentPhrases.length; return total > 0 ? `${total}개 중 ${done}개 통과했어요.` : "이번 주 표현이 곧 올라와요."; })()}
+      </div>}
 
       {/* Filter chips moved off the top — they now live as a bottom-sheet filter on the
           library section below (Most Recent stays unfiltered). */}
 
-      {/* Most Recent Session — always visible, expanded */}
-      {filteredRecent.length > 0 && (
+      {/* Most Recent Session (이번 주) — shown in the week segment (and always in legacy) */}
+      {showWeekSeg && filteredRecent.length > 0 && (
         <PhraseSection
           sectionKey="recent"
           title="Most Recent Session"
@@ -5232,8 +5272,9 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
       )}
 
       {/* Library filter control — button opens the category bottom sheet; active filter
-          shows as a clearable pill. Lives with the library, not at the top of the screen. */}
-      {libraryPhrases.length > 0 && availableTags.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "12px" } },
+          shows as a clearable pill. Lives with the library, not at the top of the screen.
+          Legacy only; v3's 지난 표현 groups by week instead. */}
+      {!rv3 && libraryPhrases.length > 0 && availableTags.length > 0 && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "12px" } },
         React.createElement("button", {
           onClick: () => setFilterSheetOpen(true),
           style: { display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "100px", border: `1px solid ${activeFilterTag ? navyA : C.border}`, background: C.bg, color: activeFilterTag ? navyA : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
@@ -5246,8 +5287,27 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
         )
       )}
 
-      {/* Keep Practicing — library phrases not yet mastered */}
-      {(() => {
+      {/* 지난 표현 (library). Legacy: Keep Practicing + Mastered. v3: grouped by week. */}
+      {showPastSeg && (() => {
+        if (rv3) {
+          const groups = {};
+          filteredLibrary.forEach(p => { const label = weekLabelKo(p.created_at); (groups[label] = groups[label] || []).push(p); });
+          const orderVal = (label) => label === "지난주" ? 1 : (label === "이전 표현" ? 9999 : (parseInt(label, 10) || 500));
+          const labels = Object.keys(groups).sort((a, b) => orderVal(a) - orderVal(b));
+          if (labels.length === 0) return React.createElement("div", { style: { fontSize: "13px", color: WAYVE_TOKENS.ink3, padding: "24px 4px", textAlign: "center", fontFamily: FONT_V3 } }, "아직 지난 표현이 없어요.");
+          return React.createElement(React.Fragment, null,
+            labels.map(label => React.createElement(PhraseSection, {
+              key: label, sectionKey: `wk_${label}`, title: label, titleKo: label,
+              phrases: groups[label], progress, sessionReset: false,
+              user, isPreview, onUpdate: handleProgressUpdate, onPracticed,
+              sectionProgress: getSectionProgress(groups[label]),
+              onReset: () => {}, defaultCollapsed: false, showNewBadge: false,
+              onSave: handleSaveClassPhrase, savedIds: savedClassPhraseIds,
+              onPin: handlePinPhrase, pinnedIds: pinnedPhraseIds,
+              onDismiss: isPreview ? null : (p) => setDismissTarget(p), newUI,
+            }))
+          );
+        }
         const keepPracticing = filteredLibrary.filter(p => !progress[p.id]?.passed);
         const mastered = filteredLibrary.filter(p => progress[p.id]?.passed);
         return React.createElement(React.Fragment, null,
@@ -5999,6 +6059,23 @@ function FreeTalkTab({ user, group, isPreview, onPracticed, onPhraseSaved }) {
   const [exprList, setExprList] = useState([]);
   const [savedIds, setSavedIds] = useState(new Set());
   const [pinnedExprIds, setPinnedExprIds] = useState(new Set());
+  // v3: a Solo result's save toggles (re-tap removes) — same My List store (student_phrases)
+  // as class phrases and MyPhrasesTab. Legacy keeps its existing save-only buttons.
+  const toggleSaveSolo = async (obj) => {
+    if (isPreview || !obj?.english) return;
+    const eng = obj.english;
+    const already = savedIds.has(eng);
+    setSavedIds(prev => { const n = new Set(prev); if (already) n.delete(eng); else n.add(eng); return n; });
+    try {
+      if (already) {
+        await db.delete("student_phrases", `student_id=eq.${user.id}&english=eq.${encodeURIComponent(eng)}`);
+      } else {
+        await db.insert("student_phrases", { student_id: user.id, english: eng, korean: obj.korean || "", context: obj.context || "", hidden: false, source: "solo" });
+        haptic.success();
+      }
+      onPhraseSaved && onPhraseSaved();
+    } catch(e) {}
+  };
   const [todaysExpr, setTodaysExpr] = useState(null);
   const [loadingTodays, setLoadingTodays] = useState(false);
   const [todaysExprError, setTodaysExprError] = useState(false);
@@ -6510,7 +6587,10 @@ Return ONLY this JSON array, no markdown:
                   const isSaved = savedIds.has(phraseToSave);
                   return React.createElement("button", {
                     onClick: async () => {
-                      if (isSaved || isPreview) return;
+                      if (isPreview) return;
+                      // v3: toggle (re-tap removes). Legacy: save-only.
+                      if (rv3) { toggleSaveSolo({ english: phraseToSave, korean: "", context: feedback.correction.note || "" }); return; }
+                      if (isSaved) return;
                       try {
                         await db.insert("student_phrases", { student_id: user.id, english: phraseToSave, korean: "", context: feedback.correction.note || "", hidden: false });
                         setSavedIds(prev => new Set([...prev, phraseToSave]));
@@ -6524,7 +6604,7 @@ Return ONLY this JSON array, no markdown:
                       border: `1px solid ${isSaved ? C.successBorder : C.goldBorder}`,
                       color: isSaved ? C.success : C.gold,
                       fontSize: "12px", fontWeight: "600",
-                      cursor: isSaved ? "default" : "pointer",
+                      cursor: (isSaved && !rv3) ? "default" : "pointer",
                       fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: "5px",
                       transition: "all 0.2s ease",
                     }
@@ -6814,8 +6894,12 @@ Return ONLY this JSON array, no markdown:
                         style={{ background: pinnedExprIds.has(expr.expression) ? (newUI ? WAYVE_TOKENS.waveSoft : "#EEF2FF") : "transparent", border: `1px solid ${pinnedExprIds.has(expr.expression) ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.hairline : C.border)}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", color: pinnedExprIds.has(expr.expression) ? (newUI ? WAYVE_TOKENS.wave : C.navy) : (newUI ? WAYVE_TOKENS.ink3 : C.textLight), fontWeight: pinnedExprIds.has(expr.expression) ? "700" : "500", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s", whiteSpace: "nowrap" }}>
                         {pinnedExprIds.has(expr.expression) ? "✅ 요청됨" : "🙋🏻 수업 요청"}
                       </button>
-                      <button onClick={async () => { if (isSaved) return; try { await db.insert("student_phrases", { student_id: user.id, english: expr.expression, korean: expr.korean || expr.explanation || "", context: expr.example || "", hidden: false }); setSavedIds(prev => new Set([...prev, expr.expression])); haptic.success(); onPhraseSaved && onPhraseSaved(); } catch(e) {} }}
-                        style={{ background: isSaved ? C.successBg : C.goldBg, border: `1px solid ${isSaved ? C.successBorder : C.goldBorder}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : C.gold, cursor: isSaved ? "default" : "pointer", fontFamily: FONT }}>
+                      <button onClick={async () => {
+                          if (isPreview) return;
+                          if (rv3) { toggleSaveSolo({ english: expr.expression, korean: expr.korean || expr.explanation || "", context: expr.example || "" }); return; } // toggle
+                          if (isSaved) return;
+                          try { await db.insert("student_phrases", { student_id: user.id, english: expr.expression, korean: expr.korean || expr.explanation || "", context: expr.example || "", hidden: false }); setSavedIds(prev => new Set([...prev, expr.expression])); haptic.success(); onPhraseSaved && onPhraseSaved(); } catch(e) {} }}
+                        style={{ background: isSaved ? C.successBg : C.goldBg, border: `1px solid ${isSaved ? C.successBorder : C.goldBorder}`, borderRadius: "100px", padding: "5px 12px", fontSize: "12px", fontWeight: "600", color: isSaved ? C.success : C.gold, cursor: (isSaved && !rv3) ? "default" : "pointer", fontFamily: FONT }}>
                         {isSaved ? T("saved", lang) : T("save_to_list", lang)}
                       </button>
                     </div>
