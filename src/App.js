@@ -5421,6 +5421,7 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
 // Renders one of the two named phrase sections (Most Recent or Library).
 // Replaces the old SessionFeed which was per-session-number.
 function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionReset, user, isPreview, onUpdate, onPracticed, sectionProgress, onReset, defaultCollapsed, showNewBadge, onRetry, hasEverCompleted, onSave, savedIds = new Set(), onPin, pinnedIds = new Set(), onDismiss, onMoveToLibrary, newUI = false }) {
+  const rv3 = isRedesignV3(user); // v3: softer passed-card fade
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [openId, setOpenId] = useState(null);
   const { passed, total } = sectionProgress;
@@ -5485,15 +5486,15 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
           {showNewBadge && (
             <span style={{ background: newUI ? WAYVE_TOKENS.wave : C.text, color: "#fff", fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "100px", letterSpacing: "0.5px" }}>NEW</span>
           )}
-          <div style={{ fontSize: newUI ? "20px" : "15px", fontWeight: "800", color: newUI ? WAYVE_TOKENS.ink : C.text, letterSpacing: "-0.3px" }}>{title}</div>
-          <div style={{ fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight }}>{titleKo}</div>
+          {!rv3 && <div style={{ fontSize: newUI ? "20px" : "15px", fontWeight: "800", color: newUI ? WAYVE_TOKENS.ink : C.text, letterSpacing: "-0.3px" }}>{title}</div>}
+          <div style={rv3 ? { fontSize: "15px", fontWeight: "800", color: WAYVE_TOKENS.ink, letterSpacing: "-0.2px" } : { fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight }}>{titleKo}</div>
           <span style={{ fontSize: "11px", fontWeight: "700", color: allDone ? (newUI ? WAYVE_TOKENS.green : C.success) : (newUI ? WAYVE_TOKENS.ink2 : C.textMid), background: allDone ? (newUI ? WAYVE_TOKENS.greenSoft : C.successBg) : (newUI ? WAYVE_TOKENS.bgGrouped : C.bgSoft), borderRadius: "100px", padding: "3px 10px", border: `1px solid ${allDone ? (newUI ? WAYVE_TOKENS.greenSoft : C.successBorder) : (newUI ? WAYVE_TOKENS.hairline : C.border)}` }}>
             {passed}/{total}{allDone ? " ✓" : ""}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-          <button onClick={onReset} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}>↺ 다시</button>
-          <button onClick={() => setCollapsed(c => !c)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: "3px 10px", borderRadius: "12px", whiteSpace: "nowrap" }}>
+          {!rv3 && <button onClick={onReset} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: "12px", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}>↺ 다시</button>}
+          <button onClick={() => setCollapsed(c => !c)} style={{ background: "transparent", border: `1px solid ${rv3 ? WAYVE_TOKENS.hairline : C.border}`, color: rv3 ? WAYVE_TOKENS.ink3 : C.textMid, fontSize: "12px", cursor: "pointer", fontFamily: FONT, padding: "3px 10px", borderRadius: "12px", whiteSpace: "nowrap" }}>
             {collapsed ? `펼치기 ▼` : `접기 ▲`}
           </button>
         </div>
@@ -5510,7 +5511,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
               key: `${phrase.id}-${sessionReset ? Date.now() : 0}`,
               "data-tour-phrase-first": idx === 0 ? "true" : undefined,
               style: {
-                opacity: isPassed && !isAnimating && !isOpen ? 0.45 : 1,
+                opacity: isPassed && !isAnimating && !isOpen ? (rv3 ? 0.75 : 0.45) : 1,
                 transform: isAnimating ? "scale(0.98)" : "scale(1)",
                 transition: "opacity 0.3s ease, transform 0.4s ease",
               }
@@ -5548,6 +5549,7 @@ function PhraseSection({ sectionKey, title, titleKo, phrases, progress, sessionR
 // onDelete: remove from My List entirely
 function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onUpdate, onPracticed, onRetry, sectionAllDone, openId, setOpenId, source = "mine", onSave, isSaved, onGraduate, onUngraduate, onDelete, inLibrary = false, onPin, isPinned = false, onDismiss, newUI = false }) {
   const lang = useLang();
+  const rv3 = isRedesignV3(user); // v3 (⑤⑭) card polish — Korean labels, 통과 ✓ / 연습 중 status
   const open = openId === phrase.id;
   const setOpen = () => setOpenId(open ? null : phrase.id);
   const [localProg, setLocalProg] = useState(() => sessionReset ? null : (progress?.[phrase.id] || null));
@@ -5581,8 +5583,12 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
   return (
     <div style={{
       borderRadius: newUI ? WAYVE_TOKENS.rCard : "16px",
-      border: `1px solid ${passed && !inLibrary ? "#B8D5C0" : needsRetry && !inLibrary ? "#E8C090" : (newUI ? WAYVE_TOKENS.hairline : C.border)}`,
-      background: cardBg,
+      // v3: cards stay white regardless of state (passed reads via 통과 ✓ + softer opacity);
+      // the currently-practicing card gets a wave-tinted border.
+      border: rv3
+        ? `${attempted && !inLibrary ? "1.5px" : "1px"} solid ${attempted && !inLibrary ? "rgba(62,123,250,0.35)" : WAYVE_TOKENS.hairline}`
+        : `1px solid ${passed && !inLibrary ? "#B8D5C0" : needsRetry && !inLibrary ? "#E8C090" : (newUI ? WAYVE_TOKENS.hairline : C.border)}`,
+      background: rv3 ? WAYVE_TOKENS.card : cardBg,
       overflow: "hidden",
       transition: "all 0.25s ease",
       opacity: openId && openId !== phrase.id ? 0.3 : 1,
@@ -5595,15 +5601,25 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         {/* Top row: source label + score/status. Tags moved to expanded view for cleaner scan. */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, flex: 1 }}>
-            <span style={{ fontSize: newUI ? "11px" : "10px", fontWeight: newUI ? "700" : "500", color: newUI ? WAYVE_TOKENS.ink3 : C.textLight, letterSpacing: "0.2px", flexShrink: 0 }}>
-              {phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine")}
+            <span style={{ fontSize: rv3 ? "11px" : (newUI ? "11px" : "10px"), fontWeight: rv3 ? "800" : (newUI ? "700" : "500"), color: newUI ? WAYVE_TOKENS.ink3 : C.textLight, letterSpacing: rv3 ? "1px" : "0.2px", flexShrink: 0 }}>
+              {rv3
+                ? (phrase.isPersonal ? "맞춤 표현" : (source === "class" ? "수업 표현" : "저장한 표현"))
+                : (phrase.isPersonal ? "🎯 For You" : (source === "class" ? "📚 Class" : "⭐ Mine"))}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }} onClick={e => e.stopPropagation()}>
             {passed && onRetry && sectionAllDone && (
               <button onClick={() => onRetry(phrase.id)} style={{ padding: "2px 9px", borderRadius: "100px", border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, background: newUI ? WAYVE_TOKENS.card : C.bg, color: C.textMid, fontSize: "10px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>↺ 다시</button>
             )}
-            {newUI ? (
+            {rv3 ? (
+              passed
+                ? <span style={{ fontSize: "12px", fontWeight: "800", color: WAYVE_TOKENS.green, whiteSpace: "nowrap" }}>통과 ✓</span>
+                : needsRetry
+                  ? <span style={{ fontSize: "11px", fontWeight: "800", whiteSpace: "nowrap", padding: "4px 10px", borderRadius: "100px", color: WAYVE_TOKENS.coral, background: WAYVE_TOKENS.coralSoft }}>복습 필요</span>
+                  : (prog?.best_score > 0
+                      ? <span style={{ fontSize: "12px", fontWeight: "700", color: WAYVE_TOKENS.ink2, whiteSpace: "nowrap" }}>{`연습 중 · 최고 ${prog.best_score}/10`}</span>
+                      : null)
+            ) : newUI ? (
               (passed || needsRetry) && (
                 <span style={{ fontSize: "11px", fontWeight: "700", whiteSpace: "nowrap", padding: "4px 10px", borderRadius: "100px",
                   color: passed ? WAYVE_TOKENS.green : WAYVE_TOKENS.coral,
