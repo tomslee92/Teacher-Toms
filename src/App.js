@@ -213,6 +213,13 @@ const DARK_TOKENS = {
 // FONT itself — that would restyle every legacy screen for everyone.
 const FONT_V3 = "'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
+// Dark mode (redesign v3, ⑮). The active token set flows through context so v3 components
+// swap WAYVE_TOKENS ↔ DARK_TOKENS by reading useTokens() instead of the constant. Only v3
+// surfaces subscribe; legacy stays on WAYVE_TOKENS (light). Adopted screen-by-screen — the
+// fully-self-contained v3 components first; mixed legacy/v3 tab internals come later.
+const ThemeTokensContext = React.createContext(WAYVE_TOKENS);
+const useTokens = () => React.useContext(ThemeTokensContext);
+
 // Bottom-nav line icons (redesign v3). 24px, stroke 1.8, round caps — paths copied
 // verbatim from the design board. Each is a fn of stroke color so active/inactive
 // state is just a color swap (wave when active, ink3 otherwise).
@@ -4279,7 +4286,7 @@ function TourSpotlightV3({ steps, stepIndex, lang, onAdvance, onBack, onSkip }) 
     tipStyle = { top: "50%", left: 20, right: 20, transform: "translateY(-50%)" };
   }
 
-  const T3 = WAYVE_TOKENS;
+  const T3 = useTokens();
   const title = lang === "zh" ? step.titleZh : step.titleKo;
   const body = lang === "zh" ? step.bodyZh : step.bodyKo;
   const cta = lang === "zh" ? step.ctaZh : step.ctaKo;
@@ -4321,6 +4328,23 @@ function TourSpotlightV3({ steps, stepIndex, lang, onAdvance, onBack, onSkip }) 
 function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, fontSize = 'default', setFontSize = () => {}, qodCelebPending = null, onCelebShown = () => {}, onOpenDailyQuestion = () => {}, onGoToWavi = () => {}, initialTab = null }) {
   _tokenUser = user; _tokenGroup = group;
   const rv3 = isRedesignV3(user); // redesign v3 — new IA/tokens/tab bar/profile sheet (Toms only)
+  // Dark mode (v3 only, ⑮): stored override wins, else follow the OS preference.
+  const [theme, setTheme] = useState(() => {
+    if (!isRedesignV3(user)) return "light";
+    try { const s = localStorage.getItem(`wayve_theme_${user?.id}`); if (s === "dark" || s === "light") return s; } catch(e) {}
+    try { return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; } catch(e) {}
+    return "light";
+  });
+  const dark = rv3 && theme === "dark";
+  const activeTokens = dark ? DARK_TOKENS : WAYVE_TOKENS;
+  const toggleTheme = () => setTheme(t => { const nt = t === "dark" ? "light" : "dark"; try { localStorage.setItem(`wayve_theme_${user.id}`, nt); } catch(e) {} return nt; });
+  // Paint the page/body dark so the safe areas + scroll overflow match the theme.
+  useEffect(() => {
+    if (!rv3) return;
+    const prevBody = document.body.style.background;
+    document.body.style.background = dark ? DARK_TOKENS.bgGrouped : "";
+    return () => { document.body.style.background = prevBody; };
+  }, [rv3, dark]);
   // v3 has no My List tab — an old myphrases deep-link routes to Practice · My List.
   const [tab, setTab] = useState(rv3 && initialTab === "myphrases" ? "practice" : initialTab);
   // v3: My List folds into Practice as a segment (⑤⑭). Toggles which of the two
@@ -4562,8 +4586,14 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   }, [isPreview, user.id]);
 
   const activeFeature = ["community", "practice", "freetalk", "myphrases", "chat"].includes(tab) ? tab : null;
+  // Dark mode currently covers the HOME surface + v3 overlays (fully adopted). The content
+  // tabs still use the light legacy palette inline, so their chrome stays light until they're
+  // adopted — otherwise dark ink would sit on a dark page. So chrome darkens on home only.
+  const darkChrome = dark && !activeFeature;
+  const chromeTokens = darkChrome ? DARK_TOKENS : WAYVE_TOKENS;
 
   return (
+    <ThemeTokensContext.Provider value={activeTokens}>
     <TourContext.Provider value={tourContextValue}>
     <LangContext.Provider value={lang}>
     <div style={{
@@ -4670,11 +4700,11 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         flexShrink: 0,
         zIndex: 10,
         background: studentScrolled
-          ? (isNewUI(user) ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.92)")
-          : (isNewUI(user) ? "rgba(255,255,255,0)" : "rgba(255,255,255,0)"),
+          ? (darkChrome ? "rgba(14,17,22,0.85)" : (isNewUI(user) ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.92)"))
+          : "rgba(255,255,255,0)",
         backdropFilter: studentScrolled ? "blur(20px) saturate(180%)" : "none",
         WebkitBackdropFilter: studentScrolled ? "blur(20px) saturate(180%)" : "none",
-        borderBottom: studentScrolled ? `0.5px solid rgba(0,0,0,0.08)` : "0.5px solid transparent",
+        borderBottom: studentScrolled ? `0.5px solid ${darkChrome ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}` : "0.5px solid transparent",
         transition: "background 0.3s ease, border-color 0.3s ease",
       }}>
         <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -4717,7 +4747,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
           // Top ~120px fades from the white header (C.bg) into the grey page so there's no
           // hard white→grey seam under the nav bar. The gradient is anchored to the scrollport
           // top (background-attachment defaults to scroll), so the fade stays put as content scrolls.
-          background: isNewUI(user) ? `linear-gradient(180deg, ${C.bg} 0px, #E7EAF0 120px)` : undefined,
+          background: darkChrome ? DARK_TOKENS.bgGrouped : (isNewUI(user) ? `linear-gradient(180deg, ${C.bg} 0px, #E7EAF0 120px)` : undefined),
         }}>
         <div style={{
           maxWidth: "600px", margin: "0 auto",
@@ -4822,6 +4852,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       ? React.createElement(ProfileSheetV3, {
           user: profileUser, group, lang, fontSize, setFontSize,
           isTeacher: isTeacherName,
+          dark, onToggleTheme: toggleTheme,
           showTourNotifSpotlight: tourActive && currentTourStep?.isNotifStep,
           onClose: () => {
             setShowProfile(false);
@@ -4919,12 +4950,12 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         const tabW = 100 / tabs.length; // kept for reference
         return React.createElement("div", { style: {
           position: "fixed", bottom: 0, left: 0, right: 0,
-          background: rv3 ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.85)",
+          background: darkChrome ? "rgba(23,27,34,0.96)" : (rv3 ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.85)"),
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           zIndex: 20,
           paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
-          borderTop: rv3 ? `1px solid ${WAYVE_TOKENS.hairline}` : `0.5px solid rgba(0,0,0,0.08)`,
+          borderTop: rv3 ? `1px solid ${chromeTokens.hairline}` : `0.5px solid rgba(0,0,0,0.08)`,
         } },
           // Legacy sliding indicator bar — v3 signals the active tab with icon color instead.
           !rv3 && React.createElement("div", { style: { position: "relative", height: "0px" } },
@@ -4940,7 +4971,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
               // Thursday "event is live" signal — the dot only appears on Thankful Thursday
               // (the weekly event), not every day. Drives students to the Community room.
               const showDQDot = id === "community" && isQodDay() && !submittedToday;
-              const iconColor = active ? WAYVE_TOKENS.wave : WAYVE_TOKENS.ink3;
+              const iconColor = active ? chromeTokens.wave : chromeTokens.ink3;
               return React.createElement("button", { key: id, className: "nav-btn", "data-tour-v3": rv3 ? `tab-${id}` : undefined, onClick: () => { haptic.light(); setTab(id === "home" ? null : id); },
                 style: { flex: 1, padding: "10px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: rv3 ? FONT_V3 : FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: rv3 ? "3px" : "4px" } },
                 React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative", opacity: rv3 ? 1 : (active ? 1 : 0.38), transition: "opacity 0.2s" } },
@@ -4997,6 +5028,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
 
     </LangContext.Provider>
     </TourContext.Provider>
+    </ThemeTokensContext.Provider>
   );
 }
 
@@ -16103,7 +16135,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
 // language, notifications, profile edit, and "앱 둘러보기 다시 하기". A bottom sheet;
 // deep profile/language edit defers to the existing ProfileModal (opened inline) so
 // all the avatar-picker + field-save logic is reused, not duplicated.
-function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, onClose, onSave, onLogout, onOpenTeacher, onRestartTour, showTourNotifSpotlight = false }) {
+function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, onClose, onSave, onLogout, onOpenTeacher, onRestartTour, showTourNotifSpotlight = false, dark = false, onToggleTheme = () => {} }) {
   const [showFullEdit, setShowFullEdit] = useState(false);
   const [enabling, setEnabling] = useState(false);
   // 알림 — a persisted on/off preference (localStorage) so the toggle actually slides and
@@ -16122,7 +16154,7 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
   // Teacher View row — teacher accounts only (TEACHER_NAMES), never real students. Computed
   // here (not from a prop) so the gate can't be loosened by a caller.
   const canSeeTeacherView = TEACHER_NAMES.includes(user?.name);
-  const T3 = WAYVE_TOKENS;
+  const T3 = useTokens();
 
   // During the tour's notification step, defer to the full ProfileModal — it owns the
   // spotlight choreography. (The tour itself is re-mapped for v3 in a later phase.)
@@ -16192,6 +16224,14 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
         React.createElement("button", { "data-tour-notif-btn": "true", onClick: toggleNotif, disabled: enabling,
           style: { width: "46px", height: "28px", borderRadius: "100px", background: notifOn ? T3.green : "rgba(22,24,29,0.12)", position: "relative", border: "none", cursor: enabling ? "default" : "pointer", padding: 0, opacity: enabling ? 0.6 : 1, transition: "background 0.2s ease" } },
           React.createElement("div", { style: { position: "absolute", top: "2px", left: notifOn ? "20px" : "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s ease" } })
+        )
+      ),
+      // 다크 모드 — persisted per-student theme override (falls back to OS preference)
+      React.createElement("div", { style: rowStyle },
+        React.createElement("div", { style: labelStyle }, "다크 모드"),
+        React.createElement("button", { onClick: onToggleTheme,
+          style: { width: "46px", height: "28px", borderRadius: "100px", background: dark ? T3.wave : "rgba(22,24,29,0.12)", position: "relative", border: "none", cursor: "pointer", padding: 0, transition: "background 0.2s ease" } },
+          React.createElement("div", { style: { position: "absolute", top: "2px", left: dark ? "20px" : "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s ease" } })
         )
       ),
       // 내 프로필
@@ -21963,7 +22003,7 @@ function StudentNotesInbox({ students, showMsg, onChanged, onReplyTo }) {
 // both; the dedicated Listen/Shadowing players arrive in a later phase. Chosen mode is
 // remembered in localStorage so the session can branch once those players exist.
 function ModeSheetV3({ onClose, onPick }) {
-  const T3 = WAYVE_TOKENS;
+  const T3 = useTokens();
   const rows = [
     { mode: "listen", title: "듣기", sub: "마이크를 쓰지 않아요", icon: React.createElement("svg", { width: 21, height: 21, viewBox: "0 0 24 24", fill: "none" },
         React.createElement("path", { d: "M4 15v-3a8 8 0 0 1 16 0v3", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" }),
@@ -22013,7 +22053,7 @@ function ModeSheetV3({ onClose, onPick }) {
 // inbox and shapes the next session); the voice path reuses the recording/Whisper
 // pipeline in a later slice. Writes a row to class_requests (kind='text').
 function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) {
-  const T3 = WAYVE_TOKENS;
+  const T3 = useTokens();
   const [text, setText] = useState(presetText);
   const [sending, setSending] = useState(false);
   const [justSent, setJustSent] = useState(false); // brief inline confirmation after a send
@@ -22113,7 +22153,7 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
 // 들었어요 ✓ button that marks the plan step done and returns home. No mic, no scoring —
 // it never touches the Wavi session or SCENARIOS. Auto-plays once on open.
 function ListenPlayerV3({ phrase, onClose, onDone }) {
-  const T3 = WAYVE_TOKENS;
+  const T3 = useTokens();
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef(null);
 
@@ -22168,7 +22208,7 @@ function ListenPlayerV3({ phrase, onClose, onDone }) {
 // gated). Plan state is derived from the same student_progress / session_phrases data
 // the legacy home reads — no new tables. "시작" / the Wavi card open the mode sheet (②).
 function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile, onStartScenario, onOpenDailyQuestion }) {
-  const T3 = WAYVE_TOKENS;
+  const T3 = useTokens();
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || "친구";
   const [plan, setPlan] = useState(null); // { waviTotal, waviRemaining, reviewCount, listenDone, todayExpr, hasLast }
   const [scenarios, setScenarios] = useState([]);
