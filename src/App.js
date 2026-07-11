@@ -4208,6 +4208,116 @@ const TOUR_STEPS = [
   },
 ];
 
+// ── Redesign v3 tour (㉑) ──────────────────────────────────────────────────────
+// A ground-up rebuild for the new IA. Every step spotlights a REAL element that's
+// visible on the home screen — the plan/Wavi/request cards, or a persistent bottom-nav
+// button — so the tour never has to navigate into tabs (which is where the legacy tour's
+// anchors broke). Anchors are data-tour-v3 attributes resolved by querySelector. Titles
+// carry no emoji. location:"home" keeps the existing "force home" effect happy.
+const TOUR_STEPS_V3 = [
+  { location: "home", anchor: '[data-tour-v3="plan"]', titleKo: "오늘의 계획", titleZh: "今日计划",
+    bodyKo: "오늘 할 일을 여기서 한눈에 봐요. 위에서부터 하나씩 하면 돼요.", bodyZh: "在这里一眼看到今天要做的事，从上往下一个一个完成就好。",
+    ctaKo: "다음 →", ctaZh: "下一步 →" },
+  { location: "home", anchor: '[data-tour-v3="wavi"]', titleKo: "Wavi와 연습", titleZh: "和 Wavi 练习",
+    bodyKo: "탭하면 듣기 또는 따라 말하기를 고를 수 있어요. 마이크나 점수 부담 없이 편하게요.", bodyZh: "点一下可以选择听或跟读，没有麦克风或分数的压力。",
+    ctaKo: "다음 →", ctaZh: "下一步 →" },
+  { location: "home", anchor: '[data-tour-v3="tab-practice"]', titleKo: "Practice", titleZh: "Practice",
+    bodyKo: "이번 주 표현, 지난 표현, 내 목록을 여기서 연습해요.", bodyZh: "在这里练习本周表达、往期表达和我的清单。",
+    ctaKo: "다음 →", ctaZh: "下一步 →" },
+  { location: "home", anchor: '[data-tour-v3="tab-freetalk"]', titleKo: "Solo", titleZh: "Solo",
+    bodyKo: "하고 싶은 말을 말로도, 글로도 물어볼 수 있어요.", bodyZh: "想说的话可以用说的，也可以用写的来问。",
+    ctaKo: "다음 →", ctaZh: "下一步 →" },
+  { location: "home", anchor: '[data-tour-v3="request"]', titleKo: "다음 수업 리퀘스트", titleZh: "下节课请求",
+    bodyKo: "배우고 싶은 걸 Toms에게 보내면 다음 수업에 반영돼요.", bodyZh: "把想学的发给 Toms，就会在下节课体现出来。",
+    ctaKo: "다음 →", ctaZh: "下一步 →" },
+  { location: "home", anchor: '[data-tour-v3="tab-community"]', titleKo: "Community", titleZh: "Community",
+    bodyKo: "매주 목요일, 감사한 일 한 가지를 반 친구들과 나눠요.", bodyZh: "每周四，和同学分享一件感恩的事。",
+    ctaKo: "다음 →", ctaZh: "下一步 →" },
+  { location: "home", anchor: null, isFinal: true, titleKo: "이렇게 쓰면 돼요", titleZh: "这样用就好",
+    bodyKo: "오늘의 계획으로 시작해서, 틈틈이 Solo로 연습하고, 목요일엔 Community에서 나눠요. 편하게 시작해봐요!", bodyZh: "从今日计划开始，有空用 Solo 练习，周四在 Community 分享。轻松开始吧！",
+    ctaKo: "시작하기", ctaZh: "开始吧" },
+];
+
+// Self-contained spotlight for the v3 tour — SVG scrim with a rounded cutout + ring
+// around the anchor, and a tooltip card (dots · title · body · 뒤로 / 건너뛰기 / CTA).
+// Isolated from the legacy TourSpotlight so it doesn't touch TOUR_STEPS.
+function TourSpotlightV3({ steps, stepIndex, lang, onAdvance, onBack, onSkip }) {
+  const step = steps[stepIndex];
+  const [rect, setRect] = useState(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    setShown(false);
+    let raf1, raf2;
+    const t = setTimeout(() => {
+      if (!step.anchor) { setRect(null); requestAnimationFrame(() => setShown(true)); return; }
+      const el = document.querySelector(step.anchor);
+      if (!el) { setRect(null); setShown(true); return; }
+      try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch(_) {}
+      // Let the scroll settle before measuring.
+      raf1 = setTimeout(() => {
+        const r = el.getBoundingClientRect();
+        setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+        raf2 = requestAnimationFrame(() => setShown(true));
+      }, 320);
+    }, 60);
+    return () => { clearTimeout(t); clearTimeout(raf1); if (raf2) cancelAnimationFrame(raf2); };
+  }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const W = typeof window !== "undefined" ? window.innerWidth : 390;
+  const H = typeof window !== "undefined" ? window.innerHeight : 800;
+  const PAD = 8;
+  const spot = rect ? { top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 } : null;
+
+  // Tooltip position: below the spot if room, else above; centered when no spot (final).
+  let tipStyle;
+  if (spot) {
+    const below = H - (spot.top + spot.height);
+    if (below > 220) tipStyle = { top: spot.top + spot.height + 14, left: 16, right: 16 };
+    else tipStyle = { bottom: H - spot.top + 14, left: 16, right: 16 };
+  } else {
+    tipStyle = { top: "50%", left: 20, right: 20, transform: "translateY(-50%)" };
+  }
+
+  const T3 = WAYVE_TOKENS;
+  const title = lang === "zh" ? step.titleZh : step.titleKo;
+  const body = lang === "zh" ? step.bodyZh : step.bodyKo;
+  const cta = lang === "zh" ? step.ctaZh : step.ctaKo;
+
+  return ReactDOM.createPortal(
+    React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 3000, opacity: shown ? 1 : 0, transition: "opacity 0.25s ease", fontFamily: FONT_V3 } },
+      // Scrim + cutout + ring
+      React.createElement("svg", { width: "100%", height: "100%", style: { position: "absolute", inset: 0, pointerEvents: "none" } },
+        React.createElement("defs", null,
+          React.createElement("mask", { id: "tv3-mask" },
+            React.createElement("rect", { x: 0, y: 0, width: "100%", height: "100%", fill: "white" }),
+            spot && React.createElement("rect", { x: spot.left, y: spot.top, width: spot.width, height: spot.height, rx: 16, fill: "black" })
+          )
+        ),
+        React.createElement("rect", { x: 0, y: 0, width: "100%", height: "100%", fill: "rgba(11,31,58,0.55)", mask: "url(#tv3-mask)" }),
+        spot && React.createElement("rect", { x: spot.left, y: spot.top, width: spot.width, height: spot.height, rx: 16, fill: "none", stroke: "#fff", strokeWidth: 2.5 })
+      ),
+      // Tap-catcher over the scrim (advances); the tooltip stops propagation.
+      React.createElement("div", { style: { position: "absolute", inset: 0 }, onClick: onAdvance }),
+      // Tooltip card
+      React.createElement("div", { onClick: e => e.stopPropagation(), style: { position: "absolute", ...tipStyle, background: T3.card, borderRadius: "20px", padding: "18px 20px 16px", boxShadow: "0 12px 40px rgba(11,31,58,0.3)" } },
+        React.createElement("div", { style: { display: "flex", gap: "5px", marginBottom: "12px" } },
+          steps.map((_, i) => React.createElement("div", { key: i, style: { width: i === stepIndex ? 18 : 5, height: 5, borderRadius: 3, background: i === stepIndex ? T3.wave : "rgba(22,24,29,0.15)", transition: "all 0.3s ease" } }))
+        ),
+        React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: T3.ink, marginBottom: "8px", letterSpacing: "-0.2px" } }, title),
+        React.createElement("div", { style: { fontSize: "14px", color: T3.ink2, lineHeight: 1.6, marginBottom: "16px" } }, body),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
+          stepIndex > 0 && React.createElement("button", { onClick: onBack, style: { background: "transparent", border: "none", color: T3.ink3, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT_V3, padding: "6px 4px" } }, lang === "zh" ? "← 上一步" : "← 뒤로"),
+          !step.isFinal && React.createElement("button", { onClick: onSkip, style: { background: "transparent", border: "none", color: T3.ink3, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT_V3, padding: "6px 4px" } }, lang === "zh" ? "跳过" : "건너뛰기"),
+          React.createElement("div", { style: { flex: 1 } }),
+          React.createElement("button", { onClick: onAdvance, style: { background: T3.wave, color: "#fff", border: "none", borderRadius: "100px", padding: "11px 22px", fontSize: "14px", fontWeight: "800", cursor: "pointer", fontFamily: FONT_V3 } }, cta)
+        )
+      )
+    ),
+    document.body
+  );
+}
+
 function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, fontSize = 'default', setFontSize = () => {}, qodCelebPending = null, onCelebShown = () => {}, onOpenDailyQuestion = () => {}, onGoToWavi = () => {}, initialTab = null }) {
   _tokenUser = user; _tokenGroup = group;
   const rv3 = isRedesignV3(user); // redesign v3 — new IA/tokens/tab bar/profile sheet (Toms only)
@@ -4297,8 +4407,10 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   // Tour never auto-starts. New students see a separate "want a tutorial?" modal
   // (driven by tutorial_seen DB flag) that opt-in starts the tour.
   const [tourStep, setTourStep] = useState(-1);
-  const tourActive = tourStep >= 0 && tourStep < TOUR_STEPS.length;
-  const currentTourStep = tourActive ? TOUR_STEPS[tourStep] : null;
+  // v3 gets its own step set (rebuilt for the new IA); legacy keeps TOUR_STEPS.
+  const activeTourSteps = rv3 ? TOUR_STEPS_V3 : TOUR_STEPS;
+  const tourActive = tourStep >= 0 && tourStep < activeTourSteps.length;
+  const currentTourStep = tourActive ? activeTourSteps[tourStep] : null;
 
   // Tutorial prompt modal — shown once for new students based on tutorial_seen flag.
   // Server-side flag (not localStorage) ensures it shows on first login regardless of device/browser.
@@ -4334,11 +4446,11 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
 
   const advanceTour = () => {
     const next = tourStep + 1;
-    if (next >= TOUR_STEPS.length) {
+    if (next >= activeTourSteps.length) {
       endTour(true); // genuinely completed — show celebration
     } else {
-      const nextStep = TOUR_STEPS[next];
-      const currentStep = TOUR_STEPS[tourStep];
+      const nextStep = activeTourSteps[next];
+      const currentStep = activeTourSteps[tourStep];
       // Only navigate if location changes — don't navigate between freetalk sub-steps
       if (nextStep.location !== currentStep.location) {
         if (nextStep.location !== "home") {
@@ -4354,8 +4466,8 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   const goBackTour = () => {
     if (tourStep <= 0) return; // can't go back from first step
     const prev = tourStep - 1;
-    const prevStep = TOUR_STEPS[prev];
-    const currentStep = TOUR_STEPS[tourStep];
+    const prevStep = activeTourSteps[prev];
+    const currentStep = activeTourSteps[tourStep];
     if (prevStep.location !== currentStep.location) {
       if (prevStep.location !== "home") {
         setTab(prevStep.location);
@@ -4829,7 +4941,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
               // (the weekly event), not every day. Drives students to the Community room.
               const showDQDot = id === "community" && isQodDay() && !submittedToday;
               const iconColor = active ? WAYVE_TOKENS.wave : WAYVE_TOKENS.ink3;
-              return React.createElement("button", { key: id, className: "nav-btn", onClick: () => { haptic.light(); setTab(id === "home" ? null : id); },
+              return React.createElement("button", { key: id, className: "nav-btn", "data-tour-v3": rv3 ? `tab-${id}` : undefined, onClick: () => { haptic.light(); setTab(id === "home" ? null : id); },
                 style: { flex: 1, padding: "10px 0", background: "transparent", border: "none", cursor: "pointer", fontFamily: rv3 ? FONT_V3 : FONT, display: "flex", flexDirection: "column", alignItems: "center", gap: rv3 ? "3px" : "4px" } },
                 React.createElement("div", { style: { fontSize: "20px", lineHeight: 1, position: "relative", opacity: rv3 ? 1 : (active ? 1 : 0.38), transition: "opacity 0.2s" } },
                   rv3 ? icon(iconColor) : icon,
@@ -4862,7 +4974,15 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       },
     })}
 
-    {tourActive && !(showProfile && currentTourStep?.isNotifStep) && React.createElement(TourSpotlight, {
+    {tourActive && rv3 && React.createElement(TourSpotlightV3, {
+      steps: activeTourSteps,
+      stepIndex: tourStep,
+      lang,
+      onAdvance: advanceTour,
+      onBack: goBackTour,
+      onSkip: () => endTour(false),
+    })}
+    {tourActive && !rv3 && !(showProfile && currentTourStep?.isNotifStep) && React.createElement(TourSpotlight, {
       step: currentTourStep,
       cardRefs: tourCardRefs,
       lang,
@@ -22184,7 +22304,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       React.createElement("div", { style: { fontSize: "14px", color: T3.ink2 } }, subtitle)
     ),
     // Plan card
-    React.createElement("div", { style: { background: T3.card, borderRadius: "20px", padding: "6px 18px", boxShadow: T3.shadowCard } },
+    React.createElement("div", { "data-tour-v3": "plan", style: { background: T3.card, borderRadius: "20px", padding: "6px 18px", boxShadow: T3.shadowCard } },
       steps.map((s, i) => {
         const status = s.done ? "done" : (s.key === currentKey ? "current" : "todo");
         return React.createElement("div", { key: s.key, style: { display: "flex", alignItems: "center", gap: "14px", padding: "15px 0", borderBottom: i < steps.length - 1 ? `1px solid ${T3.hairline}` : "none" } },
@@ -22203,7 +22323,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     // Streak line (text only, no fire — matches existing streakDisplay restraint)
     streak >= 1 && React.createElement("div", { style: { fontSize: "12px", color: T3.ink3, padding: "0 4px", marginTop: "-4px" } }, `이번 주 ${streak}일째 함께하고 있어요.`),
     // Wavi resume card (navy)
-    React.createElement("button", { onClick: openMode, style: { background: `linear-gradient(135deg, ${T3.navy1} 0%, ${T3.navy2} 100%)`, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 8px 28px rgba(11,31,58,.22)", border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+    React.createElement("button", { "data-tour-v3": "wavi", onClick: openMode, style: { background: `linear-gradient(135deg, ${T3.navy1} 0%, ${T3.navy2} 100%)`, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 8px 28px rgba(11,31,58,.22)", border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
       React.createElement("div", { style: { width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0 } },
         React.createElement("img", { src: "/wavi-encouraging.png", alt: "Wavi", style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 18%" } })),
       React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
@@ -22214,7 +22334,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     ),
     // 다음 수업 리퀘스트 (⑱⑲) — student→teacher input loop. Always open (submit as many as
     // you like); the sheet shows the full history + status. Subtitle shows the open count.
-    React.createElement("button", { onClick: () => { haptic.medium(); setRequestSheet(true); }, style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
+    React.createElement("button", { "data-tour-v3": "request", onClick: () => { haptic.medium(); setRequestSheet(true); }, style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
       React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: T3.waveSoft, display: "flex", alignItems: "center", justifyContent: "center", color: T3.wave, fontSize: "18px", flexShrink: 0 } }, "💬"),
       React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
         React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T3.ink } }, "다음 수업 리퀘스트"),
