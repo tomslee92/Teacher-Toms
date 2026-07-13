@@ -173,9 +173,16 @@ const SCENARIOS_STUDENT_ENABLED = false;
 // Add a group id here to roll out to that class without flipping the global switch.
 const SCENARIOS_ALLOW_GROUP_IDS = ["b629d52c-73cf-421d-a686-7c8d9cecbda3"]; // Group 4 (Judy)
 
+// Dark mode (v3, ⑮): ONE module flag flips the whole app's palette. It's set true only
+// while a v3 student is in a dark session (see StudentScreen); every C.* and WAYVE_TOKENS.*
+// read routes through a Proxy (defined below) to the dark twin. This is safe precisely
+// because both palettes are ONLY ever accessed via static dot-reads — no spread, no
+// Object.keys, no computed C[...] — verified across all 2000+ call sites.
+let _v3Dark = false;
+
 // Design tokens — use for ALL NEW UI in the scenario upgrade (Apple-minimal: grouped bg,
 // white 20px cards, hairlines, 8pt grid). Do NOT restyle existing screens with these.
-const WAYVE_TOKENS = {
+const WAYVE_TOKENS_LIGHT = {
   bgGrouped: "#F2F3F7", card: "#FFFFFF",
   ink: "#16181D", ink2: "#6E7178", ink3: "#9DA0A8",
   hairline: "rgba(22,24,29,0.08)",
@@ -206,6 +213,10 @@ const DARK_TOKENS = {
   shadowCard: "0 1px 2px rgba(0,0,0,.30), 0 4px 16px rgba(0,0,0,.35)",
   shadowHero: "0 8px 28px rgba(0,0,0,.50)",
 };
+
+// WAYVE_TOKENS resolves light/dark per property read via _v3Dark — every existing
+// WAYVE_TOKENS.x call site stays untouched and becomes theme-aware for free.
+const WAYVE_TOKENS = new Proxy({}, { get: (_t, k) => (_v3Dark ? DARK_TOKENS : WAYVE_TOKENS_LIGHT)[k] });
 
 // Pretendard (redesign v3) — Korean-first variable typeface. Loaded globally in
 // GlobalStyle but only APPLIED where a redesign-v3-gated component sets this as its
@@ -1034,7 +1045,7 @@ const streakShort = (streak) => {
   return `🔥 ${n}`;
 };
 
-const C = {
+const C_LIGHT = {
   // Surfaces — pure white like wayve.tiiny.site
   bg: "#FFFFFF", bgSoft: "#F5F5F5", bgMid: "#EBEBEB", bgCard: "#FFFFFF",
   bgDark: "#1E1E1E", bgDarker: "#141414",
@@ -1051,6 +1062,22 @@ const C = {
   error: "#C0392B", errorBg: "#FCECEA", errorBorder: "#F0A8A5",
   retry: "#C96A1A", retryBg: "#FEF3E8", retryBorder: "#F0C090",
 };
+// Dark twin of the legacy palette — surfaces darken, text lightens, tints go translucent,
+// semantic hues brighten for contrast. Navy accent shifts to the wave blue in dark.
+const C_DARK = {
+  bg: "#171B22", bgSoft: "#20252E", bgMid: "#2A2F38", bgCard: "#171B22",
+  bgDark: "#0E1116", bgDarker: "#080A0D",
+  text: "#F2F3F7", textMid: "#9DA0A8", textLight: "#6E7178",
+  border: "rgba(255,255,255,0.10)", borderDark: "rgba(255,255,255,0.16)",
+  navy: "#3E7BFA", navyBg: "rgba(62,123,250,0.15)",
+  gold: "#D4B463", goldBg: "rgba(212,180,99,0.12)", goldBorder: "rgba(212,180,99,0.30)",
+  success: "#4ADE80", successBg: "rgba(47,179,68,0.15)", successBorder: "rgba(74,222,128,0.35)",
+  error: "#FF7A6E", errorBg: "rgba(255,122,110,0.14)", errorBorder: "rgba(255,122,110,0.35)",
+  retry: "#F0A860", retryBg: "rgba(240,168,96,0.14)", retryBorder: "rgba(240,168,96,0.35)",
+};
+// Same Proxy pattern as WAYVE_TOKENS — the whole app's legacy palette turns dark when
+// _v3Dark is set, with no per-call-site changes.
+const C = new Proxy({}, { get: (_t, k) => (_v3Dark ? C_DARK : C_LIGHT)[k] });
 
 // ── Global Style ──────────────────────────────────────────────────────────────
 const GlobalStyle = () => React.createElement("style", null, `
@@ -2589,6 +2616,10 @@ class RootErrorBoundary extends React.Component {
 }
 
 function AppInner() {
+  // Reset the dark-palette flag each root render; StudentScreen re-sets it true when a v3
+  // student is in dark mode. Keeps teacher/login/wavi (non-student screens) on the light
+  // palette unless they opt in themselves.
+  _v3Dark = false;
   const [screen, setScreen] = useState("loading");
   const [qodFirstSubmit, setQodFirstSubmit] = useState(false);
   const [qodTourOverlay, setQodTourOverlay] = useState(false);
@@ -4336,7 +4367,8 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
     return "light";
   });
   const dark = rv3 && theme === "dark";
-  const activeTokens = dark ? DARK_TOKENS : WAYVE_TOKENS;
+  _v3Dark = dark; // drive the palette Proxy for this render (student subtree only)
+  const activeTokens = dark ? DARK_TOKENS : WAYVE_TOKENS_LIGHT;
   const toggleTheme = () => setTheme(t => { const nt = t === "dark" ? "light" : "dark"; try { localStorage.setItem(`wayve_theme_${user.id}`, nt); } catch(e) {} return nt; });
   // Paint the page/body dark so the safe areas + scroll overflow match the theme.
   useEffect(() => {
@@ -4586,11 +4618,10 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   }, [isPreview, user.id]);
 
   const activeFeature = ["community", "practice", "freetalk", "myphrases", "chat"].includes(tab) ? tab : null;
-  // Dark mode currently covers the HOME surface + v3 overlays (fully adopted). The content
-  // tabs still use the light legacy palette inline, so their chrome stays light until they're
-  // adopted — otherwise dark ink would sit on a dark page. So chrome darkens on home only.
-  const darkChrome = dark && !activeFeature;
-  const chromeTokens = darkChrome ? DARK_TOKENS : WAYVE_TOKENS;
+  // Dark mode now covers the whole student app (palette Proxy), so the chrome darkens on
+  // every tab, not just home.
+  const darkChrome = dark;
+  const chromeTokens = darkChrome ? DARK_TOKENS : WAYVE_TOKENS_LIGHT;
 
   return (
     <ThemeTokensContext.Provider value={activeTokens}>
@@ -17218,6 +17249,7 @@ function composeHomeGreeting(firstName, lastSession, hour) {
 
 // ── WavyScreen component ─────────────────────────────────────────────────────
 function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSessionComplete, onManualExit, initialScenarioId }) {
+  _v3Dark = false; // the session owns its own (navy) palette — never remap it to the dark C set
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || "친구";
 
   // Resolve {{name}}, {{job}}, {{hometown}}, etc. on a phrase using the student's profile.
