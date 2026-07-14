@@ -14379,6 +14379,7 @@ function StudentCommentView({ responseId, userId, onCommentSeen }) {
 function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existingResponse }) {
   const lang = useLang();
   const newUI = isNewUI(user);
+  const rv3 = isRedesignV3(user); // v3 (⑬): 반 친구들과 나누기 / 나만 보기로 저장 in place of the toggle+submit
   // path: null | "direct" | "korean_type" | "korean_voice"
   const [path, setPath] = useState("direct");
   // Enter straight at the record step so students can answer immediately in one window.
@@ -14504,7 +14505,8 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
 
   const rec = useRecorder(handleRecordingDone);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (privacyOverride) => {
+    const priv = privacyOverride !== undefined ? privacyOverride : isPrivate;
     const nick = user.name;
     setPosting(true);
     try {
@@ -14543,7 +14545,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
       const r = await db.insert("qod_responses", {
         prompt_id: prompt.id, student_id: user.id, nickname: nick,
         audio_url: audioUrl, transcript: finalTranscript, city_group_id: cityGroup.id,
-        is_private: isPrivate,
+        is_private: priv,
       });
       onPost(Array.isArray(r) ? r[0] : r);
     } catch(e) { console.error("Post failed:", e); setPosting(false); }
@@ -14780,6 +14782,20 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
                     </div>
                   )}
 
+                  {rv3 ? (
+                    /* ⑬ — two clear actions: share with class (public) or save private */
+                    <>
+                      <button onClick={() => handleSubmit(false)} disabled={posting}
+                        style={{ width: "100%", background: C.navy, color: "#fff", fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", border: "none", cursor: posting ? "default" : "pointer", fontFamily: FONT_V3, opacity: posting ? 0.6 : 1 }}>
+                        {posting ? "보내는 중…" : (existingResponse ? "다시 나누기" : "반 친구들과 나누기")}
+                      </button>
+                      <button onClick={() => handleSubmit(true)} disabled={posting}
+                        style={{ textAlign: "center", background: "transparent", border: "none", color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: posting ? "default" : "pointer", fontFamily: FONT_V3, padding: "10px 0" }}>
+                        나만 보기로 저장
+                      </button>
+                    </>
+                  ) : (
+                  <>
                   {/* Privacy toggle */}
                   <div style={{ background: C.bgSoft, borderRadius: "14px", padding: "4px", display: "flex", gap: "4px", marginBottom: "2px" }}>
                     {[
@@ -14798,6 +14814,8 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
                   <Btn onClick={handleSubmit} style={{ width: "100%", padding: "13px", fontSize: "15px" }}>
                     {existingResponse ? "🔄 답변 교체하기 · Replace" : isPrivate ? "🔒 선생님에게 제출하기" : "✅ 제출하기 · Submit"}
                   </Btn>
+                  </>
+                  )}
                   <div style={{ display: "flex", gap: "8px" }}>
                     <Btn onClick={() => { setCurrentFeedback(null); setFinalUrl(null); setFinalBlob(null); setFinalTranscript(""); rec.reset(); }} variant="ghost" style={{ flex: 1, padding: "11px" }}>
                       🔄 {lang === "zh" ? "重新录音" : "다시 녹음"}
@@ -15600,6 +15618,7 @@ function QodTourOverlay({ lang, onDismiss, onSkip, onStepChange = () => {} }) {
 
 function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = false, onTourOverlayDismiss = () => {}, forceShowHelp = false }) {
   const newUI = isNewUI(user);
+  const rv3 = isRedesignV3(user); // v3 (⑬): 반 친구들과 나누기 / 나만 보기로 저장 in place of the toggle+submit
   // Prompt + city group
   const [qodPrompt, setQodPrompt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15693,7 +15712,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
         }
       } catch(e) {}
       setLoading(false);
-      if (isMilestone) setTimeout(() => setMilestoneEffect("playing"), 400);
+      if (isMilestone && !rv3) setTimeout(() => setMilestoneEffect("playing"), 400); // v3: no confetti milestone (restraint)
     };
     load();
   }, []);
@@ -15794,7 +15813,8 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
   const stopRecording = () => recMediaRef.current?.stop();
 
   // ── Submit
-  const handleSubmit = async () => {
+  const handleSubmit = async (privacyOverride) => {
+    const priv = privacyOverride !== undefined ? privacyOverride : isPrivate;
     if (!finalBlob) return;
     setPosting(true);
     try {
@@ -15828,7 +15848,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
         ).catch(() => []);
         isFirst = existingToday.filter(r => r.student_id !== user.id).length === 0;
       }
-      const insertedRow = await db.insert("qod_responses", { prompt_id: qodPrompt.id, student_id: user.id, nickname: user.name, audio_url: audioUrl, transcript: finalTranscript, city_group_id: cityGroup?.id || null, is_private: isPrivate });
+      const insertedRow = await db.insert("qod_responses", { prompt_id: qodPrompt.id, student_id: user.id, nickname: user.name, audio_url: audioUrl, transcript: finalTranscript, city_group_id: cityGroup?.id || null, is_private: priv });
       const insertedId = (Array.isArray(insertedRow) ? insertedRow[0] : insertedRow)?.id;
       // Store response ID so resubmit can delete it even if RLS blocks private row reads.
       // Keyed by prompt id (the week) so the "answered" fallback holds for the whole open
@@ -16004,6 +16024,20 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
                     : (lang === "zh" ? "💪 可以再试一次或直接提交！" : "💪 다시 해보거나 그냥 제출해도 돼요!")}
                 </div>
 
+                {rv3 ? (
+                  /* ⑬ — share with class (public) or save private */
+                  <>
+                    <button onClick={() => handleSubmit(false)} disabled={posting}
+                      style={{ width: "100%", background: C.navy, color: "#fff", fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", border: "none", cursor: posting ? "default" : "pointer", fontFamily: FONT_V3, opacity: posting ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                      {posting ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", { style: { marginLeft: "8px" } }, "보내는 중…")) : "반 친구들과 나누기"}
+                    </button>
+                    <button onClick={() => handleSubmit(true)} disabled={posting}
+                      style={{ textAlign: "center", background: "transparent", border: "none", color: C.textMid, fontSize: "13px", fontWeight: "700", cursor: posting ? "default" : "pointer", fontFamily: FONT_V3, padding: "10px 0" }}>
+                      나만 보기로 저장
+                    </button>
+                  </>
+                ) : (
+                <>
                 {/* Privacy toggle */}
                 <div style={{ background: C.bgSoft, borderRadius: "14px", padding: "4px", display: "flex", gap: "4px" }}>
                   {[
@@ -16027,6 +16061,8 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
                       ? (lang === "zh" ? "🔒 提交给老师" : "🔒 선생님에게 제출하기")
                       : (lang === "zh" ? "✅ 提交" : "✅ Submit · 제출하기")}
                 </button>
+                </>
+                )}
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button onClick={resetRecording} style={{ flex: 1, padding: "11px", background: "transparent", color: C.textMid, border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
                     🔄 {lang === "zh" ? "重新录音" : "Re-record"}
