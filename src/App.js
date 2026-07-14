@@ -2184,9 +2184,9 @@ function useRecorder(onDone) {
 // ── UI Components ─────────────────────────────────────────────────────────────
 const Btn = ({ onClick, children, variant = "primary", disabled, style = {} }) => {
   const variants = {
-    primary: { background: C.text, color: "#fff", border: "none" },
+    primary: { background: C.text, color: C.bg, border: "none" },
     secondary: { background: C.bgSoft, color: C.text, border: `1px solid ${C.border}` },
-    gold: { background: C.text, color: "#fff", border: "none" }, // WAYVE: black not gold
+    gold: { background: C.text, color: C.bg, border: "none" }, // WAYVE: black not gold
     ghost: { background: "transparent", color: C.text, border: `1px solid ${C.border}` },
     danger: { background: C.error, color: "#fff", border: "none" },
     success: { background: C.success, color: "#fff", border: "none" },
@@ -7093,7 +7093,7 @@ Return ONLY this JSON array, no markdown:
               style={{ width: "100%", padding: "12px 14px", border: `1px solid ${C.border}`, borderRadius: "12px", fontSize: "14px", fontFamily: FONT, outline: "none", background: C.bgSoft, marginBottom: "10px" }}
             />
             <button onClick={handleGenerateExpression} disabled={loadingExpr}
-              style={{ width: "100%", padding: "13px", borderRadius: "100px", border: "none", background: C.text, color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loadingExpr ? "default" : "pointer", fontFamily: FONT, opacity: loadingExpr ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: exprList.length > 0 ? "16px" : "0" }}>
+              style={{ width: "100%", padding: "13px", borderRadius: "100px", border: "none", background: C.text, color: C.bg, fontSize: "14px", fontWeight: "700", cursor: loadingExpr ? "default" : "pointer", fontFamily: FONT, opacity: loadingExpr ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: exprList.length > 0 ? "16px" : "0" }}>
               {loadingExpr ? React.createElement(React.Fragment, null, React.createElement(Spinner), React.createElement("span", null, "생성 중…")) : "✨ 표현 생성하기"}
             </button>
 
@@ -13762,7 +13762,7 @@ function RichAudioPlayer({ src, label = "내 녹음 듣기", transcript = "", sh
         },
           duration === -1
             ? React.createElement("span", { style: { fontSize: "13px", color: "#fff" } }, "↗")
-            : React.createElement("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "#fff", style: { marginLeft: playing ? "0" : "2px" } },
+            : React.createElement("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: C.bg, style: { marginLeft: playing ? "0" : "2px" } },
                 playing
                   ? React.createElement("path", { d: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" })
                   : React.createElement("path", { d: "M8 5v14l11-7z" })
@@ -14601,7 +14601,7 @@ function QodAnswerFlow({ prompt, user, cityGroup, group, onPost, onClose, existi
 
             {/* Hero record button */}
             <button onClick={() => { setPath("direct"); setStep("practice"); }}
-              style={{ width: "100%", padding: "16px", borderRadius: "100px", border: "none", background: C.text, color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "10px", animation: "answerBreathe 2.5s ease-in-out infinite" }}>
+              style={{ width: "100%", padding: "16px", borderRadius: "100px", border: "none", background: C.text, color: C.bg, fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "10px", animation: "answerBreathe 2.5s ease-in-out infinite" }}>
               🎙 Answer Now
             </button>
 
