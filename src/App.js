@@ -4908,7 +4908,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       },
         React.createElement("style", null, "@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }"),
         React.createElement("div", {
-          style: { background: "#fff", borderRadius: "20px", padding: "32px 28px", maxWidth: "340px", width: "100%", textAlign: "center", animation: "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }
+          style: { background: C.bgCard, borderRadius: "20px", padding: "32px 28px", maxWidth: "340px", width: "100%", textAlign: "center", animation: "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }
         },
           React.createElement("div", { style: { fontSize: "48px", marginBottom: "16px" } }, "👋"),
           React.createElement("div", { style: { fontSize: "20px", fontWeight: "800", color: C.text, marginBottom: "10px", letterSpacing: "-0.3px" } }, "WAYVE에 오신 것을 환영해요!"),
@@ -5908,7 +5908,7 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         <div onClick={() => setConfirmDelete(false)}
           style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px", animation: "fadeIn 0.15s ease-out" }}>
           <div onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: "20px", padding: "24px 24px 20px", maxWidth: "320px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}>
+            style={{ background: C.bgCard, borderRadius: "20px", padding: "24px 24px 20px", maxWidth: "320px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}>
             <div style={{ fontSize: "17px", fontWeight: "700", color: C.text, marginBottom: "8px", textAlign: "center" }}>
               이 표현을 삭제할까요?
             </div>
