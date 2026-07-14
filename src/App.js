@@ -3554,7 +3554,7 @@ function TourCompletionEffect({ lang, submittedToday, onAnswerQuestion, onJustHo
         position: "fixed", inset: 0, zIndex: 2000,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-        background: "rgba(255,255,255,0.25)",
+        background: _v3Dark ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.25)",
         opacity: phase === "exit" ? 0 : phase === "show" ? 1 : 0,
         transition: "opacity 0.6s ease",
       },
@@ -3580,20 +3580,20 @@ function TourCompletionEffect({ lang, submittedToday, onAnswerQuestion, onJustHo
       // Card with frosted glass
       React.createElement("div", {
         style: {
-          background: "rgba(255,255,255,0.98)",
-          border: "1px solid rgba(255,255,255,0.6)",
+          background: C.bgCard,
+          border: `1px solid ${C.border}`,
           borderRadius: 32, padding: "36px 28px 28px",
           display: "flex", flexDirection: "column", alignItems: "center",
-          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
           maxWidth: 320, width: "85%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
           animation: "wv-completion-rise 0.5s ease 0.1s both", opacity: 0,
         }
       },
         React.createElement("div", { style: { fontSize: 64, marginBottom: 14, animation: "wv-completion-pop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.15s both" } }, "🎉"),
-        React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#1a1a1a", letterSpacing: "-0.5px", marginBottom: 8, textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: "-0.5px", marginBottom: 8, textAlign: "center" } },
           lang === "zh" ? "준비 완료!" : "준비 완료!"
         ),
-        React.createElement("div", { style: { fontSize: 14, color: "#444", textAlign: "center", lineHeight: 1.65, marginBottom: 22 } },
+        React.createElement("div", { style: { fontSize: 14, color: C.textMid, textAlign: "center", lineHeight: 1.65, marginBottom: 22 } },
           submittedToday
             ? (lang === "zh" ? "今天已经回答了。继续保持！" : "오늘 답변 완료! 이대로 꾸준히 가봐요.")
             : React.createElement(React.Fragment, null,
@@ -3607,7 +3607,7 @@ function TourCompletionEffect({ lang, submittedToday, onAnswerQuestion, onJustHo
           onClick: () => { haptic.medium(); handleExit(onAnswerQuestion); },
           style: {
             width: "100%", padding: "14px 18px", borderRadius: 100, border: "none",
-            background: "#1A3A6E", color: "#fff", fontSize: 15, fontWeight: 800,
+            background: C.navy, color: "#fff", fontSize: 15, fontWeight: 800,
             cursor: "pointer", fontFamily: FONT, marginBottom: 10,
             boxShadow: "0 4px 20px rgba(26,58,110,0.3)",
           }
@@ -3617,7 +3617,7 @@ function TourCompletionEffect({ lang, submittedToday, onAnswerQuestion, onJustHo
           onClick: () => { haptic.light(); handleExit(onJustHome); },
           style: {
             background: "transparent", border: "none",
-            color: "rgba(0,0,0,0.4)", fontSize: 13, fontWeight: 600,
+            color: C.textLight, fontSize: 13, fontWeight: 600,
             cursor: "pointer", fontFamily: FONT, padding: "8px 16px",
           }
         }, submittedToday
