@@ -10385,6 +10385,70 @@ function StudentRow({ s, localGroups, onRename, onUpdateGroup, onDelete, onUpdat
   );
 }
 
+// ── Group weekly schedule editor (teacher dashboard redesign, step 1) ──────────
+// Per-group weekly class times → group_schedule table (source of truth for the
+// dashboard pulse + the student request-card countdown). Supports multiple slots/week.
+const SCHED_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+function GroupScheduleEditor({ group, showMsg }) {
+  const [slots, setSlots] = useState(null); // null = loading
+  const [adding, setAdding] = useState(false);
+  const [newDay, setNewDay] = useState(3);   // default 수 (Wed)
+  const [newTime, setNewTime] = useState("20:00");
+  const [newDur, setNewDur] = useState(90);
+
+  useEffect(() => {
+    let cancelled = false;
+    db.get("group_schedule", `group_id=eq.${group.id}&order=day_of_week.asc,start_time.asc`)
+      .catch(() => [])
+      .then(rows => { if (!cancelled) setSlots(Array.isArray(rows) ? rows : []); });
+    return () => { cancelled = true; };
+  }, [group.id]);
+
+  const addSlot = async () => {
+    setAdding(true);
+    try {
+      const res = await db.insert("group_schedule", { group_id: group.id, day_of_week: Number(newDay), start_time: newTime, duration_min: Number(newDur) });
+      const row = Array.isArray(res) ? res[0] : res;
+      setSlots(prev => [...(prev || []), row].sort((a, b) => a.day_of_week - b.day_of_week || String(a.start_time).localeCompare(b.start_time)));
+      showMsg && showMsg("✓ 수업 시간 추가됨");
+    } catch(e) { showMsg && showMsg("Error: " + (e?.message || "add failed"), "error"); }
+    setAdding(false);
+  };
+  const removeSlot = async (id) => {
+    try { await db.delete("group_schedule", `id=eq.${id}`); setSlots(prev => (prev || []).filter(s => s.id !== id)); showMsg && showMsg("✓ 삭제됨"); }
+    catch(e) { showMsg && showMsg("Error deleting", "error"); }
+  };
+
+  const inputStyle = { padding: "6px 8px", borderRadius: "8px", border: `1px solid ${C.border}`, fontSize: "12px", fontFamily: FONT, background: C.bg, color: C.text };
+
+  return React.createElement("div", { style: { marginTop: "8px", marginBottom: "12px", paddingTop: "10px", borderTop: `1px solid ${C.bgSoft}` } },
+    React.createElement("div", { style: { fontSize: "10px", color: C.textLight, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" } }, "🗓 Weekly schedule · 수업 일정"),
+    slots === null
+      ? React.createElement("div", { style: { fontSize: "12px", color: C.textLight } }, "…")
+      : React.createElement(React.Fragment, null,
+          slots.length === 0 && React.createElement("div", { style: { fontSize: "12px", color: C.textLight, marginBottom: "8px" } }, "아직 수업 시간이 없어요."),
+          slots.map(s => React.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", background: C.bgSoft, borderRadius: "8px", marginBottom: "6px", fontSize: "13px" } },
+            React.createElement("span", { style: { fontWeight: "700", color: C.text } }, `${SCHED_DAYS[s.day_of_week] || "?"}요일`),
+            React.createElement("span", { style: { color: C.textMid } }, s.start_time),
+            React.createElement("span", { style: { color: C.textLight, fontSize: "12px" } }, `· ${s.duration_min || 90}분`),
+            React.createElement("div", { style: { flex: 1 } }),
+            React.createElement("button", { onClick: () => removeSlot(s.id), style: { background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "14px", padding: "0 4px" }, title: "삭제" }, "🗑")
+          )),
+          // Add row
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginTop: "4px" } },
+            React.createElement("select", { value: newDay, onChange: e => setNewDay(e.target.value), style: inputStyle },
+              SCHED_DAYS.map((d, i) => React.createElement("option", { key: i, value: i }, `${d}요일`))
+            ),
+            React.createElement("input", { type: "time", value: newTime, onChange: e => setNewTime(e.target.value), style: inputStyle }),
+            React.createElement("select", { value: newDur, onChange: e => setNewDur(e.target.value), style: inputStyle },
+              [20, 30, 45, 60, 90, 120].map(m => React.createElement("option", { key: m, value: m }, `${m}분`))
+            ),
+            React.createElement("button", { onClick: addSlot, disabled: adding, style: { padding: "6px 14px", borderRadius: "100px", border: "none", background: C.text, color: C.bg, fontSize: "12px", fontWeight: "700", cursor: adding ? "default" : "pointer", fontFamily: FONT } }, adding ? "…" : "+ 추가")
+          )
+        )
+  );
+}
+
 function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMsg }) {
   const [newName, setNewName] = useState("");
   const [newTeacherName, setNewTeacherName] = useState("");
@@ -10516,6 +10580,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
             React.createElement("span", { style: { fontSize: "11px", color: C.textLight, flexShrink: 0 } }, "👨‍🏫 Teacher:"),
             React.createElement(InlineEdit, { value: g.teacher_name || TEACHER_DISPLAY_NAME, onSave: n => updateTeacherName(g.id, n), style: { fontSize: "12px", color: C.textMid } })
           ),
+          React.createElement(GroupScheduleEditor, { group: g, showMsg }),
           React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: gs.length > 0 ? "12px" : "0" } },
             [["Students", gs.length], ["Avg Streak", gs.length ? Math.round(gs.reduce((a, b) => a + (b.streak || 0), 0) / gs.length) : 0], ["Today", gs.filter(s => s.last_practice === localToday()).length]].map(([label, val]) =>
               React.createElement("div", { key: label, style: { background: C.bgSoft, borderRadius: "6px", padding: "10px", textAlign: "center" } },
