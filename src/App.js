@@ -9747,7 +9747,7 @@ function TeacherSetupTab({ groups, setGroups, students, setStudents, phraseBank,
         {section === "qod" && React.createElement(QodStudioTab, { showMsg })}
         {section === "flags" && React.createElement(FeedbackFlagsTab, { showMsg })}
         {section === "students" && React.createElement(StudentsTab, { students, setStudents, groups, showMsg })}
-        {section === "groups" && React.createElement(GroupsTab, { groups, setGroups, students, setStudents, onPreview, showMsg })}
+        {section === "groups" && React.createElement(GroupsTab, { groups, setGroups, students, setStudents, onPreview, onAddPhrases: () => setSection("add"), showMsg })}
         {section === "cities" && React.createElement(CityGroupsTab, { groups, students, showMsg })}
         {section === "tags" && React.createElement(SituationTagsTab, { showMsg })}
         {section === "pronunciation" && React.createElement(PronunciationTab, { showMsg })}
@@ -10449,13 +10449,80 @@ function GroupScheduleEditor({ group, showMsg }) {
   );
 }
 
-function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMsg }) {
+// ── Session wrap-up (teacher dashboard redesign, step 2) ───────────────────────
+// The post-session moment: mark who attended + jump to phrase-add. Attendance is the
+// new pulse signal → written to the attendance table (delete+insert per group+date, so
+// re-opening edits the same session). Defaults everyone to attended; tap to mark absent.
+function SessionWrapUp({ group, students, sessionDate, onClose, onAddPhrases, showMsg }) {
+  const gs = students.filter(s => s.group_id === group.id);
+  const [attended, setAttended] = useState(null); // null = loading; else { [id]: bool }
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rows = await db.get("attendance", `group_id=eq.${group.id}&session_date=eq.${sessionDate}&select=student_id,attended`).catch(() => []);
+      const m = {};
+      gs.forEach(s => { m[s.id] = true; }); // default: everyone attended
+      (rows || []).forEach(r => { if (r.student_id in m) m[r.student_id] = !!r.attended; });
+      if (!cancelled) setAttended(m);
+    })();
+    return () => { cancelled = true; };
+  }, [group.id, sessionDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggle = (id) => setAttended(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const save = async () => {
+    if (saving || !attended) return;
+    setSaving(true);
+    try {
+      // Replace this session's rows wholesale so re-wrapping is idempotent.
+      await db.delete("attendance", `group_id=eq.${group.id}&session_date=eq.${sessionDate}`).catch(() => {});
+      const rows = gs.map(s => ({ student_id: s.id, group_id: group.id, session_date: sessionDate, attended: !!attended[s.id] }));
+      if (rows.length) await db.insert("attendance", rows);
+      showMsg && showMsg("✓ 출석 저장됨");
+      onClose();
+    } catch(e) { showMsg && showMsg("Error: " + (e?.message || "저장 실패"), "error"); setSaving(false); }
+  };
+
+  const attendedCount = attended ? Object.values(attended).filter(Boolean).length : 0;
+
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "flex-end", justifyContent: "center", animation: "fadeIn 0.15s ease" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.bgCard, width: "100%", maxWidth: "480px", borderRadius: "24px 24px 0 0", padding: "10px 20px calc(20px + env(safe-area-inset-bottom))", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ width: 40, height: 4, borderRadius: 100, background: C.border, margin: "4px auto 14px" }} />
+        <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{group.name} 수업 정리</div>
+        <div style={{ fontSize: 12, color: C.textLight, marginBottom: 16 }}>{sessionDate}</div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>출석 · {attendedCount}/{gs.length}</div>
+        {attended === null
+          ? <div style={{ fontSize: 13, color: C.textLight, padding: "12px 0" }}>…</div>
+          : gs.length === 0
+            ? <div style={{ fontSize: 13, color: C.textLight, padding: "12px 0" }}>이 그룹에 학생이 없어요.</div>
+            : <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                {gs.map(s => { const on = !!attended[s.id]; return (
+                  <button key={s.id} onClick={() => toggle(s.id)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 100, border: `1.5px solid ${on ? C.success : C.border}`, background: on ? C.successBg : "transparent", color: on ? C.success : C.textMid, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>
+                    <span>{on ? "✓" : "○"}</span> {s.name}
+                  </button>
+                ); })}
+              </div>}
+
+        <button onClick={() => { onClose(); onAddPhrases && onAddPhrases(); }} style={{ width: "100%", padding: "12px", borderRadius: 100, border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, marginBottom: 10 }}>+ 오늘 배운 표현 추가 →</button>
+        <button onClick={save} disabled={saving} style={{ width: "100%", padding: "14px", borderRadius: 100, border: "none", background: C.text, color: C.bg, fontSize: 15, fontWeight: 800, cursor: saving ? "default" : "pointer", fontFamily: FONT, opacity: saving ? 0.6 : 1 }}>{saving ? "저장 중…" : "완료"}</button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function GroupsTab({ groups, setGroups, students, setStudents, onPreview, onAddPhrases, showMsg }) {
   const [newName, setNewName] = useState("");
   const [newTeacherName, setNewTeacherName] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [reassignGroupId, setReassignGroupId] = useState("");
   const [activeView, setActiveView] = useState("overview");
+  const [wrapUpGroup, setWrapUpGroup] = useState(null); // group being wrapped up (attendance)
 
   const today = localToday();
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
@@ -10572,6 +10639,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
           React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
             React.createElement("div", { style: { fontSize: "15px", fontWeight: "600", flex: 1 } }, React.createElement(InlineEdit, { value: g.name, onSave: n => renameGroup(g.id, n) })),
             React.createElement("div", { style: { display: "flex", gap: "6px" } },
+              React.createElement(Btn, { onClick: () => setWrapUpGroup(g), variant: "ghost", style: { padding: "5px 12px", fontSize: "12px" } }, "🗓 수업 정리"),
               React.createElement(Btn, { onClick: () => onPreview(g), variant: "gold", style: { padding: "5px 12px", fontSize: "12px" } }, "👁 Preview"),
               React.createElement(Btn, { onClick: () => handleDelete(g), variant: "ghost", style: { padding: "5px 10px", fontSize: "12px", color: C.error, borderColor: C.error } }, "Delete")
             )
@@ -10604,6 +10672,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, showMs
       </Card>
       </div>
       )}
+      {wrapUpGroup && React.createElement(SessionWrapUp, { group: wrapUpGroup, students, sessionDate: localToday(), onClose: () => setWrapUpGroup(null), onAddPhrases, showMsg })}
     </div>
   );
 }
