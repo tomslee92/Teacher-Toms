@@ -9143,6 +9143,8 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
   const [dismissed, setDismissed] = useState([]); // phrases this student has dismissed
   const [cleanSlating, setCleanSlating] = useState(false);
   const [cleanSlateConfirm, setCleanSlateConfirm] = useState(false);
+  const [attendanceLog, setAttendanceLog] = useState([]); // 출석 기록 (newest first)
+  const [studentRequests, setStudentRequests] = useState([]); // their 다음 수업 리퀘스트
   const [pastNotes, setPastNotes] = useState([]); // session_notes for this student (newest first)
   const refreshPastNotes = useCallback(async () => {
     try {
@@ -9185,7 +9187,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         const _now = new Date();
         const _mon = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - ((_now.getDay() + 6) % 7));
         const _monStr = `${_mon.getFullYear()}-${String(_mon.getMonth()+1).padStart(2,'0')}-${String(_mon.getDate()).padStart(2,'0')}`;
-        const [qod, prog, phrases, session, duesData, dismissedData, personalData, segData] = await Promise.all([
+        const [qod, prog, phrases, session, duesData, dismissedData, personalData, segData, attData, reqData] = await Promise.all([
           db.get("qod_responses", `student_id=eq.${student.id}&order=created_at.desc&limit=10`).catch(() => []),
           db.get("student_progress", `student_id=eq.${student.id}&order=updated_at.desc`).catch(() => []),
           db.get("student_phrases", `student_id=eq.${student.id}&order=created_at.desc`).catch(() => []),
@@ -9195,6 +9197,8 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
           db.get("session_phrases", `student_id=eq.${student.id}&select=*,phrase_bank(*)&order=created_at.asc`).catch(() => []),
           // All sources (app + wavi) — confirms the time metric is whole-app, not Wavi-only
           db.get("active_time_segments", `student_id=eq.${student.id}&date=gte.${_monStr}&select=date,seconds`).catch(() => []),
+          db.get("attendance", `student_id=eq.${student.id}&order=session_date.desc&limit=60&select=session_date,attended`).catch(() => []),
+          db.get("class_requests", `student_id=eq.${student.id}&order=created_at.desc&select=id,content,status,created_at`).catch(() => []),
         ]);
         setQodHistory(qod);
         setPhraseProgress(prog);
@@ -9204,6 +9208,8 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
         setDismissed(dismissedData);
         setPersonalPhrases(personalData.filter(sp => sp.phrase_bank).map(sp => ({ ...sp.phrase_bank, sp_id: sp.id, in_library: sp.in_library })));
         setWeekSegments(segData);
+        setAttendanceLog(Array.isArray(attData) ? attData : []);
+        setStudentRequests(Array.isArray(reqData) ? reqData : []);
       } catch(e) {}
       setLoading(false);
     })();
@@ -9675,6 +9681,40 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
           ))}
         </div>
       </div>
+
+      {/* 출석 기록 + 그들의 리퀘스트 (teacher dashboard redesign, step 4) */}
+      {TEACHER_DASH_V3 && (
+        <div style={{ marginBottom: "28px" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, textTransform: "uppercase", marginBottom: 10 }}>출석 기록</div>
+          {attendanceLog.length === 0
+            ? <div style={{ fontSize: 13, color: C.textLight, marginBottom: 20 }}>아직 출석 기록이 없어요. "수업 정리"에서 남겨보세요.</div>
+            : <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, color: C.textMid, marginBottom: 8 }}>최근 {attendanceLog.length}회 중 {attendanceLog.filter(a => a.attended).length}회 출석</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {attendanceLog.map(a => { const p = String(a.session_date).split("-"); return (
+                    <span key={a.session_date} style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 100, background: a.attended ? C.successBg : C.errorBg, color: a.attended ? C.success : C.error }}>{`${+p[1]}월 ${+p[2]}일`} {a.attended ? "✓" : "✗"}</span>
+                  ); })}
+                </div>
+              </div>}
+          {studentRequests.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, textTransform: "uppercase", marginBottom: 10 }}>다음 수업 리퀘스트</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {studentRequests.map(r => {
+                  const label = { new: "접수됨", planned: "수업 반영", covered: "완료" }[r.status] || r.status;
+                  const col = { new: C.textMid, planned: C.navy, covered: C.success }[r.status] || C.textMid;
+                  return (
+                    <div key={r.id} style={{ background: C.bgSoft, borderRadius: 10, padding: "10px 12px", display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, fontSize: 13, color: C.text, lineHeight: 1.5 }}>{r.content}</div>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: col, flexShrink: 0, whiteSpace: "nowrap" }}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Personal session notes — teacher entry + past notes to this student.
           Text-only, un-shelved under SESSION_NOTES_ENABLED. Rendered whenever the
