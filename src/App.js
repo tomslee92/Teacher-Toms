@@ -14551,6 +14551,7 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
                 index={i}
                 onCommentSeen={refreshUnreadComments}
                 newUI={newUI}
+                heartOnly={rv3}
               />
             ))}
           </div>
@@ -14574,6 +14575,8 @@ function CommunityTab({ user, group, isPreview, onPracticed, unreadCommentIds = 
 // ── HistoryResponseCard — compact card for past days with reactions ────────────
 function HistoryResponseCard({ r, user }) {
   const newUI = isNewUI(user);
+  // v3 simplifies the six-emoji reaction row down to a single heart.
+  const reactionEmojis = isRedesignV3(user) ? ["❤️"] : REACTION_EMOJIS;
   const [reactions, setReactions] = useState({ counts: {}, mine: new Set() });
 
   useEffect(() => {
@@ -14637,7 +14640,7 @@ function HistoryResponseCard({ r, user }) {
       )}
       {/* Reactions */}
       <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", paddingLeft: "30px" }}>
-        {REACTION_EMOJIS.map(emoji => {
+        {reactionEmojis.map(emoji => {
           const count = reactions.counts[emoji] || 0;
           const isMine = reactions.mine.has(emoji);
           if (count === 0 && isMe) return null;
@@ -14654,7 +14657,9 @@ function HistoryResponseCard({ r, user }) {
 }
 
 // ── Response Card ─────────────────────────────────────────────────────────────
-function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onCommentSeen, newUI = false }) {
+function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onCommentSeen, newUI = false, heartOnly = false }) {
+  // v3 simplifies the six-emoji reaction row down to a single heart.
+  const reactionEmojis = heartOnly ? ["❤️"] : REACTION_EMOJIS;
   // Use optimistic reaction data from parent (updated instantly on tap)
   // Fall back to DB fetch only on first load when optimistic data not yet set
   const [dbReactions, setDbReactions] = useState(null);
@@ -14717,7 +14722,7 @@ function ResponseCard({ response, isMe, onReact, onDelete, userId, index, onComm
       {/* Reactions + delete */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-          {REACTION_EMOJIS.map(emoji => {
+          {reactionEmojis.map(emoji => {
             const count = reactionCounts[emoji] || 0;
             const isMine = myReactions.has(emoji);
             if (count === 0 && isMe) return null;
