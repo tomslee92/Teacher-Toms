@@ -1592,6 +1592,50 @@ function friendlyError(e, lang = "ko", context = "", studentName = "") {
   }
 }
 
+// Reasoning-style models (openai/gpt-oss-*) may prefix their answer with a
+// <think>…</think> or <reasoning>…</reasoning> block. Strip it so downstream text/JSON
+// parsing sees only the final answer. Harmless on non-reasoning output (llama).
+function stripReasoning(s) {
+  if (s == null) return s;
+  return String(s)
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
+    .trim();
+}
+// Returns the first *balanced* JSON object/array substring (brace-aware, string-safe),
+// which is more reliable than a greedy first-{ to last-} match when a reasoning preamble
+// or trailing prose surrounds the JSON.
+function firstBalancedJSON(s) {
+  const start = s.search(/[[{]/);
+  if (start < 0) return null;
+  const open = s[start], close = open === "{" ? "}" : "]";
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+    } else {
+      if (c === '"') inStr = true;
+      else if (c === open) depth++;
+      else if (c === close) { depth--; if (depth === 0) return s.slice(start, i + 1); }
+    }
+  }
+  return null;
+}
+// Model-agnostic JSON extraction from an LLM completion. Tolerates reasoning preambles,
+// markdown fences, and surrounding prose. Returns the parsed value, or null on failure.
+// Node-tested against clean/fenced/array/reasoning/brace-in-string inputs.
+function extractLLMJSON(raw) {
+  if (raw == null) return null;
+  let s = stripReasoning(raw).replace(/```json|```/gi, "").trim();
+  try { return JSON.parse(s); } catch (_) {}
+  const block = firstBalancedJSON(s);
+  if (block) { try { return JSON.parse(block); } catch (_) {} }
+  return null;
+}
+
 async function groqCall(prompt, lang = "ko") {
   if (!GROQ_KEY) throw new Error("GROQ_KEY not configured in Vercel environment variables");
   aiUsageTick("groq70b");
@@ -1606,7 +1650,8 @@ async function groqCall(prompt, lang = "ko") {
   }
   if (!res.ok) throw new Error("Groq API error: " + await res.text());
   const d = await res.json();
-  return cleanText(d.choices[0].message.content, lang);
+  // Strip any reasoning block at the source so every groqCall consumer (text + JSON) is clean.
+  return cleanText(stripReasoning(d.choices[0].message.content), lang);
 }
 
 async function groqCall8b(prompt) {
@@ -1666,7 +1711,8 @@ Evaluate the current Korean translation. Suggest a fix if it's inaccurate, awkwa
   const raw = d.choices?.[0]?.message?.content?.trim();
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = extractLLMJSON(raw);
+    if (!parsed) return null;
     return {
       needs_change: Boolean(parsed.needs_change),
       suggested_korean: String(parsed.suggested_korean || "").trim(),
@@ -2086,11 +2132,8 @@ Return ONLY valid JSON array:
   if (!res.ok) throw new Error("AI server error (" + res.status + ").");
   const d = await res.json();
   if (!d.choices?.[0]?.message?.content) throw new Error("Empty response.");
-  const t = d.choices[0].message.content.replace(/```json|```/g, "").trim();
-  const s = t.indexOf("["); const e = t.lastIndexOf("]");
-  if (s < 0) throw new Error("JSON format error.");
-  let parsed;
-  try { parsed = JSON.parse(t.slice(s, e + 1)); } catch(e) { throw new Error("JSON parse error."); }
+  const parsed = extractLLMJSON(d.choices[0].message.content);
+  if (!Array.isArray(parsed)) throw new Error("JSON format error.");
   return parsed.map(p => ({
     english: p.english || "",
     korean: cleanText(p.korean || "", lang),
@@ -2330,9 +2373,8 @@ Korean: "${korean}"
 JSON:`;
   try {
     const raw = await groqCall(prompt);
-    const clean = raw.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
-    if (typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    const parsed = extractLLMJSON(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
     return null;
   } catch(e) {
     console.warn("generateWordMap failed:", e);
@@ -6318,11 +6360,8 @@ function FreeTalkTab({ user, group, isPreview, onPracticed, onPhraseSaved }) {
       setTranscript(said);
       prompt = buildFeedbackPrompt(said, lang, user?.skill_level);
       const tryParse = (raw) => {
-        if (!raw) return null;
-        const s = raw.replace(/```json[\s\S]*?```|```[\s\S]*?```/g, "").replace(/```/g, "").trim();
-        try { return cleanParsedObject(JSON.parse(s)); } catch(_) {}
-        try { const m = s.match(/\{[\s\S]*\}/); if (m) return cleanParsedObject(JSON.parse(m[0])); } catch(_) {}
-        return null;
+        const parsed = extractLLMJSON(raw);
+        return parsed ? cleanParsedObject(parsed) : null;
       };
 
       const text = await groqCallSafe(prompt, undefined, lang);
@@ -6462,12 +6501,7 @@ RETURN ONLY THE JSON OBJECT:`;
       try {
         const text = await groqCall(TODAYS_EXPR_PROMPT);
         if (cancelled) return;
-        let parsed = null;
-        try {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
-          if (!parsed) parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-        } catch(e) {}
+        const parsed = extractLLMJSON(text);
         if (!cancelled && parsed?.expression) {
           const cleaned = cleanParsedObject(parsed);
           if (cleaned.explanation) {
@@ -6567,13 +6601,9 @@ Return ONLY this JSON array:
 [{"expression":"natural English phrase","korean":"${lang === "zh" ? "中文翻译" : "한국어 번역"}","explanation":"${lang === "zh" ? "用中文说明什么时候用这个表达（1-2句）" : "한국어로 언제 어떤 상황에서 쓰는지 설명 (1-2문장)"}","example":"A realistic example sentence showing it in a real conversation"}]
 
 CRITICAL: korean and explanation MUST be in ${lang === "zh" ? "Simplified Chinese (汉字) only" : "Korean hangul only"}. ${lang === "zh" ? "NO Korean, NO Japanese, NO other scripts." : "NO Chinese, NO Japanese, NO other scripts."} RETURN ONLY THE JSON ARRAY.`);
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        try {
-          const parsed = cleanParsedObject(JSON.parse(jsonMatch[0]));
-          if (Array.isArray(parsed)) setExprList(prev => [...prev, ...parsed]);
-        } catch(e) { console.warn("Expression parse error:", e.message); }
-      }
+      const ex = extractLLMJSON(text);
+      const parsed = ex ? cleanParsedObject(ex) : null;
+      if (Array.isArray(parsed)) setExprList(prev => [...prev, ...parsed]);
     } catch(e) { console.warn("Expression gen error:", e.message); }
     setLoadingExpr(false);
   };
@@ -6623,10 +6653,8 @@ Return ONLY this JSON array, no markdown:
       }
       if (!res.ok) throw new Error(await res.text());
       const d = await res.json();
-      const raw = cleanText(d.choices[0].message.content.trim());
-      const jsonMatch = raw.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("No JSON in response");
-      const parsed = cleanParsedObject(JSON.parse(jsonMatch[0]));
+      const ex = extractLLMJSON(d.choices[0].message.content);
+      const parsed = ex ? cleanParsedObject(ex) : null;
       if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("Empty result");
       setHowToSay(parsed);
     } catch(e) {
@@ -12128,8 +12156,7 @@ Format: [{"keep_id": "uuid", "remove_id": "uuid", "keep_english": "...", "remove
 No markdown, no explanation outside the JSON.`;
         try {
           const raw = await groqCall(prompt);
-          const clean = raw.replace(/```json|```/g, "").trim();
-          const parsed = JSON.parse(clean);
+          const parsed = extractLLMJSON(raw);
           if (Array.isArray(parsed)) {
             // Deduplicate against already found pairs
             for (const pair of parsed) {
@@ -12315,8 +12342,7 @@ No markdown, no explanation outside JSON.`;
 
         try {
           const raw = await groqCall(prompt);
-          const clean = raw.replace(/```json|```/g, "").trim();
-          const parsed = JSON.parse(clean);
+          const parsed = extractLLMJSON(raw);
           if (Array.isArray(parsed)) {
             for (const c of parsed) {
               if (c.id && c.rewritten_english && c.rewritten_english.includes("{{")) {
@@ -17466,8 +17492,9 @@ Scoring:
     });
     if (!res.ok) throw new Error("eval");
     const data = await res.json();
-    const txt = data.choices[0].message.content.replace(/```json|```/g, "").trim();
-    return JSON.parse(txt);
+    const parsed = extractLLMJSON(data.choices[0].message.content);
+    if (parsed == null) throw new Error("eval");
+    return parsed;
   } catch(e) {
     // Word-coverage fallback
     const targetWords = targetPhrase.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
