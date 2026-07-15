@@ -8132,26 +8132,26 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
 
             {/* ── Rate Limit Alert Banner ── */}
             {rateLimitAlerts.length > 0 && !alertsDismissed && (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "12px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <div style={{ background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "12px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
                 <span style={{ fontSize: "20px", flexShrink: 0 }}>⚠️</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "14px", fontWeight: "700", color: "#991B1B", marginBottom: "4px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: C.error, marginBottom: "4px" }}>
                     AI Usage Limit Reached
                   </div>
-                  <div style={{ fontSize: "13px", color: "#B91C1C", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "8px" }}>
                     {rateLimitAlerts.length} student{rateLimitAlerts.length > 1 ? "s" : ""} hit the daily AI limit in the last 24 hours.
-                    Upgrade the Groq plan at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" style={{ color: "#991B1B", fontWeight: "600" }}>console.groq.com</a> to restore access.
+                    Upgrade the Groq plan at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" style={{ color: C.error, fontWeight: "600" }}>console.groq.com</a> to restore access.
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                     {[...new Set(rateLimitAlerts.map(a => a.student_name))].map(name => (
                       React.createElement("span", {
                         key: name,
-                        style: { fontSize: "11px", background: "#FEE2E2", color: "#991B1B", borderRadius: "100px", padding: "2px 10px", fontWeight: "500" }
+                        style: { fontSize: "11px", background: C.bg, color: C.error, borderRadius: "100px", padding: "2px 10px", fontWeight: "500" }
                       }, name)
                     ))}
                   </div>
                 </div>
-                <button onClick={() => setAlertsDismissed(true)} style={{ background: "transparent", border: "none", color: "#B91C1C", fontSize: "18px", cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: "0" }}>×</button>
+                <button onClick={() => setAlertsDismissed(true)} style={{ background: "transparent", border: "none", color: C.textMid, fontSize: "18px", cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: "0" }}>×</button>
               </div>
             )}
 
@@ -9124,14 +9124,14 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
         <div style={{ position: "relative", flexShrink: 0 }}>
           <StudentAvatar student={s} size={38} />
           {isOnline && (
-            <div style={{ position: "absolute", bottom: 1, right: 1, width: "10px", height: "10px", borderRadius: "50%", background: "#22C55E", border: "2px solid #fff" }} />
+            <div style={{ position: "absolute", bottom: 1, right: 1, width: "10px", height: "10px", borderRadius: "50%", background: "#22C55E", border: `2px solid ${C.bgCard}` }} />
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "14px", fontWeight: "600", color: C.text, display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
             {s.name}
             {genderLabel && <span style={{ fontSize: "10px", color: genderColor, fontWeight: "700", background: genderColor + "18", border: `1px solid ${genderColor}40`, borderRadius: "100px", padding: "1px 5px" }}>{genderLabel}</span>}
-            {isOnline && <span style={{ fontSize: "10px", fontWeight: "700", color: "#22C55E", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: "100px", padding: "1px 6px", letterSpacing: "0.3px" }}>ONLINE</span>}
+            {isOnline && <span style={{ fontSize: "10px", fontWeight: "700", color: C.success, background: C.successBg, border: `1px solid ${C.successBorder}`, borderRadius: "100px", padding: "1px 6px", letterSpacing: "0.3px" }}>ONLINE</span>}
             {duesPaid && <span style={{ fontSize: "10px", fontWeight: "700", color: C.success, background: C.successBg, border: `1px solid ${C.successBorder}`, borderRadius: "100px", padding: "1px 6px" }}>💰 Paid</span>}
             {showDuesAlert && dayOfMonth > 7 && <span style={{ fontSize: "10px", fontWeight: "700", color: C.error, background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "100px", padding: "1px 6px" }}>Unpaid</span>}
           </div>
