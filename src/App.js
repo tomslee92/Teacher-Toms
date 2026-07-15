@@ -7976,7 +7976,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
   const V3_PRIMARY_IDS = ["today", "students", "inbox"];
   const primaryTabs = TEACHER_DASH_V3 ? TABS.filter(t => V3_PRIMARY_IDS.includes(t.id)) : TABS;
   const moreTabs = TEACHER_DASH_V3 ? TABS.filter(t => !V3_PRIMARY_IDS.includes(t.id)) : [];
-  const bellCount = (inboxUnread || 0) + (notesUnread || 0);
+  const moreBadge = moreTabs.reduce((n, t) => n + (t.badge || 0), 0); // unread inside the ⚙ menu (e.g. Notes)
   const goTab = (id) => { setTab(id); setSelectedStudent(null); setMoreOpen(false); };
   const menuItemStyle = { display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: FONT, fontSize: "13px", color: C.text, width: "100%" };
 
@@ -8048,13 +8048,11 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
                     <div style={{ fontSize: "9px", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "500" }}>Teacher</div>
                   </div>
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", position: "relative" }}>
-                    <button onClick={() => goTab("inbox")} title="받은 알림"
-                      style={{ position: "relative", background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>
-                      🔔
-                      {bellCount > 0 && <span style={{ position: "absolute", top: "-3px", right: "-3px", background: C.error, color: "#fff", fontSize: "9px", fontWeight: "800", borderRadius: "100px", padding: "1px 5px", minWidth: "15px", textAlign: "center", lineHeight: "15px" }}>{bellCount}</span>}
-                    </button>
                     <button onClick={() => setMoreOpen(o => !o)} title="설정"
-                      style={{ background: moreOpen ? C.text : C.bgSoft, border: `1px solid ${moreOpen ? C.text : C.border}`, color: moreOpen ? "#fff" : C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>⚙</button>
+                      style={{ position: "relative", background: moreOpen ? C.text : C.bgSoft, border: `1px solid ${moreOpen ? C.text : C.border}`, color: moreOpen ? "#fff" : C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>
+                      ⚙
+                      {moreBadge > 0 && !moreOpen && <span style={{ position: "absolute", top: "-2px", right: "-2px", width: "10px", height: "10px", background: C.error, borderRadius: "100px", border: `2px solid ${C.bg}` }} />}
+                    </button>
                     {moreOpen && (
                       <React.Fragment>
                         <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
