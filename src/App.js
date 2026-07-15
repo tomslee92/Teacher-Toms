@@ -2288,8 +2288,8 @@ ${depthRulesKo}`;
 
 // ── Word Map Generator ────────────────────────────────────────────────────────
 // Calls Groq once per phrase to generate an English→Korean word alignment map.
-// Stored in phrase_bank.word_map (JSONB). Used by TappableText + KoreanWordHighlight
-// to simultaneously highlight the tapped English word and its Korean equivalent.
+// Stored in phrase_bank.word_map (JSONB). Retained on the write side only; the reader
+// (KoreanWordHighlight) was removed because per-word EN→KO highlighting can't sync reliably.
 // {{tokens}} are treated as atomic units and mapped as whole tokens.
 async function generateWordMap(english, korean) {
   if (!english || !korean) return null;
@@ -2349,8 +2349,12 @@ function TappableText({ text, style = {}, wordStyle = {}, highlightWord = null, 
       if (/^\s+$/.test(token)) return token;
       const clean = cleanWord(token);
       const isWord = clean.length >= 2;
-      const isThisActive = isWord && isActive && activeWord === clean;
-      const isHighlighted = isWord && highlightWord && highlightWord === clean;
+      // The tapped word lights up the instant it's tapped (activeWord is set synchronously,
+      // before speak() runs) and stays lit through playback — deepening slightly while the
+      // audio is actually sounding. Previously the visible highlight only appeared *after*
+      // audio finished, because the (near-invisible) speaking-state style took precedence and
+      // the yellow only surfaced once the speaking state cleared.
+      const isTapped = isWord && activeWord === clean;
       return React.createElement("span", {
         key: i,
         onClick: isWord ? (e) => handleWordTap(e, token) : undefined,
@@ -2359,7 +2363,7 @@ function TappableText({ text, style = {}, wordStyle = {}, highlightWord = null, 
           borderRadius: "3px",
           padding: "0 1px",
           transition: "background 0.2s ease",
-          background: isThisActive ? "rgba(26,58,110,0.10)" : isHighlighted ? "rgba(255,200,50,0.35)" : "transparent",
+          background: isTapped ? (isActive ? "rgba(255,193,40,0.55)" : "rgba(255,200,50,0.38)") : "transparent",
           ...wordStyle
         } : {}
       }, token);
@@ -2367,51 +2371,11 @@ function TappableText({ text, style = {}, wordStyle = {}, highlightWord = null, 
   );
 }
 
-// ── KoreanWordHighlight ───────────────────────────────────────────────────────
-// Renders a Korean translation string, highlighting the word that corresponds
-// to the tapped English word via the stored word_map.
-// Falls back to highlighting the whole line if no map exists.
-function KoreanWordHighlight({ korean, wordMap, tappedEnglishWord, style = {} }) {
-  if (!korean) return null;
-
-  const highlightedKorean = React.useMemo(() => {
-    if (!tappedEnglishWord || !wordMap) return null;
-    return wordMap[tappedEnglishWord] || null;
-  }, [tappedEnglishWord, wordMap]);
-
-  // No tapped word — just render plain Korean
-  if (!tappedEnglishWord) {
-    return React.createElement("span", { style }, korean);
-  }
-
-  // No word map — highlight whole line
-  if (!wordMap) {
-    return React.createElement("span", {
-      style: { ...style, background: "rgba(255,200,50,0.25)", borderRadius: "4px", padding: "0 2px", transition: "background 0.2s" }
-    }, korean);
-  }
-
-  // Word map exists — highlight just the matched Korean word/group
-  if (!highlightedKorean) {
-    return React.createElement("span", { style }, korean);
-  }
-
-  const idx = korean.indexOf(highlightedKorean);
-  if (idx === -1) {
-    // Substring not found (spacing/form variation) — fall back to whole line
-    return React.createElement("span", {
-      style: { ...style, background: "rgba(255,200,50,0.25)", borderRadius: "4px", padding: "0 2px", transition: "background 0.2s" }
-    }, korean);
-  }
-
-  return React.createElement("span", { style },
-    korean.slice(0, idx),
-    React.createElement("span", {
-      style: { background: "rgba(255,200,50,0.45)", borderRadius: "3px", padding: "0 1px", transition: "background 0.2s ease" }
-    }, highlightedKorean),
-    korean.slice(idx + highlightedKorean.length)
-  );
-}
+// KoreanWordHighlight was removed: per-word EN→KO highlighting can't sync reliably
+// (Korean particle-attachment + word-order + the stored word_map being a JSON string
+// that was never parsed on read). The phrase card now renders the Korean line plainly;
+// only the English word tap→highlight→audio path remains. word_map generation is kept
+// on the write side in case a reliable alignment approach is added later.
 
 // ── ListenButton ─────────────────────────────────────────────────────────────
 // Drop-in replacement for "speak()" buttons across the app. Shows a loading
@@ -5848,14 +5812,7 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
         </div>
         {phrase.korean && (
           <div style={{ fontSize: newUI ? "14px" : "13px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, lineHeight: 1.4 }}>
-            {open
-              ? React.createElement(KoreanWordHighlight, {
-                  korean: applyPhraseTokens(lang === "zh" && phrase.chinese ? phrase.chinese : phrase.korean),
-                  wordMap: phrase.word_map || null,
-                  tappedEnglishWord: tappedWord,
-                })
-              : applyPhraseTokens(lang === "zh" && phrase.chinese ? phrase.chinese : phrase.korean)
-            }
+            {applyPhraseTokens(lang === "zh" && phrase.chinese ? phrase.chinese : phrase.korean)}
           </div>
         )}
         {(lang === "zh" ? (phrase.context_zh || phrase.context) : phrase.context) && (
