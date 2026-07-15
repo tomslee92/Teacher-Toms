@@ -4821,10 +4821,12 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
         {rv3 && tab === "practice" && (
           <>
             <div style={{ fontSize: "30px", fontWeight: "800", letterSpacing: "-0.6px", color: WAYVE_TOKENS.ink, fontFamily: FONT_V3, marginBottom: "14px" }}>Practice</div>
-            <div style={{ background: "rgba(22,24,29,0.06)", borderRadius: "100px", padding: "3px", display: "flex", marginBottom: "16px", fontFamily: FONT_V3 }}>
+            <div style={{ background: WAYVE_TOKENS.bgGrouped, border: `1px solid ${WAYVE_TOKENS.hairline}`, borderRadius: "100px", padding: "3px", display: "flex", marginBottom: "16px", fontFamily: FONT_V3 }}>
               {[["week", "이번 주"], ["past", "지난 표현"], ["mylist", "내 목록"]].map(([id, label]) => {
                 const on = practiceSegment === id;
-                return <button key={id} onClick={() => { haptic.light(); setPracticeSegment(id); }} style={{ flex: 1, background: on ? "#fff" : "transparent", borderRadius: "100px", padding: "9px 0", textAlign: "center", fontSize: "13px", fontWeight: on ? "800" : "700", color: on ? WAYVE_TOKENS.ink : WAYVE_TOKENS.ink2, boxShadow: on ? "0 1px 3px rgba(16,24,40,.1)" : "none", border: "none", cursor: "pointer", fontFamily: FONT_V3 }}>{label}</button>;
+                // Active pill uses the theme card surface (white in light, #171B22 in dark) — never a
+                // hardcoded #fff, which turned white-on-white in dark mode.
+                return <button key={id} onClick={() => { haptic.light(); setPracticeSegment(id); }} style={{ flex: 1, background: on ? WAYVE_TOKENS.card : "transparent", borderRadius: "100px", padding: "9px 0", textAlign: "center", fontSize: "13px", fontWeight: on ? "800" : "700", color: on ? WAYVE_TOKENS.ink : WAYVE_TOKENS.ink2, boxShadow: on ? "0 1px 3px rgba(16,24,40,.1)" : "none", border: "none", cursor: "pointer", fontFamily: FONT_V3 }}>{label}</button>;
               })}
             </div>
           </>
@@ -8087,9 +8089,11 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
                   <div style={{ display: "flex", gap: "4px", background: C.bgSoft, borderRadius: "100px", padding: "4px" }}>
                     {primaryTabs.map(t => {
                       const active = tab === t.id;
+                      // Active pill must LIFT off the container in both modes: a lighter surface
+                      // in dark (bgMid > bgSoft), white in light. Text is always high-contrast.
                       return (
                         <button key={t.id} onClick={() => goTab(t.id)}
-                          style={{ flex: 1, position: "relative", padding: "8px 0", borderRadius: "100px", border: "none", background: active ? C.bg : "transparent", color: active ? C.text : C.textMid, fontSize: "13px", fontWeight: active ? "800" : "600", fontFamily: FONT, cursor: "pointer", boxShadow: active ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "all 0.15s" }}>
+                          style={{ flex: 1, position: "relative", padding: "8px 0", borderRadius: "100px", border: `1px solid ${active && teacherDark ? C.border : "transparent"}`, background: active ? (teacherDark ? C.bgMid : C.bg) : "transparent", color: active ? C.text : C.textMid, fontSize: "13px", fontWeight: active ? "800" : "600", fontFamily: FONT, cursor: "pointer", boxShadow: active && !teacherDark ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "all 0.15s" }}>
                           {t.label}
                           {t.badge > 0 && <span style={{ position: "absolute", top: "3px", right: "10px", background: C.error, color: "#fff", fontSize: "9px", fontWeight: "800", borderRadius: "100px", padding: "0 5px", lineHeight: "14px" }}>{t.badge}</span>}
                         </button>
@@ -16793,7 +16797,7 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
       // 글자 크기 — segmented control (wired to the existing body[data-fontsize] zoom)
       React.createElement("div", { style: rowStyle },
         React.createElement("div", { style: labelStyle }, "글자 크기"),
-        React.createElement("div", { style: { background: "rgba(22,24,29,0.06)", borderRadius: "100px", padding: "3px", display: "flex" } },
+        React.createElement("div", { style: { background: T3.bgGrouped, border: `1px solid ${T3.hairline}`, borderRadius: "100px", padding: "3px", display: "flex" } },
           sizes.map(([id, label]) => {
             const on = fontSize === id;
             return React.createElement("button", { key: id, onClick: () => { haptic.light(); setFontSize(id); },
