@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<meta property="og:image" content="https://wayve.tiiny.site/og-image.png" data-id="th-modified" ><meta property="og:url" content="https://www.wayvekr.com/" data-id="th-modified" ><meta property="og:type" content="website" data-id="th-modified" ><script defer data-domain="www.wayvekr.com" src="https://analytics.tiiny.net/js/plausible.js"></script></head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0f0e0c">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0f0e0c"></rect>
+    <text x="600" y="440" font-family="Georgia, serif" font-size="150" font-weight="700" fill="#fbfbf9" text-anchor="middle" letter-spacing="8">WAYVE</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAYVE — 영어로 말하고, 세상과 연결되세요</title>
+  <meta name="description" content="Read less. Speak more. 매주의 위클리 질문과 90분 실시간 세션으로, 읽기만 하던 영어를 말하는 영어로 — 영어 스피킹 커뮤니티 WAYVE.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WAYVE">
+  <meta property="og:title" content="WAYVE — Read less. Speak more.">
+  <meta property="og:description" content="매주의 위클리 질문과 90분 실시간 세션으로, 읽기만 하던 영어를 말하는 영어로.">
+  <meta property="og:image" content="https://wayvekr.com/assets/img-01.png">
+  <link rel="icon" type="image/png" href="assets/img-01.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #fbfbf9; color: #0f0e0c; font-family: 'Pretendard Variable', Pretendard, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-x: hidden; }
+    a { color: #0f0e0c; text-decoration: none; }
+    a:hover { color: #71706b; }
+    ::selection { background: #0f0e0c; color: #fbfbf9; }
+    @media (max-width: 720px) {
+      [data-mgrid="true"] { grid-template-columns: 1fr !important; }
+      [data-mgrid="true"] > p { position: static !important; }
+      nav > div:not([data-mmenu="true"]) { gap: 12px !important; }
+      nav > div:not([data-mmenu="true"]) > a { font-size: 13px !important; letter-spacing: 0 !important; }
+      nav a[data-magnetic="true"] { padding: 8px 12px !important; }
+      nav > div:not([data-mmenu="true"]) > a:not([data-magnetic="true"]) { display: none !important; }
+      nav [data-mburger="true"] { display: flex !important; }
+    }
+    @keyframes riseUp { from { transform: translateY(115%); } to { transform: translateY(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes flipWord { 0%,24% { transform: translateY(0); } 33%,57% { transform: translateY(-25%); } 66%,90% { transform: translateY(-50%); } 100% { transform: translateY(-75%); } }
+    @keyframes scrollLine { 0% { transform: scaleY(0); transform-origin: top; } 45% { transform: scaleY(1); transform-origin: top; } 55% { transform: scaleY(1); transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+    @keyframes marqueeX { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes curtainUp { from { transform: translateY(0); } to { transform: translateY(-100%); } }
+    @keyframes introMark { 0% { opacity: 0; transform: translateY(26px); } 35%, 70% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-20px); } }
+    @keyframes blinkCaret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    @keyframes dimIn { from { opacity: 0; } to { opacity: 1; } }
+    @media (max-width: 640px) {
+      [data-cine-q="true"] { font-size: 30px !important; }
+      [data-cine-line="true"] { font-size: 22px !important; }
+      [data-cine-unmute="true"] { bottom: calc(24px + env(safe-area-inset-bottom)) !important; }
+    }
+    @keyframes pulseDots { 0%, 100% { transform: scale(1); } 8% { transform: scale(1.05); } 16% { transform: scale(1); } }
+  </style>
+</helmet>
+
+<div data-screen-label="Home Signature" style="position: relative;">
+
+  <!-- CINEMATIC INTRO -->
+  <sc-if value="{{ introVisible }}" hint-placeholder-val="{{ true }}">
+  <div data-cine="true" style="position: fixed; inset: 0; z-index: 999; background: #0f0e0c; color: #fbfbf9; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+    <button onClick="{{ cineSkip }}" style="position: absolute; top: 20px; right: 24px; z-index: 10; background: none; border: 1px solid rgba(251,251,249,0.25); color: rgba(251,251,249,0.6); padding: 8px 18px; border-radius: 99px; font-size: 13px; cursor: pointer; font-family: 'Pretendard Variable', Pretendard, sans-serif; letter-spacing: 0.04em;" style-hover="border-color: rgba(251,251,249,0.7); color: #fbfbf9;">건너뛰기 →</button>
+    <sc-if value="{{ cineMuted }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ cineUnmute }}" data-cine-unmute="true" style="position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 10; display: inline-flex; align-items: center; gap: 8px; background: rgba(251,251,249,0.08); border: 1px solid rgba(251,251,249,0.35); color: #fbfbf9; padding: 11px 24px; border-radius: 99px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Pretendard Variable', Pretendard, sans-serif; letter-spacing: 0.04em; animation: fadeUp 0.8s ease 1s both;" style-hover="background: rgba(251,251,249,0.18);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>소리 켜기</button>
+    </sc-if>
+    <sc-if value="{{ cineP1 }}" hint-placeholder-val="{{ true }}">
+      <div style="text-align: center; display: flex; flex-direction: column; gap: 22px; padding: 0 24px;">
+        <sc-for list="{{ cineStudyLines }}" as="line" hint-placeholder-count="0">
+          <div data-cine-line="true" style="font-family: 'Noto Serif KR', serif; font-size: clamp(24px, 3.4vw, 42px); font-weight: 400; color: rgba(251,251,249,0.85); animation: fadeUp 0.8s ease both;">{{ line }}</div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ cineP2 }}" hint-placeholder-val="{{ false }}">
+      <div style="text-align: center; padding: 0 24px;">
+        <p style="margin: 0 0 28px; font-size: 13px; font-weight: 600; letter-spacing: 0.22em; color: rgba(251,251,249,0.4); animation: fadeUp 0.6s ease both;">그때, 누군가 물었습니다</p>
+        <div data-cine-q="true" style="font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(32px, 5.4vw, 64px); min-height: 1.4em;">&ldquo;{{ cineTyped }}<span style="animation: blinkCaret 1s step-end infinite;">|</span>&rdquo;</div>
+        <sc-if value="{{ cineSub }}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 28px 0 0; font-size: clamp(14px, 1.8vw, 17px); letter-spacing: 0.02em; color: rgba(251,251,249,0.5); animation: fadeUp 0.8s ease both;">그래서… 어떻게 생각하세요?</p>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ cineP3 }}" hint-placeholder-val="{{ false }}">
+      <div style="text-align: center; padding: 0 24px;">
+        <div data-cine-quote="true" data-cine-q="true" style="font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(32px, 5.4vw, 64px); color: rgba(251,251,249,0.18); min-height: 1.4em; transition: transform 0.14s ease;">&ldquo;So, what do you think?&rdquo;</div>
+        <p style="margin: 34px 0 0; font-size: clamp(14px, 1.8vw, 18px); letter-spacing: 0.12em; color: rgba(251,251,249,0.45); min-height: 1.6em; animation: fadeUp 0.8s ease both;">{{ cineSeconds }}</p>
+        <sc-if value="{{ cineFreeze }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top: 34px; font-family: 'Noto Serif KR', serif; font-size: clamp(28px, 4.4vw, 52px); font-weight: 700; animation: fadeUp 1.2s ease both;">머릿속이, 하얘집니다.</div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ cineP4 }}" hint-placeholder-val="{{ false }}">
+      <div style="text-align: center; padding: 0 24px; display: flex; flex-direction: column; gap: 26px;">
+        <div style="font-family: 'Noto Serif KR', serif; font-size: clamp(24px, 3.6vw, 44px); font-weight: 400; color: rgba(251,251,249,0.7); animation: fadeUp 1s ease both;">공부가 부족해서가 아닙니다.</div>
+        <sc-if value="{{ cineTurn }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family: 'Noto Serif KR', serif; font-size: clamp(30px, 4.8vw, 58px); font-weight: 900; animation: fadeUp 1s ease both;">말할 기회가 드물었을 뿐입니다.</div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ cineP5 }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0.15) 25%, rgba(0,0,0,0.8) 100%); animation: dimIn 2.2s ease both; pointer-events: none;"></div>
+      <div style="position: relative; text-align: center; animation: fadeUp 1.4s ease both;">
+        <img src="assets/img-01.png" alt="WAYVE" style="height: clamp(24px, 3.4vw, 36px); filter: invert(1);">
+        <p style="margin: 22px 0 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(17px, 2vw, 22px); color: rgba(251,251,249,0.55);">Read less. Speak more.</p>
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <!-- SCROLL PROGRESS -->
+  <div data-progress="true" style="position: fixed; top: 0; left: 0; height: 2px; width: 0%; background: #0f0e0c; z-index: 300;"></div>
+
+  <!-- NAV -->
+  <nav data-nav="true" style="position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 48px); background: rgba(251,251,249,0.8); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(15,14,12,0.07); transition: transform 0.45s cubic-bezier(0.2,0.65,0.2,1);">
+    <a href="#" style="display: flex; align-items: center;"><img src="assets/img-01.png" alt="WAYVE" style="height: 18px; display: block;"></a>
+    <div style="display: flex; align-items: center; gap: 30px;">
+      <a href="#" style="font-size: 14px; color: #0f0e0c; font-weight: 600; letter-spacing: 0.01em;">홈</a>
+      <a href="about.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">소개</a>
+      <a href="sessions.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">이용 방법</a>
+      <a href="stories.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">후기</a>
+      <a href="blog.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">블로그</a>
+      <a href="http://pf.kakao.com/_xaHXsX" target="_blank" data-magnetic="true" style="font-size: 14px; font-weight: 700; color: #2B1600; background: #FEE500; padding: 10px 20px; border-radius: 99px; display: inline-block;" style-hover="color: #2B1600; opacity: 0.88;">카카오톡 문의</a>
+      <button data-mburger="true" aria-label="메뉴 열기" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 40px; height: 40px; background: none; border: none; cursor: pointer; padding: 0;"><span style="display: block; width: 20px; height: 2px; background: #0f0e0c; transition: transform 0.3s ease, opacity 0.3s ease;"></span><span style="display: block; width: 20px; height: 2px; background: #0f0e0c; transition: transform 0.3s ease, opacity 0.3s ease;"></span><span style="display: block; width: 20px; height: 2px; background: #0f0e0c; transition: transform 0.3s ease, opacity 0.3s ease;"></span></button>
+    </div>
+    <div data-mmenu="true" style="position: absolute; top: 64px; left: 0; right: 0; background: rgba(251,251,249,0.97); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(15,14,12,0.08); padding: 8px 20px 20px; display: none; flex-direction: column;"><a href="#" style="font-size: 17px; font-weight: 700; color: #0f0e0c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">홈</a><a href="about.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">소개</a><a href="sessions.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">이용 방법</a><a href="stories.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">후기</a><a href="blog.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">블로그</a></div>
+  </nav>
+
+  <!-- HERO -->
+  <header style="position: relative; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 140px clamp(20px, 5vw, 64px) 150px; overflow: hidden;">
+    <div data-hero-parallax="true">
+      <p style="margin: 0 0 34px; display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; letter-spacing: 0.22em; color: #71706b; opacity: 0; animation: fadeUp 0.9s ease 1.7s forwards;"><span style="display: inline-block; width: 36px; height: 1px; background: #0f0e0c;"></span>영어 스피킹 커뮤니티 — 대한민국</p>
+      <h1 style="margin: 0; font-family: 'Noto Serif KR', serif; font-size: clamp(48px, 9vw, 124px); font-weight: 900; letter-spacing: -0.025em; line-height: 1.22;">
+        <span style="display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em;"><span style="display: block; transform: translateY(115%); animation: riseUp 1.2s cubic-bezier(0.16,0.8,0.2,1) 1.85s forwards;">영어로</span></span>
+        <span style="display: block; overflow: hidden; height: 1.22em;"><span style="display: block; transform: translateY(115%); animation: riseUp 1.2s cubic-bezier(0.16,0.8,0.2,1) 2s forwards;"><span data-flip="true" style="display: block; animation: flipWord 7s cubic-bezier(0.76,0,0.24,1) 3.4s infinite;"><span style="display: block; height: 1.22em;">말하고,</span><span style="display: block; height: 1.22em;">연결되고,</span><span style="display: block; height: 1.22em;">성장하고,</span><span style="display: block; height: 1.22em;">말하고,</span></span></span></span>
+        <span style="display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em;"><span style="display: block; transform: translateY(115%); animation: riseUp 1.2s cubic-bezier(0.16,0.8,0.2,1) 2.15s forwards;">세계를 넓히다.</span></span>
+      </h1>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; margin-top: 52px; flex-wrap: wrap;">
+        <p style="margin: 0; max-width: 440px; font-size: 18px; line-height: 1.8; color: #52514c; opacity: 0; animation: fadeUp 0.9s ease 2.5s forwards;">공부는 오래 했는데 아직 말하는 게 어렵다면 — WAYVE에서 영어를 <strong style="color: #0f0e0c; font-weight: 700;">'사용'</strong>해 보세요.</p>
+        <div style="display: flex; gap: 12px; opacity: 0; animation: fadeUp 0.9s ease 2.65s forwards;">
+          <a href="http://pf.kakao.com/_xaHXsX" target="_blank" data-magnetic="true" style="display: inline-flex; align-items: center; gap: 8px; background: #FEE500; color: #2B1600; font-size: 16px; font-weight: 700; padding: 17px 32px; border-radius: 99px;" style-hover="color: #2B1600; opacity: 0.88;">카카오톡으로 시작하기</a>
+          <a href="https://www.instagram.com/wayve.kr" target="_blank" data-magnetic="true" style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(15,14,12,0.25); color: #0f0e0c; font-size: 16px; font-weight: 600; padding: 17px 30px; border-radius: 99px;" style-hover="background: #0f0e0c; color: #fbfbf9;">@wayve.kr</a>
+          <button onClick="{{ cineReplay }}" style="display: inline-flex; align-items: center; gap: 8px; background: none; border: none; color: #71706b; font-size: 14px; font-weight: 600; padding: 17px 10px; cursor: pointer; font-family: 'Pretendard Variable', Pretendard, sans-serif;" style-hover="color: #0f0e0c;">↺ 스토리 다시 보기</button>
+        </div>
+      </div>
+    </div>
+    <div style="position: absolute; bottom: 40px; right: clamp(20px, 5vw, 64px); width: 1px; height: 60px; overflow: hidden; opacity: 0; animation: fadeUp 0.8s ease 3s forwards;">
+      <div style="width: 1px; height: 100%; background: #0f0e0c; animation: scrollLine 2s cubic-bezier(0.6,0,0.4,1) infinite;"></div>
+    </div>
+  </header>
+
+  <!-- GAP: ledger stats -->
+  <section id="gap" style="padding: clamp(90px, 13vw, 170px) clamp(20px, 5vw, 64px); border-top: 1px solid rgba(15,14,12,0.08);">
+    <div style="max-width: 1160px; margin: 0 auto;">
+      <div data-reveal="true" data-mgrid="true" style="display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 24px; align-items: start;">
+        <p style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c;">01 — THE GAP</p>
+        <div style="max-width: 720px;">
+          <h2 style="margin: 0 0 24px; font-family: 'Noto Serif KR', serif; font-size: clamp(32px, 4.4vw, 56px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3;">열심히 했는데,<br>자신감은 왜 안 생길까?</h2>
+          <p style="margin: 0; font-size: 18px; color: #52514c; line-height: 1.85;">한국은 세계 어느 나라보다 영어 교육에 많이 투자합니다. 그런데 막상 말해야 하는 순간, 왜 머릿속이 하얘질까요? <span style="border-bottom: 2px solid #0f0e0c;">공부하는 것과 말하는 것은 다른 문제</span>이기 때문입니다.</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 76px;">
+        <div data-reveal="true" data-mgrid="true" style="display: grid; grid-template-columns: minmax(150px, 340px) 1fr; gap: 24px; align-items: baseline; padding: 36px 0; border-top: 1px solid rgba(15,14,12,0.85);">
+          <div style="display: flex; align-items: baseline;"><span data-counter="10" style="font-family: 'Noto Serif KR', serif; font-size: clamp(56px, 8vw, 110px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;">0</span><span style="font-family: 'Noto Serif KR', serif; font-size: clamp(28px, 4vw, 52px); font-weight: 900;">년+</span></div>
+          <p style="margin: 0; font-size: 16px; color: #52514c; line-height: 1.7;">한국 학생이 영어를 공부하는 평균 기간. 3세에 시작하기도 합니다.<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; color: #a3a29c; font-size: 15px;">Years the average Korean student studies English.</em></p>
+        </div>
+        <div data-reveal="true" data-mgrid="true" style="display: grid; grid-template-columns: minmax(150px, 340px) 1fr; gap: 24px; align-items: baseline; padding: 36px 0; border-top: 1px solid rgba(15,14,12,0.2);">
+          <div style="display: flex; align-items: baseline;"><span data-counter="8" style="font-family: 'Noto Serif KR', serif; font-size: clamp(56px, 8vw, 110px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;">0</span><span style="font-family: 'Noto Serif KR', serif; font-size: clamp(28px, 4vw, 52px); font-weight: 900;">조 원</span></div>
+          <p style="margin: 0; font-size: 16px; color: #52514c; line-height: 1.7;">매년 영어 사교육에 지출되는 금액. (KOSIS, 2023)<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; color: #a3a29c; font-size: 15px;">Spent every year on private English education in Korea.</em></p>
+        </div>
+        <div data-reveal="true" data-mgrid="true" style="display: grid; grid-template-columns: minmax(150px, 340px) 1fr; gap: 24px; align-items: baseline; padding: 36px 0; border-top: 1px solid rgba(15,14,12,0.2);">
+          <div style="display: flex; align-items: baseline;"><span style="font-family: 'Noto Serif KR', serif; font-size: clamp(28px, 4vw, 52px); font-weight: 900; color: #b9b8b2;">#</span><span data-counter="49" style="font-family: 'Noto Serif KR', serif; font-size: clamp(56px, 8vw, 110px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;">0</span></div>
+          <p style="margin: 0; font-size: 16px; color: #52514c; line-height: 1.7;">한국의 글로벌 영어 <strong style="color: #0f0e0c;">말하기</strong> 능숙도 순위. (EF EPI 2023)<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; color: #a3a29c; font-size: 15px;">Korea's global English speaking proficiency ranking.</em></p>
+        </div>
+        <div data-reveal="true" data-mgrid="true" style="display: grid; grid-template-columns: minmax(150px, 340px) 1fr; gap: 24px; align-items: baseline; padding: 36px 0; border-top: 1px solid rgba(15,14,12,0.2); border-bottom: 1px solid rgba(15,14,12,0.85);">
+          <div style="display: flex; align-items: baseline;"><span style="font-family: 'Noto Serif KR', serif; font-size: clamp(56px, 8vw, 110px); font-weight: 900; line-height: 1;">0</span><span style="font-family: 'Noto Serif KR', serif; font-size: clamp(28px, 4vw, 52px); font-weight: 900;">시간</span></div>
+          <p style="margin: 0; font-size: 16px; color: #52514c; line-height: 1.7;">대부분의 학습자가 원어민과 실제로 대화하는 주당 시간.<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; color: #a3a29c; font-size: 15px;">Weekly speaking practice with a native speaker: zero.</em></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATEMENT: word-fill scrub -->
+  <section style="padding: clamp(40px, 7vw, 100px) clamp(20px, 5vw, 64px) clamp(90px, 12vw, 150px);">
+    <p data-fill-text="true" style="max-width: 900px; margin: 0 auto; font-family: 'Noto Serif KR', serif; font-size: clamp(26px, 4vw, 48px); font-weight: 700; line-height: 1.6; text-align: center;">투자한 시간도, 노력도 헛되지 않았습니다. 이제 그 영어를 꺼내 쓸 차례입니다. WAYVE는 공부와 말하기 사이의 간격을 채웁니다.</p>
+  </section>
+
+  <!-- PHOTO BREAK (full color) -->
+  <section style="padding: 0 clamp(20px, 5vw, 64px);">
+    <div data-clip-photo="true" style="max-width: 1160px; margin: 0 auto; overflow: hidden; clip-path: inset(12% 6% 12% 6%); transition: clip-path 1.2s cubic-bezier(0.2,0.65,0.2,1);">
+      <img data-parallax-img="true" src="assets/img-04.jpg" alt="WAYVE community" style="width: 100%; display: block; transform: scale(1.15);">
+    </div>
+    <p data-reveal="true" style="max-width: 1160px; margin: 16px auto 0; font-size: 13px; color: #a3a29c; display: flex; justify-content: space-between; gap: 20px;"><span>영어가 열어주는 관계들 — 진짜 우정, 진짜 연결.</span><em style="font-family: 'Instrument Serif', serif; font-style: italic;">The kind of relationships English can open the door to.</em></p>
+  </section>
+
+  <!-- DIFFERENCE: black section -->
+  <section style="margin-top: clamp(90px, 13vw, 170px); background: #0f0e0c; color: #fbfbf9; padding: clamp(90px, 13vw, 170px) clamp(20px, 5vw, 64px);">
+    <div style="max-width: 1160px; margin: 0 auto;">
+      <div data-reveal="true" data-mgrid="true" style="display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 24px; align-items: start;">
+        <p style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: rgba(251,251,249,0.35);">02 — 차이</p>
+        <div style="max-width: 760px;">
+          <h2 style="margin: 0 0 24px; font-family: 'Noto Serif KR', serif; font-size: clamp(32px, 4.4vw, 56px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3;">수업이 아닙니다.<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">A real community.</em></h2>
+          <p style="margin: 0; font-size: 18px; color: rgba(251,251,249,0.6); line-height: 1.85;">말하기를 배우는 가장 좋은 방법은 직접 말하는 것. WAYVE는 그 하나의 믿음에서 시작됐습니다.</p>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0; margin-top: 64px; border: 1px solid rgba(251,251,249,0.18);">
+        <div data-reveal="true" style="padding: clamp(28px, 4vw, 44px); border-bottom: 1px solid rgba(251,251,249,0.18);">
+          <p style="margin: 0 0 24px; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; color: rgba(251,251,249,0.35);">일반 영어 학원</p>
+          <div style="display: flex; flex-direction: column; gap: 16px; font-size: 16px; color: rgba(251,251,249,0.55); line-height: 1.6;">
+            <span>문법 훈련과 교과서 중심 수업</span>
+            <span>단어장 암기, 시험 준비 중심</span>
+            <span>발표할 때만 말하는 구조</span>
+            <span>소통보다 정확성 우선</span>
+          </div>
+        </div>
+        <div data-reveal="true" data-reveal-delay="120" style="padding: clamp(28px, 4vw, 44px); background: #fbfbf9; color: #0f0e0c; border-bottom: 1px solid rgba(251,251,249,0.18);">
+          <p style="margin: 0 0 24px; font-size: 13px; font-weight: 800; letter-spacing: 0.16em;">WAYVE</p>
+          <div style="display: flex; flex-direction: column; gap: 16px; font-size: 16px; font-weight: 600; line-height: 1.6;">
+            <span>첫날부터 진짜 대화</span>
+            <span>원어민이 실제로 쓰는 자연스러운 표현</span>
+            <span>매 세션 직접 말하는 구조</span>
+            <span>교정보다 연결 — <em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">connection over correction</em></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW: sticky stacked cards -->
+  <section id="how" style="padding: clamp(90px, 13vw, 150px) clamp(20px, 5vw, 64px) 40px;">
+    <div style="max-width: 900px; margin: 0 auto;">
+      <div data-reveal="true" style="text-align: center; max-width: 680px; margin: 0 auto 68px;">
+        <p style="margin: 0 0 18px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c;">03 — 이렇게 진행됩니다</p>
+        <h2 style="margin: 0; font-family: 'Noto Serif KR', serif; font-size: clamp(32px, 4.4vw, 56px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3;">단순하게 설계되고,<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">강력하게</em> 경험됩니다.</h2>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 24px; padding-bottom: 60px;">
+        <div data-stack-card="true" style="position: sticky; top: 104px; background: #ffffff; border: 1px solid rgba(15,14,12,0.1); border-radius: 6px; padding: clamp(32px, 5vw, 56px); box-shadow: 0 24px 60px rgba(15,14,12,0.08); display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 4vw, 48px); align-items: start;">
+          <div style="font-family: 'Noto Serif KR', serif; font-size: clamp(48px, 6vw, 84px); font-weight: 900; line-height: 1;">1</div>
+          <div>
+            <h3 style="margin: 0 0 12px; font-size: clamp(22px, 2.8vw, 30px); font-weight: 800; letter-spacing: -0.02em;">소규모 그룹에 합류하세요</h3>
+            <p style="margin: 0 0 10px; font-size: 17px; color: #52514c; line-height: 1.75;">소규모 그룹입니다. 실제로 말할 수 있을 만큼 작고, 실수해도 괜찮을 만큼 안전한 공간입니다.</p>
+            <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 16px; color: #a3a29c;">Small enough to speak. Safe enough to try.</p>
+          </div>
+        </div>
+        <div data-stack-card="true" style="position: sticky; top: 128px; background: #ffffff; border: 1px solid rgba(15,14,12,0.1); border-radius: 6px; padding: clamp(32px, 5vw, 56px); box-shadow: 0 24px 60px rgba(15,14,12,0.08); display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 4vw, 48px); align-items: start;">
+          <div style="font-family: 'Noto Serif KR', serif; font-size: clamp(48px, 6vw, 84px); font-weight: 900; line-height: 1;">2</div>
+          <div>
+            <h3 style="margin: 0 0 12px; font-size: clamp(22px, 2.8vw, 30px); font-weight: 800; letter-spacing: -0.02em;">원어민과 진짜 대화를</h3>
+            <p style="margin: 0 0 10px; font-size: 17px; color: #52514c; line-height: 1.75;">원어민이 진행하는 Zoom 라이브 세션. 수업이 아닌, 진짜 대화로 채워집니다.</p>
+            <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 16px; color: #a3a29c;">Live Zoom. Real native. Real conversation.</p>
+          </div>
+        </div>
+        <div data-stack-card="true" style="position: sticky; top: 152px; background: #ffffff; border: 1px solid rgba(15,14,12,0.1); border-radius: 6px; padding: clamp(32px, 5vw, 56px); box-shadow: 0 24px 60px rgba(15,14,12,0.08); display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 4vw, 48px); align-items: start;">
+          <div style="font-family: 'Noto Serif KR', serif; font-size: clamp(48px, 6vw, 84px); font-weight: 900; line-height: 1;">3</div>
+          <div>
+            <h3 style="margin: 0 0 12px; font-size: clamp(22px, 2.8vw, 30px); font-weight: 800; letter-spacing: -0.02em;">자연스러운 표현을 익히세요</h3>
+            <p style="margin: 0 0 10px; font-size: 17px; color: #52514c; line-height: 1.75;">원어민이 실제로 쓰는 표현과 관용구 — 어떤 교과서에도 나오지 않는 것들입니다.</p>
+            <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 16px; color: #a3a29c;">The phrases no textbook ever teaches.</p>
+          </div>
+        </div>
+        <div data-stack-card="true" style="position: sticky; top: 176px; background: #0f0e0c; color: #fbfbf9; border-radius: 6px; padding: clamp(32px, 5vw, 56px); box-shadow: 0 24px 60px rgba(15,14,12,0.3); display: grid; grid-template-columns: auto 1fr; gap: clamp(20px, 4vw, 48px); align-items: start;">
+          <div style="font-family: 'Noto Serif KR', serif; font-size: clamp(48px, 6vw, 84px); font-weight: 900; line-height: 1; color: transparent; -webkit-text-stroke: 1.5px #fbfbf9;">4</div>
+          <div>
+            <h3 style="margin: 0 0 12px; font-size: clamp(22px, 2.8vw, 30px); font-weight: 800; letter-spacing: -0.02em;">진짜 자신감을 키우세요</h3>
+            <p style="margin: 0 0 10px; font-size: 17px; color: rgba(251,251,249,0.6); line-height: 1.75;">말할수록 쉬워집니다. 자신감은 기술입니다 — WAYVE는 그 기술을 연습하는 곳입니다.</p>
+            <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 16px; color: rgba(251,251,249,0.45);">Confidence is a skill. WAYVE is where you practice it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIAL: scroll-scrubbed words -->
+  <section id="stories" data-scrub-section="true" style="position: relative; height: 200vh;">
+    <div style="position: sticky; top: 0; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 0 24px;">
+      <div style="max-width: 840px; text-align: center;">
+        <p style="margin: 0 0 36px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c;">04 — 멤버 이야기</p>
+        <p data-scrub-text="true" style="margin: 0; font-family: 'Noto Serif KR', serif; font-size: clamp(26px, 3.8vw, 44px); font-weight: 700; letter-spacing: -0.01em; line-height: 1.55;">이제는 영어로 말하는 게 두렵지 않아요. 문법 공부만 하던 제가 달라졌습니다. WAYVE가 영어를 바라보는 방식 자체를 바꿔줬어요.</p>
+        <p style="margin: 36px 0 0; font-size: 14px; letter-spacing: 0.12em; color: #a3a29c;">— WAYVE 멤버 · 서울</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section style="position: relative; background: #0f0e0c; color: #fbfbf9; text-align: center; padding: clamp(110px, 16vw, 210px) 24px; overflow: hidden;">
+    <div style="position: absolute; top: 50%; left: 0; transform: translateY(-50%); white-space: nowrap; display: flex; opacity: 0.05; pointer-events: none;">
+      <span style="font-family: 'Noto Serif KR', serif; font-size: clamp(90px, 16vw, 220px); font-weight: 900; letter-spacing: -0.02em; padding-right: 0.6em; animation: marqueeX 28s linear infinite; display: inline-block;">PAVE YOUR WAY · JOIN THE WAYVE · PAVE YOUR WAY · JOIN THE WAYVE ·&nbsp;</span>
+    </div>
+    <div data-reveal="true" style="position: relative; z-index: 1;">
+      <p style="margin: 0 0 26px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: rgba(251,251,249,0.35);">지금 시작할 준비가 됐나요?</p>
+      <h2 style="margin: 0 auto; max-width: 720px; font-family: 'Noto Serif KR', serif; font-size: clamp(40px, 6.5vw, 84px); font-weight: 900; letter-spacing: -0.02em; line-height: 1.18;">당신의 길을<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">열어가세요.</em></h2>
+      <p style="margin: 22px 0 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 19px; color: rgba(251,251,249,0.45);">Pave your way. Join the Wayve.</p>
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 48px; flex-wrap: wrap;">
+        <a href="http://pf.kakao.com/_xaHXsX" target="_blank" data-magnetic="true" style="display: inline-flex; align-items: center; background: #FEE500; color: #2B1600; font-size: 16px; font-weight: 700; padding: 18px 36px; border-radius: 99px;" style-hover="color: #2B1600; opacity: 0.88;">카카오톡으로 시작하기</a>
+        <a href="https://www.instagram.com/wayve.kr" target="_blank" data-magnetic="true" style="display: inline-flex; align-items: center; border: 1px solid rgba(251,251,249,0.3); color: #fbfbf9; font-size: 16px; font-weight: 600; padding: 18px 36px; border-radius: 99px;" style-hover="background: #fbfbf9; color: #0f0e0c;">인스타그램 @wayve.kr</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="background: #0f0e0c; border-top: 1px solid rgba(251,251,249,0.1); padding: 32px clamp(20px, 4vw, 48px); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+    <img src="assets/img-01.png" alt="WAYVE" style="height: 15px; filter: invert(1); opacity: 0.85;">
+    <div style="display: flex; gap: 24px; font-size: 13px;">
+      <a href="about.html" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">소개</a>
+      <a href="sessions.html" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">이용 방법</a>
+      <a href="https://www.instagram.com/wayve.kr" target="_blank" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">@wayve.kr</a>
+      <a href="http://pf.kakao.com/_xaHXsX" target="_blank" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">카카오톡 문의</a>
+      <span style="color: rgba(251,251,249,0.3);">© 2026 WAYVE</span>
+    </div>
+  </footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showIntro&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Motion&quot;}, &quot;flipSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 7, &quot;min&quot;: 3, &quot;max&quot;: 14, &quot;step&quot;: 1, &quot;unit&quot;: &quot;s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Motion&quot;}, &quot;reduceMotion&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Motion&quot;}}">
+class Component extends DCLogic {
+  state = { cine: 'p1', cineMuted: false, cineStudyLines: [], cineTyped: '', cineSub: false, cineSeconds: '', cineFreeze: false, cineTurn: false };
+  timers = [];
+  _t(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+  _clearT() { this.timers.forEach(clearTimeout); this.timers = []; }
+  _ac() { if (!this._actx) this._actx = new (window.AudioContext || window.webkitAudioContext)(); return this._actx; }
+  _key(soft) {
+    const c = this._ac(), t = c.currentTime, v = soft ? 0.5 : 1;
+    const n = 400 + Math.floor(Math.random() * 200);
+    const b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4);
+    const s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = 0.85 + Math.random() * 0.35;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200 + Math.random() * 1200; bp.Q.value = 1.2;
+    const g1 = c.createGain(); g1.gain.value = (0.16 + Math.random() * 0.08) * v;
+    s.connect(bp); bp.connect(g1); g1.connect(c.destination); s.start(t);
+    const o = c.createOscillator(), g2 = c.createGain();
+    o.type = 'triangle';
+    const f0 = 140 + Math.random() * 60;
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.6, t + 0.04);
+    g2.gain.setValueAtTime(0.12 * v, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(g2); g2.connect(c.destination); o.start(t); o.stop(t + 0.07);
+  }
+  _pencil() { // real sample if provided, else granular synth
+    if (this._samples && this._samples.pencil) {
+      const c2 = this._ac(), t0 = c2.currentTime, buf = this._samples.pencil;
+      const src = c2.createBufferSource(); src.buffer = buf;
+      const g = c2.createGain();
+      // consecutive lines play consecutive halves of the clean take — continuous writing, no repeat
+      const part = (this._pencilN || 0) % 2; this._pencilN = (this._pencilN || 0) + 1;
+      const offset = part * 2.2;
+      const dur = Math.min(2.3, buf.duration - offset);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.55, t0 + 0.06);
+      g.gain.setValueAtTime(0.55, t0 + dur - 0.3);
+      g.gain.linearRampToValueAtTime(0.0001, t0 + dur - 0.05);
+      src.connect(g); g.connect(c2.destination);
+      src.start(t0, offset, dur);
+      return;
+    }
+    // sample may still be decoding when the first line lands — retry briefly before synth fallback
+    this._pencilTries = (this._pencilTries || 0) + 1;
+    if (this._pencilTries < 6) { this._t(() => this._pencil(), 250); return; }
+    const c = this._ac(), t = c.currentTime;
+    let off = 0.05;
+    const strokes = 7 + Math.floor(Math.random() * 4); // like writing a word
+    for (let s = 0; s < strokes; s++) {
+      const dur = 0.05 + Math.random() * 0.09;
+      const n = Math.floor(c.sampleRate * dur);
+      const b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+      let spike = 0;
+      for (let i = 0; i < n; i++) {
+        const env = Math.sin(Math.PI * (i / n));
+        // grain density follows stroke speed — more graphite catch mid-stroke
+        if (Math.random() < 0.1 + 0.3 * env) spike = (Math.random() * 2 - 1) * (0.4 + Math.random() * 0.6);
+        spike *= 0.8;
+        d[i] = (spike + (Math.random() * 2 - 1) * 0.07 * env) * env;
+      }
+      const src = c.createBufferSource(); src.buffer = b; src.playbackRate.value = 0.85 + Math.random() * 0.25;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1150 + Math.random() * 550; bp.Q.value = 0.6;
+      const paper = c.createBiquadFilter(); paper.type = 'peaking'; paper.frequency.value = 3400; paper.Q.value = 1.4; paper.gain.value = 4; // paper-tooth sizzle
+      const g = c.createGain(); g.gain.value = 0.42;
+      src.connect(bp); bp.connect(paper); paper.connect(g); g.connect(c.destination);
+      src.start(t + off);
+      // mostly tiny gaps (within a word), occasional longer lift (between words)
+      off += dur + (Math.random() < 0.25 ? 0.09 + Math.random() * 0.12 : 0.015 + Math.random() * 0.04);
+    }
+  }
+  _tick() {
+    const c = this._ac(), t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain(), bp = c.createBiquadFilter();
+    o.type = 'square'; o.frequency.value = 1100;
+    bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 8;
+    g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    o.connect(bp); bp.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.15);
+  }
+  _ring() {
+    const c = this._ac(), t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.value = 2900;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.014, t + 2.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 5.5);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 5.6);
+  }
+  _beat(vol) {
+    const c = this._ac(), t = c.currentTime, v = vol || 1;
+    [0, 0.16].forEach((off, i) => {
+      // kick-style sweep: starts higher so it's audible on laptop/phone speakers too
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(115, t + off);
+      o.frequency.exponentialRampToValueAtTime(42, t + off + 0.16);
+      g.gain.setValueAtTime(0.0001, t + off);
+      g.gain.exponentialRampToValueAtTime(Math.min(1.0, (i ? 0.55 : 0.85) * v), t + off + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + off + 0.32);
+      o.connect(g); g.connect(c.destination); o.start(t + off); o.stop(t + off + 0.36);
+      // soft chest-thud attack
+      const n = Math.floor(c.sampleRate * 0.04);
+      const b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+      for (let k = 0; k < n; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / n, 3);
+      const s2 = c.createBufferSource(); s2.buffer = b;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+      const g2 = c.createGain(); g2.gain.value = Math.min(0.9, 0.5 * v * (i ? 0.6 : 1));
+      s2.connect(lp); lp.connect(g2); g2.connect(c.destination); s2.start(t + off);
+    });
+  }
+  _chord() {
+    const c = this._ac(), t = c.currentTime;
+    [220, 277.18, 329.63, 440].forEach(fr => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.value = fr;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.05, t + 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3.5);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 3.6);
+    });
+  }
+  _runCine = () => {
+    this._clearT();
+    this._pencilN = 0;
+    this.setState({ cine: 'p1', cineStudyLines: [], cineTyped: '', cineSub: false, cineSeconds: '', cineFreeze: false, cineTurn: false });
+    const lines = ['영어, 오래 공부했습니다.', '단어장 몇 권, 시험 점수도 충분한데 —'];
+    lines.forEach((line, i) => this._t(() => {
+      this.setState(s => ({ cineStudyLines: [...s.cineStudyLines, line] }));
+      this._pencil();
+    }, 400 + i * 1900));
+    this._t(() => {
+      this.setState({ cine: 'p2' });
+      const voice = this._samples && this._samples.question;
+      if (voice) { // real voice asks the question — no key clicks
+        const c = this._ac();
+        const src = c.createBufferSource(); src.buffer = voice;
+        const g = c.createGain(); g.gain.value = 0.9;
+        src.connect(g); g.connect(c.destination); src.start(c.currentTime + 0.6);
+      }
+      const q = 'So, what do you think?';
+      q.split('').forEach((ch, i) => this._t(() => {
+        this.setState(s => ({ cineTyped: s.cineTyped + ch }));
+        if (!voice && ch !== ' ') this._key(true);
+      }, 700 + i * 65));
+      // Korean subtitle fades in as the voice lands
+      this._t(() => this.setState({ cineSub: true }), 1500);
+    }, 4700);
+    this._t(() => {
+      this.setState({ cine: 'p3' });
+      // heartbeat only — nothing else competes with it
+      let hb = 0;
+      [1.0, 0.95, 0.85, 0.75, 0.65, 0.6, 0.55, 0.5, 0.5, 0.48, 0.46].forEach((gap, i) => {
+        hb += gap * 1000;
+        this._t(() => {
+          this._beat(1.0 + i * 0.09);
+          const q = document.querySelector('[data-cine-quote]');
+          if (q) { q.style.transform = 'scale(1.045)'; setTimeout(() => { q.style.transform = 'scale(1)'; }, 160); }
+        }, hb);
+      });
+      this._t(() => this.setState({ cineSeconds: '모두가 기다립니다.' }), 2600);
+      this._t(() => { this.setState({ cineFreeze: true }); this._ring(); }, 5200);
+    }, 8300);
+    this._t(() => {
+      this.setState({ cine: 'p4' });
+      this._t(() => this.setState({ cineTurn: true }), 1400);
+    }, 17500);
+    this._t(() => { this.setState({ cine: 'p5' }); this._chord(); }, 20700);
+    this._t(() => this._cineEnd(), 23500);
+  };
+  _cineEnd = () => {
+    const el = document.querySelector('[data-cine]');
+    if (el) el.style.animation = 'curtainUp 0.9s cubic-bezier(0.76,0,0.24,1) forwards';
+    this._restartHero();
+    this._t(() => this.setState({ cine: 'done' }), 950);
+  };
+  _restartHero() {
+    const header = document.querySelector('header');
+    if (!header) return;
+    header.querySelectorAll('*').forEach(el => {
+      const cs = getComputedStyle(el);
+      if (cs.animationName === 'none' || !el.style.animation) return;
+      const anim = el.style.animation;
+      const delays = cs.animationDelay.split(',').map(s => Math.max(0.1, parseFloat(s) - 1.4) + 's').join(',');
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = anim;
+      el.style.animationDelay = delays;
+    });
+  }
+  componentDidMount() {
+    this._cleanups = [];
+    this._applyProps();
+    // Auto-run intro; browsers keep audio suspended until first interaction — resume then
+    const wake = () => { if (this._actx) { this._actx.resume(); } if (this.state.cineMuted) this.setState({ cineMuted: false }); };
+    window.addEventListener('pointerdown', wake);
+    window.addEventListener('keydown', wake);
+    this._cleanups.push(() => window.removeEventListener('pointerdown', wake), () => window.removeEventListener('keydown', wake));
+    if (this.props.showIntro ?? true) {
+      this._ac(); this._runCine();
+      this._t(() => { if (this._actx && this._actx.state === 'suspended') this.setState({ cineMuted: true }); }, 400);
+    } else this.setState({ cine: 'done' });
+    // optional real recordings: drop mp3s at assets/audio/pencil.mp3 and assets/audio/question.mp3
+    this._samples = {};
+    const audioFiles = { pencil: 'assets/audio/pencil-clean.wav', question: 'assets/audio/question.mp3' };
+    Object.keys(audioFiles).forEach(k => {
+      fetch(audioFiles[k])
+        .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+        .then(ab => this._ac().decodeAudioData(ab))
+        .then(buf => { this._samples[k] = buf; })
+        .catch(() => {});
+    });
+
+    // Reveal on scroll
+    const revealEls = document.querySelectorAll('[data-reveal]');
+    revealEls.forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(36px)';
+      el.style.transition = 'opacity 1s cubic-bezier(0.2,0.65,0.2,1), transform 1s cubic-bezier(0.2,0.65,0.2,1)';
+      el.style.transitionDelay = (el.dataset.revealDelay || 0) + 'ms';
+    });
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.style.opacity = '1';
+          e.target.style.transform = 'translateY(0)';
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    revealEls.forEach(el => io.observe(el));
+    this._cleanups.push(() => io.disconnect());
+
+    // Counters
+    const counterIO = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        counterIO.unobserve(e.target);
+        const el = e.target;
+        const to = parseFloat(el.dataset.counter);
+        const t0 = performance.now(), dur = 1500;
+        const tick = now => {
+          const p = Math.min(1, (now - t0) / dur);
+          el.textContent = Math.round(to * (1 - Math.pow(1 - p, 4)));
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }, { threshold: 0.6 });
+    document.querySelectorAll('[data-counter]').forEach(el => counterIO.observe(el));
+    this._cleanups.push(() => counterIO.disconnect());
+
+    // Photo clip reveal
+    const clip = document.querySelector('[data-clip-photo]');
+    if (clip) {
+      const clipIO = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) { clip.style.clipPath = 'inset(0% 0% 0% 0%)'; clipIO.disconnect(); }
+        });
+      }, { threshold: 0.3 });
+      clipIO.observe(clip);
+      this._cleanups.push(() => clipIO.disconnect());
+    }
+
+    // Split words helper
+    const splitWords = el => {
+      const out = [];
+      const raw = el.textContent.trim().split(/\s+/);
+      el.textContent = '';
+      raw.forEach((w, i) => {
+        const s = document.createElement('span');
+        s.textContent = w;
+        s.style.transition = 'color 0.3s linear, opacity 0.25s linear';
+        el.appendChild(s);
+        if (i < raw.length - 1) el.appendChild(document.createTextNode(' '));
+        out.push(s);
+      });
+      return out;
+    };
+    const fill = document.querySelector('[data-fill-text]');
+    const fillWords = fill ? splitWords(fill) : [];
+    fillWords.forEach(w => { w.style.color = 'rgba(15,14,12,0.13)'; });
+    const scrubText = document.querySelector('[data-scrub-text]');
+    const scrubWords = scrubText ? splitWords(scrubText) : [];
+    scrubWords.forEach(w => { w.style.opacity = '0.12'; });
+    const scrubSection = document.querySelector('[data-scrub-section]');
+
+    // Scroll loop
+    const heroInner = document.querySelector('[data-hero-parallax]');
+    const pImg = document.querySelector('[data-parallax-img]');
+    const progress = document.querySelector('[data-progress]');
+    const nav = document.querySelector('[data-nav]');
+    const stackCards = Array.from(document.querySelectorAll('[data-stack-card]'));
+    let lastY = 0;
+    const onScroll = () => {
+      const reduce = this.props.reduceMotion ?? false;
+      const y = window.scrollY;
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      if (progress) progress.style.width = (docH > 0 ? (y / docH) * 100 : 0) + '%';
+      if (nav) {
+        nav.style.transform = (y > 400 && y > lastY) ? 'translateY(-100%)' : 'translateY(0)';
+        lastY = y;
+      }
+      if (heroInner && !reduce) {
+        heroInner.style.transform = 'translateY(' + y * 0.24 + 'px)';
+        heroInner.style.opacity = Math.max(0, 1 - y / (window.innerHeight * 0.9));
+      }
+      if (pImg && !reduce) {
+        const r = pImg.getBoundingClientRect();
+        const p = (r.top + r.height / 2 - window.innerHeight / 2) / window.innerHeight;
+        pImg.style.transform = 'scale(1.15) translateY(' + p * -34 + 'px)';
+      }
+      if (fill && fillWords.length) {
+        const r = fill.getBoundingClientRect();
+        const p = Math.min(1, Math.max(0, (window.innerHeight * 0.88 - r.top) / (window.innerHeight * 0.65)));
+        const nOn = Math.floor(p * fillWords.length);
+        fillWords.forEach((w, i) => { w.style.color = i < nOn ? '#0f0e0c' : 'rgba(15,14,12,0.13)'; });
+      }
+      if (scrubSection && scrubWords.length) {
+        const r = scrubSection.getBoundingClientRect();
+        const total = r.height - window.innerHeight;
+        const p = Math.min(1, Math.max(0, -r.top / total));
+        const nOn = reduce ? scrubWords.length : Math.floor(p * 1.15 * scrubWords.length);
+        scrubWords.forEach((w, i) => { w.style.opacity = i < nOn ? '1' : '0.12'; });
+      }
+      if (!reduce) stackCards.forEach((card, i) => {
+        if (i === stackCards.length - 1) return;
+        const next = stackCards[i + 1];
+        const r = next.getBoundingClientRect();
+        const cover = Math.min(1, Math.max(0, 1 - (r.top - 104) / window.innerHeight));
+        card.style.transform = 'scale(' + (1 - cover * 0.055) + ')';
+        card.style.filter = 'brightness(' + (1 - cover * 0.1) + ')';
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    this._cleanups.push(() => window.removeEventListener('scroll', onScroll));
+
+    // Mobile menu
+    const burgerEl = document.querySelector('[data-mburger]');
+    const mmenuEl = document.querySelector('[data-mmenu]');
+    if (burgerEl && mmenuEl) {
+      let mOpen = false;
+      const bars = burgerEl.querySelectorAll('span');
+      const mToggle = () => {
+        mOpen = !mOpen;
+        mmenuEl.style.display = mOpen ? 'flex' : 'none';
+        burgerEl.setAttribute('aria-label', mOpen ? '메뉴 닫기' : '메뉴 열기');
+        bars[0].style.transform = mOpen ? 'translateY(7px) rotate(45deg)' : 'none';
+        bars[1].style.opacity = mOpen ? '0' : '1';
+        bars[2].style.transform = mOpen ? 'translateY(-7px) rotate(-45deg)' : 'none';
+      };
+      burgerEl.addEventListener('click', mToggle);
+      mmenuEl.querySelectorAll('a').forEach(a => {
+        const h = () => { if (mOpen) mToggle(); };
+        a.addEventListener('click', h);
+        this._cleanups.push(() => a.removeEventListener('click', h));
+      });
+      this._cleanups.push(() => burgerEl.removeEventListener('click', mToggle));
+    }
+
+    // Magnetic buttons
+    document.querySelectorAll('[data-magnetic]').forEach(btn => {
+      const move = e => {
+        if (this.props.reduceMotion ?? false) return;
+        const r = btn.getBoundingClientRect();
+        const dx = e.clientX - (r.left + r.width / 2);
+        const dy = e.clientY - (r.top + r.height / 2);
+        btn.style.transform = 'translate(' + dx * 0.18 + 'px,' + dy * 0.25 + 'px)';
+      };
+      const leave = () => {
+        btn.style.transition = 'transform 0.45s cubic-bezier(0.2,0.65,0.2,1)';
+        btn.style.transform = 'translate(0,0)';
+        setTimeout(() => { btn.style.transition = ''; }, 450);
+      };
+      btn.addEventListener('mousemove', move);
+      btn.addEventListener('mouseleave', leave);
+      this._cleanups.push(() => { btn.removeEventListener('mousemove', move); btn.removeEventListener('mouseleave', leave); });
+    });
+  }
+  componentDidUpdate() { this._applyProps(); }
+  _applyProps() {
+    const intro = document.querySelector('[data-intro]');
+    if (intro) intro.style.display = (this.props.showIntro ?? true) ? '' : 'none';
+    const flip = document.querySelector('[data-flip]');
+    if (flip) flip.style.animationDuration = (this.props.flipSpeed ?? 7) + 's';
+  }
+  componentWillUnmount() { (this._cleanups || []).forEach(fn => fn()); this._clearT(); }
+  renderVals() {
+    const { cine } = this.state;
+    return {
+      introVisible: (this.props.showIntro ?? true) && cine !== 'done',
+      cineP1: cine === 'p1',
+      cineP2: cine === 'p2',
+      cineP3: cine === 'p3',
+      cineP4: cine === 'p4',
+      cineP5: cine === 'p5',
+      cineStudyLines: this.state.cineStudyLines,
+      cineTyped: this.state.cineTyped,
+      cineSub: this.state.cineSub,
+      cineSeconds: this.state.cineSeconds,
+      cineFreeze: this.state.cineFreeze,
+      cineTurn: this.state.cineTurn,
+      cineMuted: this.state.cineMuted,
+      cineUnmute: () => { this._ac().resume(); this.setState({ cineMuted: false }); },
+      cineStart: () => { this._ac().resume(); this._runCine(); },
+      cineSkip: () => { this._clearT(); this._cineEnd(); },
+      cineReplay: () => { window.scrollTo(0, 0); this._ac().resume(); this._runCine(); },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -8936,6 +8936,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
   const [newGender, setNewGender] = useState("unset");
   const [adding, setAdding] = useState(false);
   const [duesMap, setDuesMap] = useState({}); // studentId → dues record for current month
+  const [pulseMap, setPulseMap] = useState({}); // studentId → { level, weekMin } — mirrors TeacherTodayV3 (source of truth for the rules)
 
   // Load current month dues for all students
   useEffect(() => {
@@ -8947,6 +8948,62 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
       setDuesMap(map);
     });
   }, []);
+
+  // Per-student pulse dot (same rules as TeacherTodayV3 — kept lightweight here to avoid re-fetching the whole Today payload).
+  useEffect(() => {
+    let cancelled = false;
+    const pad = n => String(n).padStart(2, "0");
+    const dateStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    (async () => {
+      const now = new Date();
+      const daysFromMon = (now.getDay() + 6) % 7;
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysFromMon);
+      const cutoff14 = new Date(now.getTime() - 14 * 86400000);
+      const [sched, att, segs] = await Promise.all([
+        db.get("group_schedule", "select=group_id,day_of_week,start_time").catch(() => []),
+        db.get("attendance", `session_date=gte.${dateStr(cutoff14)}&select=student_id,session_date,attended`).catch(() => []),
+        db.get("active_time_segments", `date=gte.${dateStr(monday)}&select=student_id,seconds`).catch(() => []),
+      ]);
+      if (cancelled) return;
+      const minBy = {};
+      (segs || []).forEach(x => { minBy[x.student_id] = (minBy[x.student_id] || 0) + (x.seconds || 0); });
+      const slotsByGroup = {};
+      (sched || []).forEach(x => { (slotsByGroup[x.group_id] = slotsByGroup[x.group_id] || []).push(x); });
+      const attMap = {};
+      (att || []).forEach(a => { attMap[`${a.student_id}|${a.session_date}`] = !!a.attended; });
+      const lastSessionDate = (groupId) => {
+        let best = null;
+        (slotsByGroup[groupId] || []).forEach(slot => {
+          let diff = (now.getDay() - slot.day_of_week + 7) % 7;
+          if (diff === 0) {
+            const [h, m] = String(slot.start_time || "00:00").split(":").map(Number);
+            const st = new Date(now); st.setHours(h || 0, m || 0, 0, 0);
+            if (now < st) diff = 7;
+          }
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+          if (!best || d > best) best = d;
+        });
+        return best;
+      };
+      const map = {};
+      (students || []).forEach(s => {
+        const weekMin = Math.floor((minBy[s.id] || 0) / 60);
+        const practiced = weekMin > 0;
+        const last = lastSessionDate(s.group_id);
+        let attended = null;
+        if (last) { const k = `${s.id}|${dateStr(last)}`; attended = k in attMap ? attMap[k] : null; }
+        let daysQuiet = 999;
+        if (s.last_practice) { const lp = new Date(s.last_practice + "T00:00:00"); daysQuiet = Math.floor((now - lp) / 86400000); }
+        let level;
+        if (last && attended !== null) level = (attended && practiced) ? "green" : (!attended && !practiced) ? "red" : "yellow";
+        else if (last && attended === null) level = "gray";
+        else level = practiced ? "green" : (daysQuiet > 4 ? "red" : "gray");
+        map[s.id] = { level, weekMin };
+      });
+      setPulseMap(map);
+    })();
+    return () => { cancelled = true; };
+  }, [students]);
 
   const addStudent = async () => {
     if (!newName.trim()) { showMsg("Please enter a name", "error"); return; }
@@ -9011,11 +9068,14 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
     const now = new Date();
     const dayOfMonth = now.getDate();
     const showDuesAlert = !duesPaid && dayOfMonth >= 1; // show from 1st onwards if unpaid
+    const pulse = pulseMap[s.id];
+    const PULSE_COLOR = { green: "#22C55E", yellow: "#F59E0B", red: "#EF4444", gray: C.border };
     return (
       <div key={s.id} onClick={() => onSelectStudent(s)}
         style={{ padding: "12px 16px", borderBottom: i < total - 1 ? `1px solid ${C.border}` : "none", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", transition: "background 0.1s" }}
         onMouseEnter={e => e.currentTarget.style.background = C.bgSoft}
         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+        <div style={{ width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0, background: pulse ? PULSE_COLOR[pulse.level] : C.border }} title={pulse ? `이번 주 ${pulse.weekMin}분` : ""} />
         <div style={{ position: "relative", flexShrink: 0 }}>
           <StudentAvatar student={s} size={38} />
           {isOnline && (
@@ -9032,6 +9092,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
           </div>
           <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>
             {streakDisplay(s.streak)}
+            {pulse && ` · 이번 주 ${pulse.weekMin}분`}
             {(() => { const la = lastActiveDisplay(s); return la ? ` · ${la}` : ''; })()}
             {s.hometown && ` · ${s.hometown}`}
           </div>

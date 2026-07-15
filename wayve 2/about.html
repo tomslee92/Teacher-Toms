@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<script defer data-domain="www.wayvekr.com" src="https://analytics.tiiny.net/js/plausible.js"></script></head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0f0e0c">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0f0e0c"/>
+    <text x="600" y="440" font-family="Georgia, serif" font-size="150" font-weight="700" fill="#fbfbf9" text-anchor="middle" letter-spacing="8">WAYVE</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAYVE — 소개 · Toms Lee</title>
+  <meta name="description" content="WAYVE를 만든 Toms의 이야기와 우리가 영어를 대하는 방식 — 읽는 영어가 아니라 말하는 영어.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="WAYVE">
+  <meta property="og:title" content="WAYVE — 소개">
+  <meta property="og:description" content="WAYVE를 만든 Toms의 이야기와 우리가 영어를 대하는 방식.">
+  <meta property="og:image" content="https://wayvekr.com/assets/img-01.png">
+  <link rel="icon" type="image/png" href="assets/img-01.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700;900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #fbfbf9; color: #0f0e0c; font-family: 'Pretendard Variable', Pretendard, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-x: hidden; }
+    a { color: #0f0e0c; text-decoration: none; }
+    a:hover { color: #71706b; }
+    ::selection { background: #0f0e0c; color: #fbfbf9; }
+    @media (max-width: 720px) {
+      [data-mgrid="true"] { grid-template-columns: 1fr !important; }
+      [data-mgrid="true"] > p { position: static !important; }
+      [data-pgrid="true"] { grid-template-columns: 1fr !important; }
+      [data-pcell="true"] { padding: 26px 0 !important; border-right: none !important; }
+      [data-pcell="true"] + [data-pcell="true"] { border-top: 1px solid rgba(15,14,12,0.12) !important; }
+      nav > div:not([data-mmenu="true"]) { gap: 12px !important; }
+      nav > div:not([data-mmenu="true"]) > a { font-size: 13px !important; letter-spacing: 0 !important; }
+      nav a[data-magnetic="true"] { padding: 8px 12px !important; }
+      nav > div:not([data-mmenu="true"]) > a:not([data-magnetic="true"]) { display: none !important; }
+      nav [data-mburger="true"] { display: flex !important; }
+    }
+    @keyframes riseUp { from { transform: translateY(115%); } to { transform: translateY(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes clipIn { from { clip-path: inset(100% 0% 0% 0%); } to { clip-path: inset(0% 0% 0% 0%); } }
+  </style>
+</helmet>
+
+<div data-screen-label="About" style="position: relative;">
+
+  <!-- SCROLL PROGRESS -->
+  <div data-progress="true" style="position: fixed; top: 0; left: 0; height: 2px; width: 0%; background: #0f0e0c; z-index: 300;"></div>
+
+  <!-- NAV -->
+  <nav data-nav="true" style="position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 48px); background: rgba(251,251,249,0.8); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(15,14,12,0.07); transition: transform 0.45s cubic-bezier(0.2,0.65,0.2,1);">
+    <a href="index.html" style="display: flex; align-items: center;"><img src="assets/img-01.png" alt="WAYVE" style="height: 18px; display: block;"></a>
+    <div style="display: flex; align-items: center; gap: 30px;">
+      <a href="index.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">홈</a>
+      <a href="#" style="font-size: 14px; color: #0f0e0c; font-weight: 600; letter-spacing: 0.01em;">소개</a>
+      <a href="sessions.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">이용 방법</a>
+      <a href="stories.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">후기</a>
+      <a href="blog.html" style="font-size: 14px; color: #71706b; letter-spacing: 0.01em;" style-hover="color: #0f0e0c;">블로그</a>
+      <a href="http://pf.kakao.com/_xaHXsX" target="_blank" data-magnetic="true" style="font-size: 14px; font-weight: 700; color: #2B1600; background: #FEE500; padding: 10px 20px; border-radius: 99px; display: inline-block;" style-hover="color: #2B1600; opacity: 0.88;">카카오톡 문의</a>
+      <button data-mburger="true" aria-label="메뉴 열기" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 40px; height: 40px; background: none; border: none; cursor: pointer; padding: 0;"><span style="display: block; width: 20px; height: 2px; background: #0f0e0c; transition: transform 0.3s ease, opacity 0.3s ease;"></span><span style="display: block; width: 20px; height: 2px; background: #0f0e0c; transition: transform 0.3s ease, opacity 0.3s ease;"></span><span style="display: block; width: 20px; height: 2px; background: #0f0e0c; transition: transform 0.3s ease, opacity 0.3s ease;"></span></button>
+    </div>
+    <div data-mmenu="true" style="position: absolute; top: 64px; left: 0; right: 0; background: rgba(251,251,249,0.97); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(15,14,12,0.08); padding: 8px 20px 20px; display: none; flex-direction: column;"><a href="index.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">홈</a><a href="#" style="font-size: 17px; font-weight: 700; color: #0f0e0c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">소개</a><a href="sessions.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">이용 방법</a><a href="stories.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">후기</a><a href="blog.html" style="font-size: 17px; font-weight: 500; color: #52514c; padding: 14px 4px; border-bottom: 1px solid rgba(15,14,12,0.06);">블로그</a></div>
+  </nav>
+
+  <!-- HERO -->
+  <header style="padding: 150px clamp(20px, 5vw, 64px) clamp(70px, 9vw, 120px);">
+    <div data-mgrid="true" style="max-width: 1160px; margin: 0 auto; display: grid; grid-template-columns: minmax(260px, 420px) 1fr; gap: clamp(32px, 6vw, 80px); align-items: center;">
+      <div style="overflow: hidden; border-radius: 4px; clip-path: inset(100% 0% 0% 0%); animation: clipIn 1.2s cubic-bezier(0.2,0.65,0.2,1) 0.3s forwards;">
+        <img src="assets/img-03.png" alt="Toms Lee" style="width: 100%; display: block;">
+      </div>
+      <div>
+        <p style="margin: 0 0 26px; display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; letter-spacing: 0.22em; color: #71706b; opacity: 0; animation: fadeUp 0.9s ease 0.5s forwards;"><span style="display: inline-block; width: 36px; height: 1px; background: #0f0e0c;"></span>설립자 소개</p>
+        <h1 style="margin: 0; font-family: 'Noto Serif KR', serif; font-size: clamp(52px, 8vw, 110px); font-weight: 900; letter-spacing: -0.02em; line-height: 1.05;">
+          <span style="display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em;"><span style="display: block; transform: translateY(115%); animation: riseUp 1.2s cubic-bezier(0.16,0.8,0.2,1) 0.6s forwards;">Toms</span></span>
+          <span style="display: block; overflow: hidden; padding-bottom: 0.14em; margin-bottom: -0.14em;"><span style="display: block; transform: translateY(115%); animation: riseUp 1.2s cubic-bezier(0.16,0.8,0.2,1) 0.75s forwards;"><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">Lee</em></span></span>
+        </h1>
+        <p style="margin: 26px 0 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(17px, 2vw, 21px); color: #71706b; line-height: 1.6; opacity: 0; animation: fadeUp 0.9s ease 1.1s forwards;">English teacher. World traveler.<br>Believer in the power of conversation.</p>
+        <p style="margin: 24px 0 0; max-width: 460px; font-size: 18px; color: #52514c; line-height: 1.8; opacity: 0; animation: fadeUp 0.9s ease 1.25s forwards;">저는 한국에서 태어나 미국에서 자랐습니다. 그리고 우리 가족이 바다 건너에서 찾은 기회를 <strong style="color: #0f0e0c;">다음 세대에게</strong> 전하기 위해 돌아왔습니다.</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ORIGIN -->
+  <section style="padding: clamp(80px, 11vw, 150px) clamp(20px, 5vw, 64px); border-top: 1px solid rgba(15,14,12,0.08);">
+    <div data-mgrid="true" style="max-width: 1160px; margin: 0 auto; display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 24px; align-items: start;">
+      <p data-reveal="true" style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c; position: sticky; top: 100px;">01 — 시작 이야기</p>
+      <div style="max-width: 720px;">
+        <h2 data-reveal="true" style="margin: 0 0 28px; font-family: 'Noto Serif KR', serif; font-size: clamp(30px, 4.2vw, 52px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.35;">부모님은 더 밝은 미래를 위해 한국을 떠나셨습니다.<br>저는 그 미래를 <em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">고향으로</em> 가져왔습니다.</h2>
+        <div data-reveal="true" style="display: flex; flex-direction: column; gap: 18px; font-size: 18px; color: #52514c; line-height: 1.85;">
+          <p style="margin: 0;">어렸을 때 부모님은 더 나은 미래를 위해 미국으로 이민을 가셨습니다. 코리안-아메리칸으로 자라며 저는 두 세계, 두 언어 사이를 살았습니다. 영어는 단순한 과목이 아니었습니다 — <strong style="color: #0f0e0c;">모든 문을 열어주는 열쇠</strong>였습니다.</p>
+          <p style="margin: 0;">영어에 자신감이 생기면 어떤 일이 일어나는지 직접 지켜봤습니다. 열리는 기회들, 싹트는 우정, 생겨나는 소속감. 그리고 한국에 돌아왔을 때, 저는 그 간극을 분명히 보았습니다 — <strong style="color: #0f0e0c;">10년 이상 영어를 공부했지만, 막상 써야 하는 순간 얼어버리는 세대.</strong></p>
+          <p style="margin: 0;">그때 WAYVE가 시작되었습니다 — 사업 아이디어가 아닌, <strong style="color: #0f0e0c;">소명으로서.</strong></p>
+        </div>
+        <div data-reveal="true" style="margin-top: 44px; background: #0f0e0c; color: #fbfbf9; border-radius: 6px; padding: clamp(32px, 5vw, 52px);">
+          <p style="margin: 0 0 22px; font-size: 12px; font-weight: 700; letter-spacing: 0.22em; color: rgba(251,251,249,0.35);">THE NAME · 이름의 의미</p>
+          <p style="margin: 0 0 16px; font-family: 'Noto Serif KR', serif; font-size: clamp(24px, 3.4vw, 38px); font-weight: 900; letter-spacing: -0.01em;"><span style="color: rgba(251,251,249,0.45); font-weight: 400;">WAY</span> + <span style="color: rgba(251,251,249,0.45); font-weight: 400;">PAVE</span> = WAYVE</p>
+          <p style="margin: 0 0 12px; font-size: 17px; color: rgba(251,251,249,0.7); line-height: 1.8;">To <strong style="color: #fbfbf9;">pave the way</strong>. 선구자가 되는 것. 남보다 먼저 나아가 다른 이들이 따를 수 있도록. 그것이 이 이름의 의미입니다 — <strong style="color: #fbfbf9;">파도가 되어</strong>, 함께 나아갑니다.</p>
+          <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 15px; color: rgba(251,251,249,0.4); line-height: 1.6;">길을 준비하는 사람들의 움직임. 그리고 결국 세상을 덮게 될, 하나의 파도.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STORY -->
+  <section style="padding: clamp(80px, 11vw, 150px) clamp(20px, 5vw, 64px); background: #ffffff; border-top: 1px solid rgba(15,14,12,0.08);">
+    <div data-mgrid="true" style="max-width: 1160px; margin: 0 auto; display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 24px; align-items: start;">
+      <p data-reveal="true" style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c; position: sticky; top: 100px;">02 — 모든 것을 바꾼 순간</p>
+      <div style="max-width: 720px;">
+        <h2 data-reveal="true" style="margin: 0 0 28px; font-family: 'Noto Serif KR', serif; font-size: clamp(30px, 4.2vw, 52px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.35;">2주간의 여행.<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">평생 남을</em> 자신감.</h2>
+        <p data-reveal="true" style="margin: 0 0 28px; font-size: 18px; color: #52514c; line-height: 1.85;">올해 초, 저는 19살 사촌 예은이를 데리고 미국으로 여행을 떠났습니다. 출발 전까지만 해도 예은이는 영어에 <strong style="color: #0f0e0c;">전혀 자신이 없었습니다.</strong> 몇 년 동안 공부했지만, 수많은 한국 학생들처럼 영어로 말하는 것이 불가능하게 느껴졌습니다.</p>
+        <div data-reveal="true" style="border: 1px solid rgba(15,14,12,0.12); border-radius: 6px; padding: clamp(28px, 4vw, 44px); margin-bottom: 28px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
+            <span style="border: 1px solid rgba(15,14,12,0.2); border-radius: 99px; padding: 7px 16px; font-size: 13px; font-weight: 600;">Washington DC</span>
+            <span style="border: 1px solid rgba(15,14,12,0.2); border-radius: 99px; padding: 7px 16px; font-size: 13px; font-weight: 600;">New York</span>
+            <span style="border: 1px solid rgba(15,14,12,0.2); border-radius: 99px; padding: 7px 16px; font-size: 13px; font-weight: 600;">Boston</span>
+            <span style="border: 1px solid rgba(15,14,12,0.2); border-radius: 99px; padding: 7px 16px; font-size: 13px; font-weight: 600;">Seattle</span>
+          </div>
+          <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(24px, 3vw, 34px); line-height: 1.4;">"Wow — your English is so good!"</p>
+        </div>
+        <div data-reveal="true" style="display: flex; flex-direction: column; gap: 18px; font-size: 18px; color: #52514c; line-height: 1.85;">
+          <p style="margin: 0;">미국 전역을 다니며 예은이를 제 친구들에게 소개할 때, 예상치 못한 일이 일어났습니다. 그들은 예은이의 한계를 보지 않았습니다 — <strong style="color: #0f0e0c;">예은이 자체를 봤습니다.</strong> 응원해줬습니다. 환영해줬습니다. 그리고 새로운 우정이 쌓일 때마다 예은이의 자신감도 함께 자랐습니다.</p>
+          <p style="margin: 0;">여행이 중반쯤 지났을 때, 예은이가 저를 돌아보며 평생 잊지 못할 말을 했습니다.</p>
+        </div>
+        <div data-reveal="true" style="background: #0f0e0c; color: #fbfbf9; border-radius: 6px; padding: clamp(32px, 5vw, 52px); margin: 28px 0; text-align: center;">
+          <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: clamp(26px, 3.4vw, 40px); line-height: 1.4;">"Toms, please only speak<br>to me in English."</p>
+        </div>
+        <div data-reveal="true" style="display: flex; flex-direction: column; gap: 18px; font-size: 18px; color: #52514c; line-height: 1.85;">
+          <p style="margin: 0;">그 순간이 저에게는 <strong style="color: #0f0e0c;">모든 것을 바꿔놓았습니다.</strong> 예은이의 자신감을 열어준 것은 문법이 아니었습니다. 시험 점수도 아니었습니다. <strong style="color: #0f0e0c;">관계였습니다.</strong> 진심으로 아껴주는 사람들과 진짜 대화를 나누며, 있는 그대로 환영받은 경험이었습니다.</p>
+          <p style="margin: 0;">WAYVE는 바로 그 믿음 위에 세워졌습니다. <strong style="color: #0f0e0c;">커리큘럼이 아닌 커뮤니티. 교실이 아닌 연결.</strong></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BELIEF: word-fill scrub -->
+  <section style="padding: clamp(100px, 14vw, 180px) clamp(20px, 5vw, 64px);">
+    <div style="max-width: 900px; margin: 0 auto; text-align: center;">
+      <p data-reveal="true" style="margin: 0 0 36px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c;">03 — 내가 믿는 것</p>
+      <p data-fill-text="true" style="margin: 0; font-family: 'Noto Serif KR', serif; font-size: clamp(28px, 4.4vw, 54px); font-weight: 700; letter-spacing: -0.01em; line-height: 1.55;">언어는 시험의 맥락이 아닌, 관계를 만드는 맥락에서 가장 강력합니다.</p>
+      <p data-reveal="true" style="margin: 30px auto 0; max-width: 640px; font-size: 18px; color: #52514c; line-height: 1.85;">모든 WAYVE 학생이 그 순간을 경험하기를 원합니다 — 영어가 공부하는 과목에서 <strong style="color: #0f0e0c;">걸어 들어가는 문</strong>이 되는 순간. 새로운 우정으로. 새로운 세계로. <strong style="color: #0f0e0c;">누구와도, 어디서든 연결될 수 있는 나 자신의 버전</strong>으로.</p>
+    </div>
+  </section>
+
+  <!-- PERSONAL -->
+  <section style="padding: 0 clamp(20px, 5vw, 64px) clamp(90px, 12vw, 160px);">
+    <div style="max-width: 1160px; margin: 0 auto;">
+      <div data-reveal="true" style="max-width: 680px; margin-bottom: 48px;">
+        <p style="margin: 0 0 18px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: #a3a29c;">04 — 저에 대해 조금 더</p>
+        <h2 style="margin: 0 0 20px; font-family: 'Noto Serif KR', serif; font-size: clamp(30px, 4.2vw, 52px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.35;"><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">수업 밖의</em> 제 이야기.</h2>
+        <p style="margin: 0; font-size: 18px; color: #52514c; line-height: 1.8;">저는 '선생님'이기 이전에 <strong style="color: #0f0e0c;">여러분과 같은 진짜 사람</strong>입니다. Zoom 세션 밖에서의 저를 소개합니다.</p>
+      </div>
+      <div data-clip-photo="true" style="overflow: hidden; border-radius: 4px; clip-path: inset(12% 6% 12% 6%); transition: clip-path 1.2s cubic-bezier(0.2,0.65,0.2,1);">
+        <img data-parallax-img="true" src="assets/img-friends-us.jpg" alt="Friends in the US" style="width: 100%; display: block; transform: scale(1.15);">
+      </div>
+      <p data-reveal="true" style="margin: 16px 0 0; font-size: 13px; color: #a3a29c; display: flex; justify-content: space-between; gap: 20px;"><span>미국에 있는 제 친구들 — 영어가 열어주는 진짜 관계들.</span><em style="font-family: 'Instrument Serif', serif; font-style: italic;">The kind of relationships English can open the door to.</em></p>
+
+      <div data-pgrid="true" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; margin-top: 56px; border-top: 1px solid rgba(15,14,12,0.85);">
+        <div data-reveal="true" data-pcell="true" style="padding: 36px 32px 36px 0; border-right: 1px solid rgba(15,14,12,0.12);">
+          <p style="margin: 0 0 14px; font-size: 16px; font-weight: 800;">세계 여행자 <em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #a3a29c;">· World traveler</em></p>
+          <p style="margin: 0; font-size: 15px; color: #52514c; line-height: 1.75;">20개국 이상을 방문하며 다양한 문화를 경험했습니다. 여행은 언어가 장벽이 아닌 다리라는 것을 가르쳐줬습니다.</p>
+        </div>
+        <div data-reveal="true" data-reveal-delay="100" data-pcell="true" style="padding: 36px 32px; border-right: 1px solid rgba(15,14,12,0.12);">
+          <p style="margin: 0 0 14px; font-size: 16px; font-weight: 800;">긍정적 영향력 <em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #a3a29c;">· Impact-driven</em></p>
+          <p style="margin: 0; font-size: 15px; color: #52514c; line-height: 1.75;">주변 사람들에게 긍정적인 영향을 미치는 것이 제가 매일 아침 일어나는 이유입니다. 학생 한 명 한 명의 성장이 저에게는 개인적인 기쁨입니다.</p>
+        </div>
+        <div data-reveal="true" data-reveal-delay="200" data-pcell="true" style="padding: 36px 0 36px 32px;">
+          <p style="margin: 0 0 14px; font-size: 16px; font-weight: 800;">음식 탐험가 <em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #a3a29c;">· Food lover</em></p>
+          <p style="margin: 0; font-size: 15px; color: #52514c; line-height: 1.75;">맛있는 음식과 좋은 대화는 언제나 함께합니다. 맛집 추천 항상 환영합니다!</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section style="position: relative; background: #0f0e0c; color: #fbfbf9; text-align: center; padding: clamp(110px, 16vw, 200px) 24px; overflow: hidden;">
+    <div data-reveal="true" style="position: relative; z-index: 1;">
+      <p style="margin: 0 0 26px; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: rgba(251,251,249,0.35);">지금 시작할 준비가 됐나요?</p>
+      <h2 style="margin: 0 auto; max-width: 720px; font-family: 'Noto Serif KR', serif; font-size: clamp(40px, 6.5vw, 84px); font-weight: 900; letter-spacing: -0.02em; line-height: 1.18;">당신의 길을<br><em style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;">열어가세요.</em></h2>
+      <p style="margin: 22px 0 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 19px; color: rgba(251,251,249,0.45);">Pave your way. Join the Wayve.</p>
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 48px; flex-wrap: wrap;">
+        <a href="http://pf.kakao.com/_xaHXsX" target="_blank" data-magnetic="true" style="display: inline-flex; align-items: center; background: #FEE500; color: #2B1600; font-size: 16px; font-weight: 700; padding: 18px 36px; border-radius: 99px;" style-hover="color: #2B1600; opacity: 0.88;">카카오톡으로 시작하기</a>
+        <a href="https://www.instagram.com/wayve.kr" target="_blank" data-magnetic="true" style="display: inline-flex; align-items: center; border: 1px solid rgba(251,251,249,0.3); color: #fbfbf9; font-size: 16px; font-weight: 600; padding: 18px 36px; border-radius: 99px;" style-hover="background: #fbfbf9; color: #0f0e0c;">인스타그램 @wayve.kr</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="background: #0f0e0c; border-top: 1px solid rgba(251,251,249,0.1); padding: 32px clamp(20px, 4vw, 48px); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+    <a href="index.html" style="display: flex;"><img src="assets/img-01.png" alt="WAYVE" style="height: 15px; filter: invert(1); opacity: 0.85;"></a>
+    <div style="display: flex; gap: 24px; font-size: 13px;">
+      <a href="index.html" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">홈</a>
+      <a href="sessions.html" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">이용 방법</a>
+      <a href="https://www.instagram.com/wayve.kr" target="_blank" style="color: rgba(251,251,249,0.5);" style-hover="color: #fbfbf9;">@wayve.kr</a>
+      <span style="color: rgba(251,251,249,0.3);">© 2026 WAYVE</span>
+    </div>
+  </footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this._cleanups = [];
+
+    // Reveal on scroll
+    const revealEls = document.querySelectorAll('[data-reveal]');
+    revealEls.forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(36px)';
+      el.style.transition = 'opacity 1s cubic-bezier(0.2,0.65,0.2,1), transform 1s cubic-bezier(0.2,0.65,0.2,1)';
+      el.style.transitionDelay = (el.dataset.revealDelay || 0) + 'ms';
+    });
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.style.opacity = '1';
+          e.target.style.transform = 'translateY(0)';
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    revealEls.forEach(el => io.observe(el));
+    this._cleanups.push(() => io.disconnect());
+
+    // Photo clip reveal
+    const clip = document.querySelector('[data-clip-photo]');
+    if (clip) {
+      const clipIO = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) { clip.style.clipPath = 'inset(0% 0% 0% 0%)'; clipIO.disconnect(); }
+        });
+      }, { threshold: 0.3 });
+      clipIO.observe(clip);
+      this._cleanups.push(() => clipIO.disconnect());
+    }
+
+    // Belief word-fill
+    const fill = document.querySelector('[data-fill-text]');
+    let fillWords = [];
+    if (fill) {
+      const raw = fill.textContent.trim().split(/\s+/);
+      fill.textContent = '';
+      raw.forEach((w, i) => {
+        const s = document.createElement('span');
+        s.textContent = w;
+        s.style.color = 'rgba(15,14,12,0.13)';
+        s.style.transition = 'color 0.3s linear';
+        fill.appendChild(s);
+        if (i < raw.length - 1) fill.appendChild(document.createTextNode(' '));
+        fillWords.push(s);
+      });
+    }
+
+    // Scroll loop
+    const progress = document.querySelector('[data-progress]');
+    const nav = document.querySelector('[data-nav]');
+    const pImg = document.querySelector('[data-parallax-img]');
+    let lastY = 0;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      if (progress) progress.style.width = (docH > 0 ? (y / docH) * 100 : 0) + '%';
+      if (nav) {
+        nav.style.transform = (y > 400 && y > lastY) ? 'translateY(-100%)' : 'translateY(0)';
+        lastY = y;
+      }
+      if (pImg) {
+        const r = pImg.getBoundingClientRect();
+        const p = (r.top + r.height / 2 - window.innerHeight / 2) / window.innerHeight;
+        pImg.style.transform = 'scale(1.15) translateY(' + p * -34 + 'px)';
+      }
+      if (fill && fillWords.length) {
+        const r = fill.getBoundingClientRect();
+        const p = Math.min(1, Math.max(0, (window.innerHeight * 0.88 - r.top) / (window.innerHeight * 0.6)));
+        const nOn = Math.floor(p * fillWords.length);
+        fillWords.forEach((w, i) => { w.style.color = i < nOn ? '#0f0e0c' : 'rgba(15,14,12,0.13)'; });
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    this._cleanups.push(() => window.removeEventListener('scroll', onScroll));
+
+    // Mobile menu
+    const burgerEl = document.querySelector('[data-mburger]');
+    const mmenuEl = document.querySelector('[data-mmenu]');
+    if (burgerEl && mmenuEl) {
+      let mOpen = false;
+      const bars = burgerEl.querySelectorAll('span');
+      const mToggle = () => {
+        mOpen = !mOpen;
+        mmenuEl.style.display = mOpen ? 'flex' : 'none';
+        burgerEl.setAttribute('aria-label', mOpen ? '메뉴 닫기' : '메뉴 열기');
+        bars[0].style.transform = mOpen ? 'translateY(7px) rotate(45deg)' : 'none';
+        bars[1].style.opacity = mOpen ? '0' : '1';
+        bars[2].style.transform = mOpen ? 'translateY(-7px) rotate(-45deg)' : 'none';
+      };
+      burgerEl.addEventListener('click', mToggle);
+      mmenuEl.querySelectorAll('a').forEach(a => {
+        const h = () => { if (mOpen) mToggle(); };
+        a.addEventListener('click', h);
+        this._cleanups.push(() => a.removeEventListener('click', h));
+      });
+      this._cleanups.push(() => burgerEl.removeEventListener('click', mToggle));
+    }
+
+    // Magnetic buttons
+    document.querySelectorAll('[data-magnetic]').forEach(btn => {
+      const move = e => {
+        const r = btn.getBoundingClientRect();
+        const dx = e.clientX - (r.left + r.width / 2);
+        const dy = e.clientY - (r.top + r.height / 2);
+        btn.style.transform = 'translate(' + dx * 0.18 + 'px,' + dy * 0.25 + 'px)';
+      };
+      const leave = () => {
+        btn.style.transition = 'transform 0.45s cubic-bezier(0.2,0.65,0.2,1)';
+        btn.style.transform = 'translate(0,0)';
+        setTimeout(() => { btn.style.transition = ''; }, 450);
+      };
+      btn.addEventListener('mousemove', move);
+      btn.addEventListener('mouseleave', leave);
+      this._cleanups.push(() => { btn.removeEventListener('mousemove', move); btn.removeEventListener('mouseleave', leave); });
+    });
+  }
+  componentWillUnmount() { (this._cleanups || []).forEach(fn => fn()); }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
