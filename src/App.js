@@ -7044,7 +7044,7 @@ Return ONLY this JSON array, no markdown:
                   ) : (
                     <>
                       <div style={{ fontSize: "13px", color: C.textMid, marginBottom: "10px" }}>오늘의 표현을 불러오지 못했어요</div>
-                      <button onClick={() => { setTodaysExprError(false); setLoadingTodays(true); groqCall(TODAYS_EXPR_PROMPT).then(text => { const m = text.match(/\{[\s\S]*\}/); if (m) { try { const p = cleanParsedObject(JSON.parse(m[0])); if (p?.expression) setTodaysExpr(p); } catch(e) {} } setLoadingTodays(false); }).catch((err) => { const m = (err?.message||"").toLowerCase(); setTodaysExprError(m.includes("429")||m.includes("rate")||m.includes("tpd") ? "ratelimit" : "error"); setLoadingTodays(false); }); }} style={{ padding: "8px 20px", borderRadius: "100px", background: C.text, color: "#fff", border: "none", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>🔄 다시 시도</button>
+                      <button onClick={() => { setTodaysExprError(false); setLoadingTodays(true); groqCall(TODAYS_EXPR_PROMPT).then(text => { const m = text.match(/\{[\s\S]*\}/); if (m) { try { const p = cleanParsedObject(JSON.parse(m[0])); if (p?.expression) setTodaysExpr(p); } catch(e) {} } setLoadingTodays(false); }).catch((err) => { const m = (err?.message||"").toLowerCase(); setTodaysExprError(m.includes("429")||m.includes("rate")||m.includes("tpd") ? "ratelimit" : "error"); setLoadingTodays(false); }); }} style={{ padding: "8px 20px", borderRadius: "100px", background: C.text, color: C.bg, border: "none", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }}>🔄 다시 시도</button>
                     </>
                   )}
                 </div>
@@ -7909,6 +7909,23 @@ function formatDay(dateStr) {
 // Desktop (≥768px): left sidebar + right content panel
 // Mobile: top tab bar + single column scroll
 function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
+  // Dark mode for the teacher dashboard (redesign step 6). Own theme source (student theme
+  // lives elsewhere); drives the palette Proxy. Only when TEACHER_DASH_V3 is on.
+  const [teacherTheme, setTeacherTheme] = useState(() => {
+    try { const s = localStorage.getItem("wayve_teacher_theme"); if (s === "dark" || s === "light") return s; } catch(e) {}
+    try { return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light"; } catch(e) {}
+    return "light";
+  });
+  const teacherDark = TEACHER_DASH_V3 && teacherTheme === "dark";
+  _v3Dark = teacherDark; // drive the palette Proxy for this render (teacher subtree)
+  const toggleTeacherTheme = () => setTeacherTheme(t => { const n = t === "dark" ? "light" : "dark"; try { localStorage.setItem("wayve_teacher_theme", n); } catch(e) {} return n; });
+  useEffect(() => {
+    if (!TEACHER_DASH_V3) return;
+    const prevBg = document.body.style.background, prevCol = document.body.style.color;
+    document.body.style.background = teacherDark ? DARK_TOKENS.bgGrouped : "";
+    document.body.style.color = teacherDark ? DARK_TOKENS.ink : ""; // color-less text inherits this
+    return () => { document.body.style.background = prevBg; document.body.style.color = prevCol; };
+  }, [teacherDark]);
   const [tab, setTab] = useState("today");
   const [students, setStudents] = useState([]);
   const [phraseBank, setPhraseBank] = useState([]);
@@ -8044,7 +8061,10 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
                 <div style={{ fontSize: "16px", fontWeight: "800", letterSpacing: "4px", textTransform: "uppercase" }}>WAYVE</div>
                 <div style={{ fontSize: "9px", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "500" }}>Teacher Dashboard</div>
               </div>
-              <div style={{ display: "flex", gap: "6px" }}>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                {TEACHER_DASH_V3 && (
+                  <button onClick={toggleTeacherTheme} title="다크 모드" style={{ background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 10px", borderRadius: "100px", fontSize: "13px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>{teacherDark ? "☀️" : "🌙"}</button>
+                )}
                 {user && TEACHER_NAMES.includes(user.name) && (
                   <button onClick={() => setScreen("student")} style={{ background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 12px", borderRadius: "100px", fontSize: "11px", fontFamily: FONT, cursor: "pointer" }}>← Student</button>
                 )}
@@ -10251,7 +10271,7 @@ function AIToolsHub({ phraseBank, setPhraseBank, showMsg, onGoToTab }) {
           // Action
           React.createElement("button", {
             onClick: tool.action.onClick,
-            style: { background: C.text, color: "#fff", border: "none", padding: "8px 16px", borderRadius: "100px", fontSize: "13px", fontWeight: "600", fontFamily: FONT, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }
+            style: { background: C.text, color: C.bg, border: "none", padding: "8px 16px", borderRadius: "100px", fontSize: "13px", fontWeight: "600", fontFamily: FONT, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }
           }, tool.action.label, React.createElement("span", { style: { fontSize: "11px" } }, "→"))
         );
       })
@@ -10428,7 +10448,7 @@ function TranslationsAuditTab({ phraseBank, setPhraseBank, showMsg }) {
                       <button
                         onClick={() => acceptOne(p)}
                         disabled={savingId === p.id}
-                        style={{ background: C.text, color: "#fff", border: "none", padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: savingId === p.id ? "default" : "pointer" }}
+                        style={{ background: C.text, color: C.bg, border: "none", padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: savingId === p.id ? "default" : "pointer" }}
                       >
                         {savingId === p.id ? React.createElement(Spinner) : "Accept"}
                       </button>
@@ -10540,7 +10560,7 @@ function EditPhraseModal({ phrase, onSave, onClose }) {
             )}
             {aiResult.needs_change && (
               <div style={{ display: "flex", gap: "6px" }}>
-                <button onClick={acceptSuggestion} style={{ background: C.text, color: "#fff", border: "none", padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>Accept</button>
+                <button onClick={acceptSuggestion} style={{ background: C.text, color: C.bg, border: "none", padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: "600", cursor: "pointer" }}>Accept</button>
                 <button onClick={() => setAiResult(null)} style={{ background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, cursor: "pointer" }}>Dismiss</button>
               </div>
             )}
@@ -11676,12 +11696,12 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
                 confirmRollover ? (
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     <span style={{ fontSize: "11px", color: C.textMid }}>Move all {recentPhrases.length} to Library?</span>
-                    <button onClick={rolloverToLibrary} style={{ background: C.text, border: "none", borderRadius: "100px", color: "#fff", fontSize: "11px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" }}>Yes, move</button>
+                    <button onClick={rolloverToLibrary} style={{ background: C.text, border: "none", borderRadius: "100px", color: C.bg, fontSize: "11px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" }}>Yes, move</button>
                     <button onClick={() => setConfirmRollover(false)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", fontSize: "11px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, color: C.textMid }}>Cancel</button>
                   </div>
                 ) : (
                   <button onClick={() => setConfirmRollover(true)}
-                    style={{ background: C.text, border: "none", borderRadius: "100px", padding: "5px 14px", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
+                    style={{ background: C.text, border: "none", borderRadius: "100px", padding: "5px 14px", color: C.bg, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT }}>
                     📚 Move all to Library
                   </button>
                 )
@@ -13587,11 +13607,11 @@ function QodPromptCard({ prompt, index, onSave, onDelete, onPreview, onSchedule,
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {prompt.tag && <span style={{ fontSize: "10px", fontWeight: "700", background: C.bgSoft, color: C.textMid, padding: "3px 9px", borderRadius: "100px", letterSpacing: "0.5px" }}>{prompt.tag}</span>}
             {diff && <span style={{ fontSize: "10px", color: C.textLight, background: C.bgSoft, padding: "3px 9px", borderRadius: "100px" }}>{diff.label.split(" ")[0]} {diff.label.slice(diff.label.indexOf(" ") + 1)}</span>}
-            {isToday && <span style={{ fontSize: "10px", fontWeight: "700", background: C.text, color: "#fff", padding: "3px 9px", borderRadius: "100px" }}>⭐ Today</span>}
+            {isToday && <span style={{ fontSize: "10px", fontWeight: "700", background: C.text, color: C.bg, padding: "3px 9px", borderRadius: "100px" }}>⭐ Today</span>}
           </div>
           <div style={{ display: "flex", gap: "4px" }}>
             {onPreview && !editing && <button onClick={onPreview} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT }}>👁 Preview</button>}
-            {!isSaved && onSave && <button onClick={onSave} style={{ background: C.text, border: "none", borderRadius: "100px", padding: "4px 12px", cursor: "pointer", fontSize: "11px", color: "#fff", fontFamily: FONT, fontWeight: "600" }}>Save ⭐</button>}
+            {!isSaved && onSave && <button onClick={onSave} style={{ background: C.text, border: "none", borderRadius: "100px", padding: "4px 12px", cursor: "pointer", fontSize: "11px", color: C.bg, fontFamily: FONT, fontWeight: "600" }}>Save ⭐</button>}
             {isSaved && onSchedule && !editing && <button onClick={onSchedule} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT }}>📅 Schedule</button>}
             {isSaved && onEdit && !editing && <button onClick={() => setEditing(true)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontSize: "11px", color: C.textMid, fontFamily: FONT }}>✏️ Edit</button>}
             {onDelete && !editing && <button onClick={onDelete} style={{ background: "transparent", border: "none", color: C.textLight, cursor: "pointer", fontSize: "16px", padding: "2px 4px" }}>×</button>}
