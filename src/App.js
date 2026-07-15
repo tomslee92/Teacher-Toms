@@ -9,6 +9,12 @@ const SUPABASE_URL = "https://ulpnmewvejvpancvqnrp.supabase.co";
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || "sb_publishable_sDP-kuCv5E2LmpDMPp8Y4A_n1ryWhNO";
 const GROQ_KEY = process.env.REACT_APP_GROQ_KEY;
 const GEMINI_KEY = process.env.REACT_APP_GEMINI_KEY;
+// Groq model IDs — single source of truth (CLAUDE.md §2b.2). Both current values
+// are decommissioned Aug 16 2026; replacements are "openai/gpt-oss-120b" (primary)
+// and "openai/gpt-oss-20b" (fallback) — the "openai/" prefix is part of the string.
+// GPT-OSS are reasoning-style: re-test every structured-output path before swapping.
+const GROQ_MODEL_PRIMARY  = "llama-3.3-70b-versatile";
+const GROQ_MODEL_FALLBACK = "llama-3.1-8b-instant";
 
 // ── Push Notifications — Firebase Cloud Messaging ─────────────────────────────
 // VAPID public key from Firebase Console → Project Settings → Cloud Messaging
@@ -1571,7 +1577,7 @@ async function groqCall(prompt, lang = "ko") {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-    body: JSON.stringify({ model: "llama-3.3-70b-versatile", max_tokens: 1200, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }] })
+    body: JSON.stringify({ model: GROQ_MODEL_PRIMARY, max_tokens: 1200, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }] })
   });
   if (res.status === 429 || res.status === 413) {
     console.warn("Groq limit hit — using Gemini");
@@ -1621,7 +1627,7 @@ Evaluate the current Korean translation. Suggest a fix if it's inaccurate, awkwa
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL_PRIMARY,
       max_tokens: 400,
       temperature: 0.3,
       response_format: { type: "json_object" },
@@ -1662,7 +1668,7 @@ async function groqCallWavy(userMessage, systemPrompt) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-    body: JSON.stringify({ model: "llama-3.3-70b-versatile", max_tokens: 200, temperature: 0.8, messages })
+    body: JSON.stringify({ model: GROQ_MODEL_PRIMARY, max_tokens: 200, temperature: 0.8, messages })
   });
   if (res.status === 429) {
     // Fallback to Gemini with custom system prompt
@@ -1682,7 +1688,7 @@ async function groqScaffold(prompt) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL_PRIMARY,
       max_tokens: 250,
       temperature: 0.3,
       messages: [{
@@ -1768,7 +1774,7 @@ Return ONLY the Korean translation, nothing else. No explanation, no alternative
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL_PRIMARY,
       max_tokens: 300,
       temperature: isRetry ? 0.7 : 0.3,
       messages: [{ role: "system", content: SYSTEM + "\n\n" + TRANSLATION_SYSTEM }, { role: "user", content: prompt }]
@@ -1810,7 +1816,7 @@ Text to translate:
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL_PRIMARY,
       max_tokens: 300,
       temperature: isRetry ? 0.7 : 0.3,
       messages: [{ role: "system", content: SYSTEM + "\n\n" + TRANSLATION_SYSTEM }, { role: "user", content: prompt }]
@@ -2035,7 +2041,7 @@ Return ONLY valid JSON array:
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile", max_tokens: 800,
+      model: GROQ_MODEL_PRIMARY, max_tokens: 800,
       temperature: 0.9,
       messages: [
         { role: "system", content: systemPrompt },
@@ -2078,7 +2084,7 @@ async function autoFillKorean(english) {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile", max_tokens: 120,
+        model: GROQ_MODEL_PRIMARY, max_tokens: 120,
         messages: [{
           role: "system",
           content: `Korean context writer for WAYVE English learning app.
@@ -6598,7 +6604,7 @@ CRITICAL: korean and explanation MUST be in ${lang === "zh" ? "Simplified Chines
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: GROQ_MODEL_PRIMARY,
           max_tokens: 400,
           temperature: 0.4,
           messages: [{
@@ -12657,7 +12663,7 @@ function ChineseTranslator({ showMsg }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", max_tokens: 120, temperature: 0.2,
+          model: GROQ_MODEL_PRIMARY, max_tokens: 120, temperature: 0.2,
           messages: [
             { role: "system", content: "You are a translator. Translate the given English phrase into natural, conversational Simplified Chinese (普通话). Return ONLY the Chinese translation, nothing else. Use 简体中文（汉字）only." },
             { role: "user", content: `English phrase: "${p.english}"\n\nTranslate into natural Simplified Chinese. Return ONLY the Chinese translation.` }
@@ -12672,7 +12678,7 @@ function ChineseTranslator({ showMsg }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", max_tokens: 100, temperature: 0.3,
+          model: GROQ_MODEL_PRIMARY, max_tokens: 100, temperature: 0.3,
           messages: [
             { role: "system", content: "为WAYVE英语学习应用编写中文使用场景说明。\n规则：\n- 只写1句简体中文\n- 说明何时和与谁使用这个英语表达——描述使用场景\n- 不要重述意思，不要以这个句子或这个表达开头\n- 直接描述场景，例如：和新认识的朋友聊天时可以自然使用。\n- 只用简体中文（汉字）" },
             { role: "user", content: `英语表达："${p.english}"\n\n写1句简体中文说明什么时候和与谁使用这个表达。直接描述场景。` }
@@ -13744,7 +13750,7 @@ async function translateQodToKorean(prompt, lang = "ko") {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", max_tokens: 200, temperature: 0.3,
+          model: GROQ_MODEL_PRIMARY, max_tokens: 200, temperature: 0.3,
           messages: [
             { role: "system", content: "You are a translator. Translate English into natural conversational Simplified Chinese (普通话). Return ONLY the Chinese translation, nothing else." },
             { role: "user", content: `Translate this English question into natural Simplified Chinese: "${prompt}"\n\nReturn ONLY the Chinese translation.` }
@@ -17348,7 +17354,7 @@ Scoring:
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: GROQ_MODEL_FALLBACK,
         max_tokens: 200,
         temperature: 0.2,
         messages: [{ role: "user", content: prompt }],
