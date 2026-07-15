@@ -4064,8 +4064,8 @@ function TourTabTooltip({ tabKey, newUI = false }) {
               React.createElement("div", { style: { fontSize: 17, fontWeight: 800, color: "#fff", marginBottom: 8, letterSpacing: "-0.3px" } }, title),
               bodyEl, btns
             )
-          : React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, background: "#fff", borderRadius: "24px 24px 0 0", padding: "14px 20px 44px", boxShadow: "0 -8px 32px rgba(0,0,0,0.15)", pointerEvents: "all", opacity: tooltipVisible ? 1 : 0, transform: `translateY(${tooltipVisible ? 0 : 14}px)`, transition: "opacity 0.55s cubic-bezier(0.32, 0.72, 0, 1), transform 0.55s cubic-bezier(0.32, 0.72, 0, 1)", zIndex: 3 } },
-              React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: "#E0E0E0", margin: "0 auto 14px" } }),
+          : React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, background: C.bgCard, borderRadius: "24px 24px 0 0", padding: "14px 20px 44px", boxShadow: "0 -8px 32px rgba(0,0,0,0.15)", pointerEvents: "all", opacity: tooltipVisible ? 1 : 0, transform: `translateY(${tooltipVisible ? 0 : 14}px)`, transition: "opacity 0.55s cubic-bezier(0.32, 0.72, 0, 1), transform 0.55s cubic-bezier(0.32, 0.72, 0, 1)", zIndex: 3 } },
+              React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: C.border, margin: "0 auto 14px" } }),
               dotRow,
               React.createElement("div", { style: { fontSize: 17, fontWeight: 800, color: C.text, marginBottom: 8, letterSpacing: "-0.3px" } }, title),
               bodyEl, btns
@@ -4315,7 +4315,7 @@ function TourSpotlightV3({ steps, stepIndex, lang, onAdvance, onBack, onSkip }) 
       // Tooltip card
       React.createElement("div", { onClick: e => e.stopPropagation(), style: { position: "absolute", ...tipStyle, background: T3.card, borderRadius: "20px", padding: "18px 20px 16px", boxShadow: "0 12px 40px rgba(11,31,58,0.3)" } },
         React.createElement("div", { style: { display: "flex", gap: "5px", marginBottom: "12px" } },
-          steps.map((_, i) => React.createElement("div", { key: i, style: { width: i === stepIndex ? 18 : 5, height: 5, borderRadius: 3, background: i === stepIndex ? T3.wave : "rgba(22,24,29,0.15)", transition: "all 0.3s ease" } }))
+          steps.map((_, i) => React.createElement("div", { key: i, style: { width: i === stepIndex ? 18 : 5, height: 5, borderRadius: 3, background: i === stepIndex ? T3.wave : T3.ink3, transition: "all 0.3s ease" } }))
         ),
         React.createElement("div", { style: { fontSize: "17px", fontWeight: "800", color: T3.ink, marginBottom: "8px", letterSpacing: "-0.2px" } }, title),
         React.createElement("div", { style: { fontSize: "14px", color: T3.ink2, lineHeight: 1.6, marginBottom: "16px" } }, body),
@@ -8323,7 +8323,7 @@ function SituationTagsTab({ showMsg }) {
         // Action: default badge or delete button
         DEFAULT_SITUATION_TAGS.find(d => d.id === tag.id)
           ? React.createElement("span", { style: { fontSize: "10px", color: C.textLight } }, "default")
-          : React.createElement("button", { onClick: () => handleDelete(tag), style: { fontSize: "11px", color: C.error, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" } }, "Delete")
+          : React.createElement("button", { onClick: () => handleDelete(tag), style: { fontSize: "11px", color: C.error, background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" } }, "Delete")
       ))
     )
   );
@@ -8419,7 +8419,7 @@ function PronunciationTab({ showMsg }) {
           React.createElement("span", { style: { fontSize: "13px", color: C.navy, fontWeight: "600" } }, fix.phonetic)
         ),
         React.createElement("button", { onClick: () => { setWord(fix.word); setPhonetic(fix.phonetic); }, style: { fontSize: "11px", color: C.textMid, background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" } }, "Edit"),
-        React.createElement("button", { onClick: () => handleDelete(fix), style: { fontSize: "11px", color: C.error, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" } }, "Delete")
+        React.createElement("button", { onClick: () => handleDelete(fix), style: { fontSize: "11px", color: C.error, background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "100px", padding: "4px 10px", cursor: "pointer", fontFamily: FONT, fontWeight: "600" } }, "Delete")
       ))
     )
   );
@@ -8953,7 +8953,7 @@ function DuesOverview({ students, duesMap, setDuesMap, showMsg }) {
             return (
               <div key={s.id}
                 onClick={() => !isSaving && toggle(s)}
-                style={{ display: "flex", alignItems: "center", gap: "12px", padding: "11px 16px", borderBottom: i < students.length - 1 ? `1px solid ${C.border}` : "none", cursor: "pointer", background: isPaid ? "#F0FDF4" : C.bg, transition: "background 0.15s" }}>
+                style={{ display: "flex", alignItems: "center", gap: "12px", padding: "11px 16px", borderBottom: i < students.length - 1 ? `1px solid ${C.border}` : "none", cursor: "pointer", background: isPaid ? C.successBg : C.bg, transition: "background 0.15s" }}>
                 {/* Checkbox */}
                 <div style={{ width: "22px", height: "22px", borderRadius: "6px", border: `2px solid ${isPaid ? C.success : C.border}`, background: isPaid ? C.success : C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
                   {isSaving ? React.createElement(Spinner) : isPaid && <span style={{ color: "#fff", fontSize: "13px", fontWeight: "800" }}>✓</span>}
@@ -9133,7 +9133,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
             {genderLabel && <span style={{ fontSize: "10px", color: genderColor, fontWeight: "700", background: genderColor + "18", border: `1px solid ${genderColor}40`, borderRadius: "100px", padding: "1px 5px" }}>{genderLabel}</span>}
             {isOnline && <span style={{ fontSize: "10px", fontWeight: "700", color: "#22C55E", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: "100px", padding: "1px 6px", letterSpacing: "0.3px" }}>ONLINE</span>}
             {duesPaid && <span style={{ fontSize: "10px", fontWeight: "700", color: C.success, background: C.successBg, border: `1px solid ${C.successBorder}`, borderRadius: "100px", padding: "1px 6px" }}>💰 Paid</span>}
-            {showDuesAlert && dayOfMonth > 7 && <span style={{ fontSize: "10px", fontWeight: "700", color: C.error, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: "100px", padding: "1px 6px" }}>Unpaid</span>}
+            {showDuesAlert && dayOfMonth > 7 && <span style={{ fontSize: "10px", fontWeight: "700", color: C.error, background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "100px", padding: "1px 6px" }}>Unpaid</span>}
           </div>
           <div style={{ fontSize: "11px", color: C.textLight, marginTop: "2px" }}>
             {streakDisplay(s.streak)}
@@ -9482,7 +9482,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <input value={nameVal} onChange={e => setNameVal(e.target.value)} onKeyDown={e => e.key === "Enter" && saveName()} autoFocus
                   style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "6px 10px", color: "#fff", fontSize: "18px", fontWeight: "700", fontFamily: FONT, outline: "none", width: "180px" }} />
-                <button onClick={saveName} style={{ background: "#fff", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, color: C.text }}>Save</button>
+                <button onClick={saveName} style={{ background: "#fff", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, color: "#16181D" }}>Save</button>
                 <button onClick={() => { setEditingName(false); setNameVal(localStudent.name); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "6px 10px", fontSize: "12px", cursor: "pointer", fontFamily: FONT, color: "rgba(255,255,255,0.7)" }}>Cancel</button>
               </div>
             ) : (
@@ -9762,7 +9762,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
                   const date = new Date(d.due_date + "T00:00:00");
                   const label = date.toLocaleDateString([], { month: "short", year: "2-digit" });
                   return (
-                    <span key={d.id} style={{ fontSize: "10px", fontWeight: "600", padding: "2px 8px", borderRadius: "100px", background: d.paid_at ? C.successBg : "#FEF2F2", color: d.paid_at ? C.success : C.error, border: `1px solid ${d.paid_at ? C.successBorder : "#FCA5A5"}` }}>
+                    <span key={d.id} style={{ fontSize: "10px", fontWeight: "600", padding: "2px 8px", borderRadius: "100px", background: d.paid_at ? C.successBg : C.errorBg, color: d.paid_at ? C.success : C.error, border: `1px solid ${d.paid_at ? C.successBorder : C.errorBorder}` }}>
                       {label} {d.paid_at ? "✓" : "✗"}
                     </span>
                   );
@@ -9886,7 +9886,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
             <div onClick={() => !cleanSlating && setCleanSlateConfirm(false)}
               style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px", animation: "fadeIn 0.15s ease-out" }}>
               <div onClick={e => e.stopPropagation()}
-                style={{ background: "#fff", borderRadius: "20px", padding: "24px 22px 20px", maxWidth: "360px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}>
+                style={{ background: C.bgCard, borderRadius: "20px", padding: "24px 22px 20px", maxWidth: "360px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}>
                 <div style={{ fontSize: "17px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>
                   Clean slate for {localStudent.name}?
                 </div>
@@ -10061,7 +10061,7 @@ function DeleteStudentSection({ student, onDelete, onBack, showMsg }) {
           onClick: () => setConfirm(true),
           style: { background: "transparent", border: "none", color: C.error, fontSize: "13px", fontWeight: "500", padding: "8px 16px", cursor: "pointer", fontFamily: FONT, opacity: 0.7, letterSpacing: "0.1px" }
         }, "Delete Student Account")
-      : React.createElement("div", { style: { width: "100%", background: "#FEF2F2", border: `1px solid #FCA5A5`, borderRadius: "14px", padding: "16px" } },
+      : React.createElement("div", { style: { width: "100%", background: C.errorBg, border: `1px solid ${C.errorBorder}`, borderRadius: "14px", padding: "16px" } },
           React.createElement("div", { style: { fontSize: "14px", fontWeight: "700", color: C.error, marginBottom: "6px", textAlign: "center" } }, "Delete " + student.name + "?"),
           React.createElement("div", { style: { fontSize: "12px", color: C.textMid, marginBottom: "14px", lineHeight: 1.5, textAlign: "center" } },
             "This will permanently delete all their data — progress, phrases, QoD responses, and their account. This cannot be undone."
@@ -11571,7 +11571,7 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
 
       {/* ── Student Nominations ── */}
       {nominations.length > 0 && (
-        <div style={{ background: "#EEF2FF", borderRadius: "16px", border: `1px solid ${C.navy}22`, padding: "14px 16px", marginBottom: "16px" }}>
+        <div style={{ background: C.navyBg, borderRadius: "16px", border: `1px solid ${C.navy}22`, padding: "14px 16px", marginBottom: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div>
               <div style={{ fontSize: "13px", fontWeight: "700", color: C.navy }}>📌 Student Nominations · {selectedGroup?.name}</div>
@@ -11587,7 +11587,7 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
               const alreadyInSession = groupPhrases.some(sp => sp.phrase_bank?.english === nom.english);
               const isClassPhrase = nom.source === "class";
               return (
-                <div key={i} style={{ background: "#fff", borderRadius: "10px", border: `1px solid ${alreadyInSession ? C.successBorder : C.border}`, padding: "10px 12px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <div key={i} style={{ background: C.bg, borderRadius: "10px", border: `1px solid ${alreadyInSession ? C.successBorder : C.border}`, padding: "10px 12px", display: "flex", alignItems: "center", gap: "10px" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                       <div style={{ fontSize: "13px", fontStyle: "italic", color: C.text }}>"{nom.english}"</div>
@@ -11771,7 +11771,7 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
                   React.createElement("div", { style: { minWidth: 0 } },
                     React.createElement("div", { style: { fontSize: "13px", fontStyle: "italic", color: C.text } },
                       highlighted[0],
-                      React.createElement("span", { style: { background: "#FFF3C4", borderRadius: "2px", fontWeight: "700" } }, highlighted[1]),
+                      React.createElement("span", { style: { background: "#FFF3C4", color: "#3A2E00", borderRadius: "2px", fontWeight: "700" } }, highlighted[1]),
                       highlighted[2]
                     ),
                     p.korean && React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "1px" } }, p.korean)
@@ -16418,7 +16418,7 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 20,
         padding: "14px 24px 12px",
         display: "flex", justifyContent: "center",
-        background: streakScrolled ? "#fff" : "rgba(255,255,255,0)",
+        background: streakScrolled ? C.bg : "rgba(255,255,255,0)",
         borderBottom: streakScrolled ? `0.5px solid ${C.border}` : "0.5px solid transparent",
         transition: "background 0.4s ease, border-color 0.4s ease",
       }}>
@@ -16783,7 +16783,7 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
       onClick: e => e.stopPropagation(),
     },
       // Grabber
-      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: "rgba(22,24,29,0.15)", alignSelf: "center", margin: "0 0 10px" } }),
+      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: dark ? "rgba(255,255,255,0.18)" : "rgba(22,24,29,0.15)", alignSelf: "center", margin: "0 0 10px" } }),
       // Header: avatar + name + group·teacher
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "12px", padding: "4px 4px 14px", borderBottom: `1px solid ${T3.hairline}` } },
         React.createElement(StudentAvatar, { student: user, size: 48 }),
@@ -16807,7 +16807,7 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
       React.createElement("div", { style: rowStyle },
         React.createElement("div", { style: labelStyle }, "알림"),
         React.createElement("button", { "data-tour-notif-btn": "true", onClick: toggleNotif, disabled: enabling,
-          style: { width: "46px", height: "28px", borderRadius: "100px", background: notifOn ? T3.green : "rgba(22,24,29,0.12)", position: "relative", border: "none", cursor: enabling ? "default" : "pointer", padding: 0, opacity: enabling ? 0.6 : 1, transition: "background 0.2s ease" } },
+          style: { width: "46px", height: "28px", borderRadius: "100px", background: notifOn ? T3.green : (dark ? "rgba(255,255,255,0.16)" : "rgba(22,24,29,0.12)"), position: "relative", border: "none", cursor: enabling ? "default" : "pointer", padding: 0, opacity: enabling ? 0.6 : 1, transition: "background 0.2s ease" } },
           React.createElement("div", { style: { position: "absolute", top: "2px", left: notifOn ? "20px" : "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s ease" } })
         )
       ),
@@ -20476,7 +20476,7 @@ function StudentMessageForm({ user, lang }) {
       React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase", marginBottom: "8px" } }, isZh ? "유형 선택" : "유형 선택"),
       React.createElement("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
         categories.map(c => React.createElement("button", { key: c.id, onClick: () => setCategory(c.id),
-          style: { padding: "7px 14px", borderRadius: "100px", border: `1.5px solid ${category === c.id ? C.text : C.border}`, background: category === c.id ? C.text : "transparent", color: category === c.id ? "#fff" : C.textMid, fontSize: "13px", fontWeight: category === c.id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
+          style: { padding: "7px 14px", borderRadius: "100px", border: `1.5px solid ${category === c.id ? C.text : C.border}`, background: category === c.id ? C.text : "transparent", color: category === c.id ? C.bg : C.textMid, fontSize: "13px", fontWeight: category === c.id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
         }, c.label))
       )
     ),
@@ -20588,7 +20588,7 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
     React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "16px" } },
       [["unresolved", `Unresolved (${unresolvedCount})`], ["resolved", "Resolved"], ["all", "All"]].map(([id, label]) =>
         React.createElement("button", { key: id, onClick: () => setFilter(id),
-          style: { padding: "5px 12px", borderRadius: "100px", border: `1.5px solid ${filter === id ? C.text : C.border}`, background: filter === id ? C.text : "transparent", color: filter === id ? "#fff" : C.textMid, fontSize: "12px", fontWeight: filter === id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
+          style: { padding: "5px 12px", borderRadius: "100px", border: `1.5px solid ${filter === id ? C.text : C.border}`, background: filter === id ? C.text : "transparent", color: filter === id ? C.bg : C.textMid, fontSize: "12px", fontWeight: filter === id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
         }, label)
       )
     ),
@@ -21532,7 +21532,7 @@ function NoteWaveformPlayer({ url, duration, accent }) {
   const fmt = (s) => { if (!s || !isFinite(s)) return "0:00"; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${String(sec).padStart(2,"0")}`; };
 
   return React.createElement("div", {
-    style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", background: "#F7F8FA", borderRadius: "14px", border: `1px solid ${C.border}` }
+    style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", background: C.bgSoft, borderRadius: "14px", border: `1px solid ${C.border}` }
   },
     React.createElement("button", {
       onClick: toggle,
@@ -21570,7 +21570,7 @@ function SessionNoteSheet({ note, onClose, showFirstOpenFraming }) {
       React.createElement("style", null, "@keyframes noteSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}"),
       React.createElement("div", {
         onClick: e => e.stopPropagation(),
-        style: { background: "#fff", width: "100%", maxWidth: "520px", maxHeight: "85vh", borderRadius: "24px 24px 0 0", padding: "10px 22px calc(28px + env(safe-area-inset-bottom)) 22px", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "noteSheetUp 400ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT }
+        style: { background: C.bg, width: "100%", maxWidth: "520px", maxHeight: "85vh", borderRadius: "24px 24px 0 0", padding: "10px 22px calc(28px + env(safe-area-inset-bottom)) 22px", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "noteSheetUp 400ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT }
       },
         React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: C.border, margin: "4px auto 18px" } }),
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "10px" } },
@@ -21621,7 +21621,7 @@ function SessionNoteArchiveSheet({ notes, onClose }) {
       React.createElement("style", null, "@keyframes archiveSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)} } @keyframes archiveItemIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}"),
       React.createElement("div", {
         onClick: e => e.stopPropagation(),
-        style: { background: "#FAFBFC", width: "100%", maxWidth: "560px", height: "92vh", borderRadius: "24px 24px 0 0", padding: "10px 0 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", animation: "archiveSheetUp 420ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT }
+        style: { background: C.bgSoft, width: "100%", maxWidth: "560px", height: "92vh", borderRadius: "24px 24px 0 0", padding: "10px 0 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", animation: "archiveSheetUp 420ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT }
       },
         React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: C.border, margin: "4px auto 14px" } }),
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 22px 12px", borderBottom: `1px solid ${C.border}` } },
@@ -21637,7 +21637,7 @@ function SessionNoteArchiveSheet({ notes, onClose }) {
             : notes.map((n, i) => React.createElement("div", {
                 key: n.id,
                 style: {
-                  background: "#fff", border: `1px solid ${C.border}`, borderRadius: "16px", padding: "16px 18px", marginBottom: "12px",
+                  background: C.bg, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "16px 18px", marginBottom: "12px",
                   boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
                   animation: `archiveItemIn 320ms cubic-bezier(0.16,1,0.3,1) ${i * 30}ms both`,
                 }
@@ -21881,8 +21881,8 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
     } catch(e) { showMsg("Error: " + e.message, "error"); }
   };
 
-  const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, background: "#fff", boxSizing: "border-box" };
-  const miniBtn = { fontSize: "11px", fontWeight: "700", width: "24px", height: "24px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#fff", color: C.textMid, cursor: "pointer", fontFamily: FONT, padding: 0, lineHeight: 1 };
+  const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, background: C.bg, boxSizing: "border-box" };
+  const miniBtn = { fontSize: "11px", fontWeight: "700", width: "24px", height: "24px", borderRadius: "6px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, cursor: "pointer", fontFamily: FONT, padding: 0, lineHeight: 1 };
   const addLineBtn = { flex: 1, padding: "8px", borderRadius: "10px", border: `1px dashed ${C.border}`, background: "transparent", color: C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT };
   const existingCategories = [...new Set(scenarios.map(s => (s.category || "").trim()).filter(Boolean))];
 
@@ -21901,7 +21901,7 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
         <div style={{ background: C.successBg, color: C.success, border: "1px solid #B8D5C0", borderRadius: "12px", padding: "10px 14px", marginBottom: "12px", fontSize: "13px", fontWeight: "700" }}>✓ Scenario saved — it's in the list below.</div>
       )}
       {saveError && (
-        <div style={{ background: "#FEF2F2", color: C.error, border: "1px solid #FCA5A5", borderRadius: "12px", padding: "10px 14px", marginBottom: "12px", fontSize: "13px", fontWeight: "700" }}>Save failed: {saveError}</div>
+        <div style={{ background: C.errorBg, color: C.error, border: `1px solid ${C.errorBorder}`, borderRadius: "12px", padding: "10px 14px", marginBottom: "12px", fontSize: "13px", fontWeight: "700" }}>Save failed: {saveError}</div>
       )}
 
       {!loading && scenarios.length > 0 && (
@@ -21991,7 +21991,7 @@ Return ONLY valid JSON, no markdown fences: {"intro":"..."}`;
           {lines.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
               {lines.map((l, i) => (
-                <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: "10px", padding: "8px", background: l.speaker === "student" ? "#F5F3FF" : "#fff" }}>
+                <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: "10px", padding: "8px", background: l.speaker === "student" ? C.navyBg : C.bgSoft }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                     <button onClick={() => toggleSpeaker(i)} title="Toggle speaker" style={{ fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "100px", border: "none", cursor: "pointer", fontFamily: FONT, background: l.speaker === "student" ? "#8b5cf6" : C.textLight, color: "#fff" }}>
                       {l.speaker === "student" ? "Student" : "Other"}
@@ -22281,22 +22281,22 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved, replyTo, onRe
       React.createElement("div", { style: { display: "flex", border: `1px solid ${C.border}`, borderRadius: "100px", overflow: "hidden" } },
         React.createElement("button", {
           onClick: () => setFormat("free"),
-          style: { padding: "5px 12px", border: "none", background: format === "free" ? C.text : "transparent", color: format === "free" ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+          style: { padding: "5px 12px", border: "none", background: format === "free" ? C.text : "transparent", color: format === "free" ? C.bg : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
         }, "자유 작성"),
         React.createElement("button", {
           onClick: () => setFormat("structured"),
-          style: { padding: "5px 12px", border: "none", background: format === "structured" ? C.text : "transparent", color: format === "structured" ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
+          style: { padding: "5px 12px", border: "none", background: format === "structured" ? C.text : "transparent", color: format === "structured" ? C.bg : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT }
         }, "구조화")
       )
     ),
     format === "structured"
       ? React.createElement(React.Fragment, null,
           React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.success, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, "잘한 점"),
-          React.createElement("textarea", { value: wentWell, onChange: e => setWentWell(e.target.value), placeholder: "이번 수업에서 특별히 잘한 점…", rows: 2, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } }),
+          React.createElement("textarea", { value: wentWell, onChange: e => setWentWell(e.target.value), placeholder: "이번 수업에서 특별히 잘한 점…", rows: 2, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, background: C.bg, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } }),
           React.createElement("div", { style: { fontSize: "10px", fontWeight: "700", color: C.gold, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" } }, "연습할 점"),
-          React.createElement("textarea", { value: workOn, onChange: e => setWorkOn(e.target.value), placeholder: "다음에 연습해볼 점…", rows: 2, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } })
+          React.createElement("textarea", { value: workOn, onChange: e => setWorkOn(e.target.value), placeholder: "다음에 연습해볼 점…", rows: 2, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, background: C.bg, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } })
         )
-      : React.createElement("textarea", { value: text, onChange: e => setText(e.target.value), placeholder: "이 학생에게 남기고 싶은 메모를 자유롭게 적어주세요…", rows: 4, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } }),
+      : React.createElement("textarea", { value: text, onChange: e => setText(e.target.value), placeholder: "이 학생에게 남기고 싶은 메모를 자유롭게 적어주세요…", rows: 4, style: { width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize: "13px", fontFamily: FONT, background: C.bg, color: C.text, resize: "vertical", marginBottom: "10px", boxSizing: "border-box" } }),
     React.createElement("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" } },
       React.createElement("button", {
         onClick: handleAIDraftFromText, disabled: generating || (format === "structured" ? !(wentWell.trim() || workOn.trim()) : !text.trim()),
@@ -22307,7 +22307,7 @@ function SessionNoteComposer({ student, teacher, showMsg, onSaved, replyTo, onRe
         style: { padding: "6px 12px", borderRadius: "100px", border: `1px solid ${C.goldBorder}`, background: C.goldBg, color: C.gold, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, opacity: generating ? 0.5 : 1 }
       }, generating ? "변환 중…" : "🎙→✨ 음성으로 초안")
     ),
-    React.createElement("div", { style: { background: "#F7F8FA", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "12px" } },
+    React.createElement("div", { style: { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "12px" } },
       React.createElement("div", { style: { fontSize: "11px", color: C.textMid, flexShrink: 0, fontWeight: "600" } }, "🎙 음성 메모"),
       React.createElement(RecordButton, { isRec: rec.isRec, time: rec.time, onStart: rec.start, onStop: rec.stop, idleLabel: "녹음", size: "sm" }),
       audioUrl && React.createElement("div", { style: { flex: 1, fontSize: "11px", color: C.textMid, display: "flex", alignItems: "center", gap: "6px" } },
@@ -22391,7 +22391,7 @@ function StudentFeedbackComposer({ user, onClose, onSent }) {
     }
   };
 
-  const sheetStyle = { background: "#fff", width: "100%", maxWidth: "520px", maxHeight: "88vh", borderRadius: "24px 24px 0 0", padding: "10px 22px calc(28px + env(safe-area-inset-bottom)) 22px", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "noteSheetUp 400ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT };
+  const sheetStyle = { background: C.bg, width: "100%", maxWidth: "520px", maxHeight: "88vh", borderRadius: "24px 24px 0 0", padding: "10px 22px calc(28px + env(safe-area-inset-bottom)) 22px", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", animation: "noteSheetUp 400ms cubic-bezier(0.16,1,0.3,1)", fontFamily: FONT };
 
   return ReactDOM.createPortal(
     React.createElement("div", {
@@ -22424,7 +22424,7 @@ function StudentFeedbackComposer({ user, onClose, onSent }) {
               React.createElement("textarea", {
                 value: text, onChange: e => setText(e.target.value),
                 placeholder: "여기에 적어주세요…", rows: 4,
-                style: { width: "100%", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FONT, color: C.text, resize: "vertical", boxSizing: "border-box", marginBottom: "12px", outline: "none" }
+                style: { width: "100%", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, fontSize: "14px", fontFamily: FONT, background: C.bg, color: C.text, resize: "vertical", boxSizing: "border-box", marginBottom: "12px", outline: "none" }
               }),
               // Voice
               React.createElement("div", { style: { background: "#F7F8FA", border: `1px solid ${C.border}`, borderRadius: "12px", padding: "12px 14px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "12px" } },
@@ -22598,7 +22598,7 @@ function StudentNotesInbox({ students, showMsg, onChanged, onReplyTo }) {
     React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "16px" } },
       [["all", `All (${notes.length})`], ["unseen", `New (${unseenCount})`]].map(([id, label]) =>
         React.createElement("button", { key: id, onClick: () => setFilter(id),
-          style: { padding: "5px 12px", borderRadius: "100px", border: `1.5px solid ${filter === id ? C.text : C.border}`, background: filter === id ? C.text : "transparent", color: filter === id ? "#fff" : C.textMid, fontSize: "12px", fontWeight: filter === id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
+          style: { padding: "5px 12px", borderRadius: "100px", border: `1.5px solid ${filter === id ? C.text : C.border}`, background: filter === id ? C.text : "transparent", color: filter === id ? C.bg : C.textMid, fontSize: "12px", fontWeight: filter === id ? "700" : "400", cursor: "pointer", fontFamily: FONT }
         }, label)
       )
     ),
@@ -22658,7 +22658,7 @@ function ModeSheetV3({ onClose, onPick }) {
       style: { background: T3.card, borderRadius: "28px 28px 0 0", padding: "12px 20px 44px", width: "100%", maxWidth: "500px", boxShadow: "0 -12px 40px rgba(11,31,58,0.25)", fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "14px", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)" },
       onClick: e => e.stopPropagation(),
     },
-      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: "rgba(22,24,29,0.15)", alignSelf: "center" } }),
+      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: T3.ink3, alignSelf: "center" } }),
       // Header — Wavi + framing line
       React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "12px", padding: "4px 4px 0" } },
         React.createElement("div", { style: { width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", border: "2px solid rgba(11,31,58,0.12)", flexShrink: 0 } },
@@ -22742,7 +22742,7 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
   }
 
   const STATUS = {
-    new:     { label: "접수됨",     color: T3.ink2,  bg: "rgba(22,24,29,0.06)" },
+    new:     { label: "접수됨",     color: T3.ink2,  bg: T3.hairline },
     planned: { label: "수업에 반영", color: T3.wave,  bg: T3.waveSoft },
     covered: { label: "완료",       color: T3.green, bg: T3.greenSoft },
   };
@@ -22775,7 +22775,7 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
       style: { background: T3.card, borderRadius: "28px 28px 0 0", padding: "12px 20px 44px", width: "100%", maxWidth: "500px", maxHeight: "88vh", overflowY: "auto", WebkitOverflowScrolling: "touch", boxShadow: "0 -12px 40px rgba(11,31,58,0.25)", fontFamily: FONT_V3, display: "flex", flexDirection: "column", gap: "14px", animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1)" },
       onClick: e => e.stopPropagation(),
     },
-      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: "rgba(22,24,29,0.15)", alignSelf: "center" } }),
+      React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: T3.ink3, alignSelf: "center" } }),
       React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "3px", padding: "4px 4px 0" } },
         React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: T3.ink } }, "다음 수업에서 배우고 싶은 게 있어요?"),
         React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, countdown || "여러 개 보내도 좋아요 — Toms가 하나씩 확인해요.")
@@ -22802,7 +22802,7 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
         style: { width: "100%", background: T3.bgGrouped, border: "none", borderRadius: "16px", padding: "14px 16px", fontSize: "15px", color: T3.ink, fontFamily: FONT_V3, outline: "none", resize: "none", lineHeight: 1.5 },
       }),
       React.createElement("button", { onClick: send, disabled: !text.trim() || sending,
-        style: { width: "100%", background: text.trim() ? T3.wave : "rgba(22,24,29,0.12)", color: "#fff", fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", border: "none", cursor: text.trim() ? "pointer" : "default", fontFamily: FONT_V3 } }, sending ? "보내는 중…" : (myRequests.length > 0 ? "하나 더 보내기" : "보내기")),
+        style: { width: "100%", background: text.trim() ? T3.wave : T3.hairline, color: "#fff", fontSize: "15px", fontWeight: "800", padding: "15px 0", borderRadius: "100px", border: "none", cursor: text.trim() ? "pointer" : "default", fontFamily: FONT_V3 } }, sending ? "보내는 중…" : (myRequests.length > 0 ? "하나 더 보내기" : "보내기")),
       React.createElement("button", { onClick: onClose, style: { textAlign: "center", fontSize: "14px", fontWeight: "700", color: T3.ink2, background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT_V3 } }, "닫기")
     )
   );
@@ -23862,7 +23862,7 @@ function FontSizeToggle({ fontSize, setFontSize }) {
   return React.createElement("div", { ref, style: { position: "relative" } },
     React.createElement("button", {
       onClick: () => setOpen(o => !o),
-      style: { width: "32px", height: "32px", borderRadius: "50%", background: fontSize !== "default" ? C.text : C.bgSoft, border: `1px solid ${fontSize !== "default" ? C.text : C.border}`, color: fontSize !== "default" ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }
+      style: { width: "32px", height: "32px", borderRadius: "50%", background: fontSize !== "default" ? C.text : C.bgSoft, border: `1px solid ${fontSize !== "default" ? C.text : C.border}`, color: fontSize !== "default" ? C.bg : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }
     }, "Aa"),
     open && React.createElement("div", {
       style: { position: "absolute", top: "38px", right: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "6px", minWidth: "140px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 100, animation: "fadeIn 0.15s ease" }
