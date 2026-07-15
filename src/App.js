@@ -20369,10 +20369,13 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("unresolved");
   const [resolving, setResolving] = useState({});
-  const [section, setSection] = useState("messages"); // messages | requests
+  const [section, setSection] = useState("messages"); // messages | requests | thursday
   const [requests, setRequests] = useState([]); // 다음 수업 리퀘스트 (class_requests)
   const [reqLoading, setReqLoading] = useState(true);
   const [advancing, setAdvancing] = useState({});
+  const [thursday, setThursday] = useState([]); // recent public qod_responses + their teacher comment
+  const [thuLoading, setThuLoading] = useState(true);
+  const [thuRefresh, setThuRefresh] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -20386,6 +20389,21 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
       setReqLoading(false);
     })();
   }, []);
+
+  // Thursday answers (public, recent) + which have a teacher comment. Reloads after a save.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cutoff = new Date(Date.now() - 21 * 86400000).toISOString();
+      const resp = await db.get("qod_responses", `is_private=eq.false&created_at=gte.${cutoff}&order=created_at.desc&limit=100`).catch(() => []);
+      const ids = (resp || []).map(r => r.id);
+      let comments = [];
+      if (ids.length) comments = await db.get("qod_comments", `response_id=in.(${ids.join(",")})&select=*`).catch(() => []);
+      const cmap = {}; (comments || []).forEach(c => { cmap[c.response_id] = c; });
+      if (!cancelled) { setThursday((resp || []).map(r => ({ ...r, comment: cmap[r.id] || null }))); setThuLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [thuRefresh]);
 
   // Advance a request's status: new → planned (수업에 반영) → covered (완료). Setting
   // covered is what surfaces "반영됐어요" on the student's home. Reversible.
@@ -20507,16 +20525,47 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
             )
       );
 
+  const thuAwaiting = thursday.filter(r => !(r.comment && (r.comment.teacher_text || "").trim())).length;
+  const thursdayView = thuLoading
+    ? React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner))
+    : React.createElement(React.Fragment, null,
+        React.createElement("div", { style: { marginBottom: "16px" } },
+          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: C.textLight, letterSpacing: "2px", textTransform: "uppercase" } }, "Thankful Thursday"),
+          React.createElement("div", { style: { fontSize: "13px", color: C.textMid, marginTop: "2px" } }, `${thuAwaiting} \uB313\uAE00 \uB300\uAE30 \u00B7 ${thursday.length} total`),
+          React.createElement("div", { style: { fontSize: "11px", color: C.textLight, marginTop: "4px" } }, "\uD559\uC0DD \uB2F5\uBCC0\uC5D0 \uB313\uAE00\uC744 \uB0A8\uAE30\uBA74 \uD559\uC0DD \uD654\uBA74\uC5D0 \uD45C\uC2DC\uB3FC\uC694.")
+        ),
+        thursday.length === 0
+          ? React.createElement("div", { style: { textAlign: "center", padding: "40px 20px", color: C.textLight, fontSize: "14px" } }, "\uC544\uC9C1 \uB2F5\uBCC0\uC774 \uC5C6\uC5B4\uC694")
+          : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } },
+              thursday.map(r => {
+                const stu = students.find(s => s.id === r.student_id);
+                const needs = !(r.comment && (r.comment.teacher_text || "").trim());
+                return React.createElement("div", { key: r.id, style: { border: `1px solid ${needs ? "#2563EB40" : C.border}`, borderLeft: `3px solid ${needs ? "#2563EB" : C.border}`, borderRadius: "12px", padding: "14px 16px", background: needs ? "#2563EB08" : C.bg } },
+                  React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" } },
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+                      React.createElement("span", { style: { fontSize: "13px", fontWeight: "700", color: C.text } }, r.nickname || stu?.name || "Student"),
+                      React.createElement("span", { style: { fontSize: "10px", fontWeight: "700", color: needs ? "#2563EB" : C.success, background: needs ? "#2563EB15" : C.successBg, padding: "2px 8px", borderRadius: "100px" } }, needs ? "\uB313\uAE00 \uB300\uAE30" : "\uB313\uAE00 \uC644\uB8CC \u2713")
+                    ),
+                    React.createElement("div", { style: { fontSize: "11px", color: C.textLight } }, new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }))
+                  ),
+                  r.transcript && React.createElement("div", { style: { fontSize: "14px", color: C.text, lineHeight: 1.6, marginBottom: r.audio_url ? "8px" : "10px", fontStyle: "italic" } }, `"${r.transcript}"`),
+                  r.audio_url && React.createElement("div", { style: { marginBottom: "10px" } }, React.createElement(RichAudioPlayer, { src: r.audio_url, label: "\uB4E3\uAE30" })),
+                  React.createElement(TeacherCommentBox, { responseId: r.id, existingComment: r.comment, transcript: r.transcript || "", question: THANKFUL_THURSDAY_PROMPT, studentName: r.nickname || stu?.name, skillLevel: stu?.skill_level || "beginner", onSaved: () => { setThuRefresh(k => k + 1); onReply && onReply(); } })
+                );
+              })
+            )
+      );
+
   return React.createElement("div", null,
-    // Section segment \u2014 \uBA54\uC2DC\uC9C0 (student_messages) / \uB9AC\uD018\uC2A4\uD2B8 (class_requests)
-    React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "16px" } },
-      [["messages", `\uBA54\uC2DC\uC9C0${unresolvedCount > 0 ? ` (${unresolvedCount})` : ""}`], ["requests", `\uB9AC\uD018\uC2A4\uD2B8${newReqCount > 0 ? ` (${newReqCount})` : ""}`]].map(([id, label]) =>
+    // Section segment \u2014 \uBA54\uC2DC\uC9C0 (student_messages) / \uB9AC\uD018\uC2A4\uD2B8 (class_requests) / Thursday (qod_comments)
+    React.createElement("div", { style: { display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" } },
+      [["messages", `\uBA54\uC2DC\uC9C0${unresolvedCount > 0 ? ` (${unresolvedCount})` : ""}`], ["requests", `\uB9AC\uD018\uC2A4\uD2B8${newReqCount > 0 ? ` (${newReqCount})` : ""}`], ["thursday", `Thursday${thuAwaiting > 0 ? ` (${thuAwaiting})` : ""}`]].map(([id, label]) =>
         React.createElement("button", { key: id, onClick: () => setSection(id),
-          style: { padding: "7px 16px", borderRadius: "100px", border: `1.5px solid ${section === id ? C.text : C.border}`, background: section === id ? C.text : "transparent", color: section === id ? "#fff" : C.textMid, fontSize: "13px", fontWeight: section === id ? "700" : "500", cursor: "pointer", fontFamily: FONT }
+          style: { padding: "7px 16px", borderRadius: "100px", border: `1.5px solid ${section === id ? C.text : C.border}`, background: section === id ? C.text : "transparent", color: section === id ? C.bg : C.textMid, fontSize: "13px", fontWeight: section === id ? "700" : "500", cursor: "pointer", fontFamily: FONT }
         }, label)
       )
     ),
-    section === "messages" ? messagesView : requestsView
+    section === "messages" ? messagesView : section === "requests" ? requestsView : thursdayView
   );
 }
 
