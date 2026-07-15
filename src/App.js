@@ -73,6 +73,27 @@ async function subscribeToPush(studentId) {
   }
 }
 
+// Honest OFF: notify.js broadcasts to the "wayve-qod" topic (not stored tokens), so the
+// only way to actually stop delivery is to leave that topic. deleteToken() invalidates the
+// device's FCM registration token, which removes it from every topic. We also null the
+// stored push_token for housekeeping. Turning notifications back on re-subscribes via
+// subscribeToPush (fresh token → re-joins the topic).
+async function unsubscribeFromPush(studentId) {
+  try {
+    await db.update("students", `id=eq.${studentId}`, { push_token: null }).catch(() => {});
+    if (!("serviceWorker" in navigator)) return;
+    const [{ initializeApp, getApps }, { getMessaging, deleteToken }] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js"),
+    ]);
+    const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+    const messaging = getMessaging(app);
+    await deleteToken(messaging).catch(() => {});
+  } catch (e) {
+    console.error("Push unsubscribe error:", e);
+  }
+}
+
 // Checks current notification permission state without prompting
 function getNotificationPermission() {
   if (!("Notification" in window)) return "unsupported";
@@ -16759,11 +16780,10 @@ function QodEntryScreen({ user, group, onEnter, lang = "ko", showTourOverlay = f
 function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, onClose, onSave, onLogout, onOpenTeacher, onRestartTour, showTourNotifSpotlight = false, dark = false, onToggleTheme = () => {} }) {
   const [showFullEdit, setShowFullEdit] = useState(false);
   const [enabling, setEnabling] = useState(false);
-  // 알림 — a persisted on/off preference (localStorage) so the toggle actually slides and
-  // sticks. Turning it ON requests browser permission + subscribes (a real effect); OFF
-  // records the preference. NOTE: a *server-honored* OFF (stop the daily push) would need a
-  // students.push_enabled column checked by the edge function — not added here (no unprompted
-  // schema change). Flagged in the summary.
+  // 알림 — a persisted on/off preference (localStorage) so the toggle slides and sticks.
+  // ON requests browser permission + subscribes to the wayve-qod topic; OFF is now honored
+  // for real — unsubscribeFromPush deletes the FCM token so the device leaves the topic and
+  // notify.js broadcasts stop reaching it. No server column / edge-function change needed.
   const [notifPref, setNotifPref] = useState(() => {
     try {
       const stored = localStorage.getItem(`wayve_notif_pref_${user?.id}`);
@@ -16797,8 +16817,12 @@ function ProfileSheetV3({ user, group, lang, fontSize, setFontSize, isTeacher, o
       setNotifPref(true);
       try { localStorage.setItem(`wayve_notif_pref_${user.id}`, "on"); } catch(e) {}
     } else {
-      setNotifPref(false);
+      // Honor OFF for real: leave the wayve-qod topic so broadcasts stop reaching this device.
+      setEnabling(true);
+      setNotifPref(false); // optimistic — flip the toggle immediately
       try { localStorage.setItem(`wayve_notif_pref_${user.id}`, "off"); } catch(e) {}
+      await unsubscribeFromPush(user.id);
+      setEnabling(false);
     }
   };
 
