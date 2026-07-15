@@ -22576,6 +22576,7 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
   const [sending, setSending] = useState(false);
   const [justSent, setJustSent] = useState(false); // brief inline confirmation after a send
   const [myRequests, setMyRequests] = useState([]); // this student's previous requests
+  const [nextSess, setNextSess] = useState(null); // soonest upcoming class from group_schedule
 
   // Load this student's request history (newest first). Fails soft if the table
   // isn't migrated yet → empty list, composer still works.
@@ -22589,13 +22590,38 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  // "N일 남음" until the group's session day, when known (nullable → omitted).
+  // Next class from the group's weekly schedule (source of truth); falls back to the
+  // legacy single session_day column when no schedule rows exist.
+  useEffect(() => {
+    if (!group?.id) return;
+    let cancelled = false;
+    (async () => {
+      const slots = await db.get("group_schedule", `group_id=eq.${group.id}&select=day_of_week,start_time`).catch(() => []);
+      if (cancelled) return;
+      const now = new Date();
+      let best = null;
+      (slots || []).forEach(slot => {
+        let diff = (slot.day_of_week - now.getDay() + 7) % 7;
+        const [h, m] = String(slot.start_time || "00:00").split(":").map(Number);
+        if (diff === 0) { const st = new Date(now); st.setHours(h || 0, m || 0, 0, 0); if (now >= st) diff = 7; }
+        if (best === null || diff < best.diff) best = { diff, day: slot.day_of_week };
+      });
+      if (best === null && typeof group.session_day === "number") {
+        best = { diff: ((group.session_day - now.getDay()) % 7 + 7) % 7 || 7, day: group.session_day };
+      }
+      setNextSess(best);
+    })();
+    return () => { cancelled = true; };
+  }, [group?.id, group?.session_day]);
+
+  // "N일 남음" until the next class (nullable → omitted).
   let countdown = null;
-  if (typeof group?.session_day === "number") {
-    const today = new Date().getDay();
-    const diff = ((group.session_day - today) % 7 + 7) % 7 || 7;
+  if (nextSess) {
     const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-    countdown = `${dayNames[group.session_day]}요일 수업까지 ${diff}일 — 지금 보내면 이번 수업에 반영돼요.`;
+    const d = nextSess.diff === 0 ? "오늘" : `${dayNames[nextSess.day]}요일`;
+    countdown = nextSess.diff === 0
+      ? "오늘 수업이에요 — 지금 보내면 반영돼요."
+      : `${d} 수업까지 ${nextSess.diff}일 — 지금 보내면 이번 수업에 반영돼요.`;
   }
 
   const STATUS = {

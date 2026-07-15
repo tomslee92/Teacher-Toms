@@ -52,8 +52,15 @@ Locked spec: `TEACHER_DASHBOARD_REDESIGN.md`. Built behind `TEACHER_DASH_V3`.
 - **Teacher dashboard:** already on (`TEACHER_DASH_V3 = true`); flip to `false` to revert to the legacy dashboard.
 - **Before student rollout:** bump `ONBOARDING_VERSION` (re-shows the tour), decide ⑧ Login, and validate scenarios before flipping `SCENARIOS_STUDENT_ENABLED`.
 
-## Open decisions for you
-1. ⑧ Login — restyle for everyone (can't gate), or leave legacy?
-2. `SCENARIOS_STUDENT_ENABLED` — flip after real-session validation (unlocks ⑩⑪ curated scenarios + ⑪ player work).
-3. ㉒㉓ Scenario Builder redesign — do alongside the Groq migration?
-4. Populate `group_schedule` (per group) so the teacher pulse's next/last-session logic + the student "N일 남음" line light up.
+## Decisions (resolved 2026-07-15)
+1. ⑧ Login — **leave legacy** (not restyled). ✅ decided.
+2. ⑪ Shadowing player — **leave as-is** for now. ✅ decided.
+3. ㉒㉓ Scenario Builder — **do together with the Groq migration** (`llama-*` → `openai/gpt-oss-*`). ▶ queued.
+4. ㉗㉘ teacher list / phrase management — **pixel-restyle**. ▶ queued.
+5. Student "N일 남음" countdown — now reads `group_schedule` (falls back to `groups.session_day`). ✅ done. Populate schedules via Setup → Groups to light it up.
+
+## Still open
+- `SCENARIOS_STUDENT_ENABLED` — flip after real-session validation (unlocks ⑩ rollout + ⑪ player).
+- ③ in-session Wavi listening — pending your OK to restyle (drop message list → last line + persistent 다시 듣기/건너뛰기), with a manual session test.
+- 알림 server-honored OFF (a `students.push_enabled` column) — add, or leave enable-only?
+- Student rollout: flip `redesign_v3_enabled` per student + bump `ONBOARDING_VERSION` at go-live.
