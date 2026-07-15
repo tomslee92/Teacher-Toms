@@ -39,9 +39,9 @@ Locked spec: `TEACHER_DASHBOARD_REDESIGN.md`. Built behind `TEACHER_DASH_V3`.
 | ⑰ Student detail | ✅ + 출석 기록 log + their 리퀘스트 |
 | ⑳ Inbox | ✅ 메시지 / 리퀘스트 / **Thursday** segments |
 | Teacher dark mode | ✅ 🌙 toggle in top bar; whole dashboard darkens |
-| Students **list** status chips | ⬜ deferred (would duplicate the Today pulse fetch — small follow) |
-| ㉗ Students list (full mockup restyle) | ⬜ functional; not restyled to the mockup |
-| ㉘ Phrase management (full mockup restyle) | ⬜ functional (AddPhrasesTab); not restyled |
+| Students **list** status chips | ✅ pulse dot (🟢/🟡/🔴/⚪️) + 이번 주 N분 on every TeacherStudentsTab row |
+| ㉗ Students list | ✅ v3 card list + pulse dots (chose the pulse-dot pass over a full re-layout) |
+| ㉘ Phrase management | ✅ header + card polish (AddPhrasesTab); functional internals left intact |
 | ㉒㉓ Scenario Builder | ⬜ exists (Groq); **not** redesigned — tied to the Groq `openai/gpt-oss-*` migration workstream (deadline Aug 16 2026) |
 
 ## Migrations run in Supabase
