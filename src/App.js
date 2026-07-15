@@ -10822,37 +10822,73 @@ function GroupScheduleEditor({ group, showMsg }) {
   );
 }
 
+// Most recent past-or-today scheduled session date for a set of group_schedule slots.
+// Returns "YYYY-MM-DD" or null when there are no slots. Mirrors TeacherTodayV3's
+// lastSessionFor so attendance always lands on the same date the pulse reads.
+function lastScheduledSessionDate(slots, now = new Date()) {
+  const pad = n => String(n).padStart(2, "0");
+  let best = null;
+  (slots || []).forEach(slot => {
+    let diff = (now.getDay() - slot.day_of_week + 7) % 7;
+    if (diff === 0) {
+      const [h, m] = String(slot.start_time || "00:00").split(":").map(Number);
+      const st = new Date(now); st.setHours(h || 0, m || 0, 0, 0);
+      if (now < st) diff = 7;
+    }
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+    if (!best || d > best) best = d;
+  });
+  return best ? `${best.getFullYear()}-${pad(best.getMonth() + 1)}-${pad(best.getDate())}` : null;
+}
+
 // ── Session wrap-up (teacher dashboard redesign, step 2) ───────────────────────
 // The post-session moment: mark who attended + jump to phrase-add. Attendance is the
 // new pulse signal → written to the attendance table (delete+insert per group+date, so
 // re-opening edits the same session). Defaults everyone to attended; tap to mark absent.
+// sessionDate may be pinned by the caller (Today wrap card already knows the date);
+// otherwise it's resolved from the group's schedule so the date matches the pulse.
 function SessionWrapUp({ group, students, sessionDate, onClose, onAddPhrases, showMsg }) {
   const gs = students.filter(s => s.group_id === group.id);
   const [attended, setAttended] = useState(null); // null = loading; else { [id]: bool }
   const [saving, setSaving] = useState(false);
+  const [resolvedDate, setResolvedDate] = useState(sessionDate || null);
 
+  // Resolve the effective session date: use the caller's explicit date, else the
+  // group's most recent scheduled session (falling back to today if no schedule).
   useEffect(() => {
+    if (sessionDate) { setResolvedDate(sessionDate); return; }
     let cancelled = false;
     (async () => {
-      const rows = await db.get("attendance", `group_id=eq.${group.id}&session_date=eq.${sessionDate}&select=student_id,attended`).catch(() => []);
+      const slots = await db.get("group_schedule", `group_id=eq.${group.id}&select=day_of_week,start_time`).catch(() => []);
+      if (!cancelled) setResolvedDate(lastScheduledSessionDate(slots) || localToday());
+    })();
+    return () => { cancelled = true; };
+  }, [group.id, sessionDate]);
+
+  useEffect(() => {
+    if (!resolvedDate) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await db.get("attendance", `group_id=eq.${group.id}&session_date=eq.${resolvedDate}&select=student_id,attended`).catch(() => []);
       const m = {};
       gs.forEach(s => { m[s.id] = true; }); // default: everyone attended
       (rows || []).forEach(r => { if (r.student_id in m) m[r.student_id] = !!r.attended; });
       if (!cancelled) setAttended(m);
     })();
     return () => { cancelled = true; };
-  }, [group.id, sessionDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [group.id, resolvedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (id) => setAttended(prev => ({ ...prev, [id]: !prev[id] }));
 
   const save = async () => {
-    if (saving || !attended) return;
+    if (saving || !attended || !resolvedDate) return;
     setSaving(true);
     try {
-      // Replace this session's rows wholesale so re-wrapping is idempotent.
-      await db.delete("attendance", `group_id=eq.${group.id}&session_date=eq.${sessionDate}`).catch(() => {});
-      const rows = gs.map(s => ({ student_id: s.id, group_id: group.id, session_date: sessionDate, attended: !!attended[s.id] }));
-      if (rows.length) await db.insert("attendance", rows);
+      // Single atomic upsert on the (student_id, session_date) unique constraint — re-wrapping
+      // edits the same rows in place. (Previously a delete+insert, which could wipe attendance
+      // if the network dropped between the two calls.)
+      const rows = gs.map(s => ({ student_id: s.id, group_id: group.id, session_date: resolvedDate, attended: !!attended[s.id] }));
+      if (rows.length) await db.upsert("attendance?on_conflict=student_id,session_date", rows);
       showMsg && showMsg("✓ 출석 저장됨");
       onClose();
     } catch(e) { showMsg && showMsg("Error: " + (e?.message || "저장 실패"), "error"); setSaving(false); }
@@ -10865,7 +10901,7 @@ function SessionWrapUp({ group, students, sessionDate, onClose, onAddPhrases, sh
       <div onClick={e => e.stopPropagation()} style={{ background: C.bgCard, width: "100%", maxWidth: "480px", borderRadius: "24px 24px 0 0", padding: "10px 20px calc(20px + env(safe-area-inset-bottom))", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ width: 40, height: 4, borderRadius: 100, background: C.border, margin: "4px auto 14px" }} />
         <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{group.name} 수업 정리</div>
-        <div style={{ fontSize: 12, color: C.textLight, marginBottom: 16 }}>{sessionDate}</div>
+        <div style={{ fontSize: 12, color: C.textLight, marginBottom: 16 }}>{resolvedDate || "…"}</div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>출석 · {attendedCount}/{gs.length}</div>
         {attended === null
@@ -11045,7 +11081,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, onAddP
       </Card>
       </div>
       )}
-      {wrapUpGroup && React.createElement(SessionWrapUp, { group: wrapUpGroup, students, sessionDate: localToday(), onClose: () => setWrapUpGroup(null), onAddPhrases, showMsg })}
+      {wrapUpGroup && React.createElement(SessionWrapUp, { group: wrapUpGroup, students, sessionDate: null, onClose: () => setWrapUpGroup(null), onAddPhrases, showMsg })}
     </div>
   );
 }
