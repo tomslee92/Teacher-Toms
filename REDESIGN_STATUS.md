@@ -38,7 +38,8 @@ Locked spec: `TEACHER_DASHBOARD_REDESIGN.md`. Built behind `TEACHER_DASH_V3`.
 | ⑯ Today — pulse | ✅ TeacherTodayV3 (context card · 내가 할 일 · 학생 현황 from attendance+minutes) |
 | ⑰ Student detail | ✅ + 출석 기록 log + their 리퀘스트 |
 | ⑳ Inbox | ✅ 메시지 / 리퀘스트 / **Thursday** segments |
-| Teacher dark mode | ✅ 🌙 toggle in top bar; whole dashboard darkens |
+| Teacher nav chrome (IA) | ✅ collapsed to Today · Students · Inbox (segmented pill on mobile, grouped sidebar on desktop); Notes / AI Tools / Setup moved behind a header ⚙ menu; 🔔 unread bell |
+| Teacher dark mode | ✅ 🌙 toggle (now inside the ⚙ menu on mobile); whole dashboard darkens |
 | Students **list** status chips | ✅ pulse dot (🟢/🟡/🔴/⚪️) + 이번 주 N분 on every TeacherStudentsTab row |
 | ㉗ Students list | ✅ v3 card list + pulse dots (chose the pulse-dot pass over a full re-layout) |
 | ㉘ Phrase management | ✅ header + card polish (AddPhrasesTab); functional internals left intact |

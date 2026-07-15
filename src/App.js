@@ -7892,6 +7892,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     return () => { document.body.style.background = prevBg; document.body.style.color = prevCol; };
   }, [teacherDark]);
   const [tab, setTab] = useState("today");
+  const [moreOpen, setMoreOpen] = useState(false); // v3 ⚙ menu (secondary nav items)
   const [students, setStudents] = useState([]);
   const [phraseBank, setPhraseBank] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -7968,26 +7969,41 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     { id: "setup", label: "Setup", icon: "⚙️" },
   ];
 
+  // v3 IA (spec): primary nav is Today · Students · Inbox; everything not-daily
+  // (Notes, AI Tools, Setup) relocates behind a header ⚙ menu.
+  const V3_PRIMARY_IDS = ["today", "students", "inbox"];
+  const primaryTabs = TEACHER_DASH_V3 ? TABS.filter(t => V3_PRIMARY_IDS.includes(t.id)) : TABS;
+  const moreTabs = TEACHER_DASH_V3 ? TABS.filter(t => !V3_PRIMARY_IDS.includes(t.id)) : [];
+  const bellCount = (inboxUnread || 0) + (notesUnread || 0);
+  const goTab = (id) => { setTab(id); setSelectedStudent(null); setMoreOpen(false); };
+  const menuItemStyle = { display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", borderRadius: "10px", border: "none", background: "transparent", cursor: "pointer", fontFamily: FONT, fontSize: "13px", color: C.text, width: "100%" };
+
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 768;
 
+  const sidebarBtn = (t, secondary = false) => (
+    <button key={t.id} onClick={() => goTab(t.id)}
+      style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: tab === t.id ? C.bgSoft : "transparent", border: "none", borderRadius: "10px", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", justifyContent: "flex-start", transition: "all 0.15s", position: "relative", opacity: secondary && tab !== t.id ? 0.72 : 1 }}>
+      <span style={{ fontSize: "16px" }}>{t.icon}</span>
+      <span style={{ fontSize: "13px", fontWeight: tab === t.id ? "700" : "500", color: tab === t.id ? C.text : C.textMid }}>{t.label}</span>
+      {t.badge > 0 && React.createElement("span", { style: { position: "absolute", top: "6px", right: "8px", background: C.error, color: "#fff", fontSize: "10px", fontWeight: "800", borderRadius: "100px", padding: "1px 5px", minWidth: "16px", textAlign: "center", lineHeight: "16px" } }, t.badge)}
+    </button>
+  );
+
   const navContent = (
-    <div style={{ display: "flex", flexDirection: isDesktop ? "column" : "row", gap: isDesktop ? "2px" : "0", padding: isDesktop ? "8px" : "0" }}>
-      {TABS.map(t => (
-        <button key={t.id} onClick={() => { setTab(t.id); setSelectedStudent(null); }}
-          style={{ display: "flex", alignItems: "center", gap: isDesktop ? "10px" : "6px", padding: isDesktop ? "10px 14px" : "10px 0", background: tab === t.id ? (isDesktop ? C.bgSoft : "transparent") : "transparent", border: "none", borderBottom: !isDesktop ? (tab === t.id ? `2px solid ${C.text}` : "2px solid transparent") : "none", borderRadius: isDesktop ? "10px" : "0", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", flex: isDesktop ? "none" : 1, justifyContent: isDesktop ? "flex-start" : "center", transition: "all 0.15s", marginBottom: isDesktop ? "0" : "-1px", position: "relative" }}>
-          <span style={{ fontSize: isDesktop ? "16px" : "18px" }}>{t.icon}</span>
-          <span style={{ fontSize: "13px", fontWeight: tab === t.id ? "700" : "500", color: tab === t.id ? C.text : C.textMid }}>{t.label}</span>
-          {t.badge > 0 && React.createElement("span", { style: { position: "absolute", top: isDesktop ? "6px" : "4px", right: isDesktop ? "8px" : "2px", background: C.error, color: "#fff", fontSize: "10px", fontWeight: "800", borderRadius: "100px", padding: "1px 5px", minWidth: "16px", textAlign: "center", lineHeight: "16px" } }, t.badge)}
-        </button>
-      ))}
-      {isDesktop && (
-        <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "6px" }}>
-          {user && TEACHER_NAMES.includes(user.name) && (
-            <button onClick={() => setScreen("student")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", cursor: "pointer", textAlign: "left" }}>← Student View</button>
-          )}
-          <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontFamily: FONT, cursor: "pointer", textAlign: "left" }}>Log out</button>
+    <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "8px" }}>
+      {primaryTabs.map(t => sidebarBtn(t))}
+      {moreTabs.length > 0 && (
+        <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "2px" }}>
+          <div style={{ fontSize: "10px", fontWeight: "700", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", padding: "2px 14px 6px" }}>More</div>
+          {moreTabs.map(t => sidebarBtn(t, true))}
         </div>
       )}
+      <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "6px" }}>
+        {user && TEACHER_NAMES.includes(user.name) && (
+          <button onClick={() => setScreen("student")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMid, padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontFamily: FONT, fontWeight: "500", cursor: "pointer", textAlign: "left" }}>← Student View</button>
+        )}
+        <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontFamily: FONT, cursor: "pointer", textAlign: "left" }}>Log out</button>
+      </div>
     </div>
   );
 
@@ -8021,29 +8037,91 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
         <div>
           {/* Top bar (mobile) */}
           <div className="teacher-topbar" style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px 0" }}>
-              <div>
-                <div style={{ fontSize: "16px", fontWeight: "800", letterSpacing: "4px", textTransform: "uppercase" }}>WAYVE</div>
-                <div style={{ fontSize: "9px", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "500" }}>Teacher Dashboard</div>
-              </div>
-              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                {TEACHER_DASH_V3 && (
-                  <button onClick={toggleTeacherTheme} title="다크 모드" style={{ background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 10px", borderRadius: "100px", fontSize: "13px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>{teacherDark ? "☀️" : "🌙"}</button>
-                )}
-                {user && TEACHER_NAMES.includes(user.name) && (
-                  <button onClick={() => setScreen("student")} style={{ background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 12px", borderRadius: "100px", fontSize: "11px", fontFamily: FONT, cursor: "pointer" }}>← Student</button>
-                )}
-                <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 12px", borderRadius: "100px", fontSize: "11px", fontFamily: FONT, cursor: "pointer" }}>Log out</button>
-              </div>
-            </div>
-            <div style={{ display: "flex", paddingLeft: "16px" }}>
-              {TABS.map(t => (
-                <button key={t.id} onClick={() => { setTab(t.id); setSelectedStudent(null); }}
-                  style={{ padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t.id ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t.id ? C.text : C.textMid, fontSize: "13px", fontWeight: tab === t.id ? "700" : "500", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", display: "flex", alignItems: "center", gap: "5px" }}>
-                  <span>{t.icon}</span> {t.label}
-                </button>
-              ))}
-            </div>
+            {TEACHER_DASH_V3 ? (
+              <React.Fragment>
+                {/* Header: brand + 🔔 + ⚙ */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px" }}>
+                  <div>
+                    <div style={{ fontSize: "15px", fontWeight: "800", letterSpacing: "3px", textTransform: "uppercase", color: C.text }}>WAYVE</div>
+                    <div style={{ fontSize: "9px", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "500" }}>Teacher</div>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center", position: "relative" }}>
+                    <button onClick={() => goTab("inbox")} title="받은 알림"
+                      style={{ position: "relative", background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>
+                      🔔
+                      {bellCount > 0 && <span style={{ position: "absolute", top: "-3px", right: "-3px", background: C.error, color: "#fff", fontSize: "9px", fontWeight: "800", borderRadius: "100px", padding: "1px 5px", minWidth: "15px", textAlign: "center", lineHeight: "15px" }}>{bellCount}</span>}
+                    </button>
+                    <button onClick={() => setMoreOpen(o => !o)} title="설정"
+                      style={{ background: moreOpen ? C.text : C.bgSoft, border: `1px solid ${moreOpen ? C.text : C.border}`, color: moreOpen ? "#fff" : C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>⚙</button>
+                    {moreOpen && (
+                      <React.Fragment>
+                        <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                        <div style={{ position: "absolute", top: "44px", right: 0, zIndex: 50, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "14px", boxShadow: "0 8px 28px rgba(0,0,0,0.18)", padding: "6px", minWidth: "210px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <button onClick={toggleTeacherTheme} style={menuItemStyle}>
+                            <span style={{ fontSize: "16px" }}>{teacherDark ? "☀️" : "🌙"}</span>
+                            <span style={{ flex: 1, textAlign: "left" }}>{teacherDark ? "라이트 모드" : "다크 모드"}</span>
+                          </button>
+                          {moreTabs.map(t => (
+                            <button key={t.id} onClick={() => goTab(t.id)} style={{ ...menuItemStyle, background: tab === t.id ? C.bgSoft : "transparent" }}>
+                              <span style={{ fontSize: "16px" }}>{t.icon}</span>
+                              <span style={{ flex: 1, textAlign: "left", fontWeight: tab === t.id ? "700" : "500" }}>{t.label}</span>
+                              {t.badge > 0 && <span style={{ background: C.error, color: "#fff", fontSize: "10px", fontWeight: "800", borderRadius: "100px", padding: "1px 6px" }}>{t.badge}</span>}
+                            </button>
+                          ))}
+                          <div style={{ height: "1px", background: C.border, margin: "4px 8px" }} />
+                          {user && TEACHER_NAMES.includes(user.name) && (
+                            <button onClick={() => setScreen("student")} style={menuItemStyle}>
+                              <span style={{ fontSize: "16px" }}>👋</span><span style={{ flex: 1, textAlign: "left" }}>← Student View</span>
+                            </button>
+                          )}
+                          <button onClick={() => setScreen("login")} style={menuItemStyle}>
+                            <span style={{ fontSize: "16px" }}>🚪</span><span style={{ flex: 1, textAlign: "left", color: C.textMid }}>Log out</span>
+                          </button>
+                        </div>
+                      </React.Fragment>
+                    )}
+                  </div>
+                </div>
+                {/* Segmented primary nav — Today · Students · Inbox */}
+                <div style={{ padding: "0 16px 12px" }}>
+                  <div style={{ display: "flex", gap: "4px", background: C.bgSoft, borderRadius: "100px", padding: "4px" }}>
+                    {primaryTabs.map(t => {
+                      const active = tab === t.id;
+                      return (
+                        <button key={t.id} onClick={() => goTab(t.id)}
+                          style={{ flex: 1, position: "relative", padding: "8px 0", borderRadius: "100px", border: "none", background: active ? C.bg : "transparent", color: active ? C.text : C.textMid, fontSize: "13px", fontWeight: active ? "800" : "600", fontFamily: FONT, cursor: "pointer", boxShadow: active ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "all 0.15s" }}>
+                          {t.label}
+                          {t.badge > 0 && <span style={{ position: "absolute", top: "3px", right: "10px", background: C.error, color: "#fff", fontSize: "9px", fontWeight: "800", borderRadius: "100px", padding: "0 5px", lineHeight: "14px" }}>{t.badge}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px 0" }}>
+                  <div>
+                    <div style={{ fontSize: "16px", fontWeight: "800", letterSpacing: "4px", textTransform: "uppercase" }}>WAYVE</div>
+                    <div style={{ fontSize: "9px", color: C.textLight, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "500" }}>Teacher Dashboard</div>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    {user && TEACHER_NAMES.includes(user.name) && (
+                      <button onClick={() => setScreen("student")} style={{ background: C.bgSoft, border: `1px solid ${C.border}`, color: C.textMid, padding: "6px 12px", borderRadius: "100px", fontSize: "11px", fontFamily: FONT, cursor: "pointer" }}>← Student</button>
+                    )}
+                    <button onClick={() => setScreen("login")} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textLight, padding: "6px 12px", borderRadius: "100px", fontSize: "11px", fontFamily: FONT, cursor: "pointer" }}>Log out</button>
+                  </div>
+                </div>
+                <div style={{ display: "flex", paddingLeft: "16px" }}>
+                  {TABS.map(t => (
+                    <button key={t.id} onClick={() => { setTab(t.id); setSelectedStudent(null); }}
+                      style={{ padding: "10px 16px", background: "transparent", border: "none", borderBottom: tab === t.id ? `2px solid ${C.text}` : "2px solid transparent", color: tab === t.id ? C.text : C.textMid, fontSize: "13px", fontWeight: tab === t.id ? "700" : "500", cursor: "pointer", fontFamily: FONT, marginBottom: "-1px", display: "flex", alignItems: "center", gap: "5px" }}>
+                      <span>{t.icon}</span> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </React.Fragment>
+            )}
           </div>
 
           {/* Content area */}
