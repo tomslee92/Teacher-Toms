@@ -5825,7 +5825,9 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
       {/* ── Action row — always visible, no separator border ── */}
       <div style={{ padding: "0 16px 12px", display: "flex", gap: "6px", alignItems: "center", flexWrap: "nowrap", overflowX: "auto" }} onClick={e => e.stopPropagation()}>
         <ListenButton text={applyPhraseTokens(phrase.english)} label={" " + T("listen", lang)} variant="plain"
-          style={{ background: newUI ? WAYVE_TOKENS.card : C.bgSoft, border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
+          style={rv3
+            ? { background: WAYVE_TOKENS.wave, border: "1px solid transparent", borderRadius: "100px", padding: "6px 14px", fontSize: "11px", color: "#fff", fontWeight: "700", whiteSpace: "nowrap", flexShrink: 0 }
+            : { background: newUI ? WAYVE_TOKENS.card : C.bgSoft, border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
         <ListenButton text={applyPhraseTokens(phrase.english)} speed={0.6} label={" " + T("listen_slow", lang)} fallbackIcon="🐢" exactSpeed={true} variant="plain"
           style={{ background: newUI ? WAYVE_TOKENS.card : C.bgSoft, border: `1px solid ${newUI ? WAYVE_TOKENS.hairline : C.border}`, borderRadius: "100px", padding: "5px 12px", fontSize: "11px", color: newUI ? WAYVE_TOKENS.ink2 : C.textMid, fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0 }} />
         {/* 🙋🏻 Request for next class */}
