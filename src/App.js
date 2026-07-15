@@ -149,6 +149,11 @@ async function logRateLimitError(context = "", studentName = "") {
 const TEACHER_PASS = "wayve2026";
 const TEACHER_NAMES = ["Toms Lee", "Toms"]; // Names that see the Teacher View button
 
+// Teacher dashboard redesign (pulse-first). When true, the Today tab shows the new
+// TeacherTodayV3 pulse; the other tabs are unchanged. Flip to false to fall back to the
+// legacy Today. Teacher-only surface, so no per-student gating. See TEACHER_DASHBOARD_REDESIGN.md.
+const TEACHER_DASH_V3 = true;
+
 // Session Notes (teacher→student) + Student Feedback (student→teacher) are SHELVED
 // (2026-06). The code, tables, and migrations remain intact — flip this to true to
 // restore every entry point (teacher 💬 Notes tab + per-student composer, the student
@@ -8086,7 +8091,9 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
             )}
 
             {tab === "today" && (
-              <TeacherTodayTab students={students} groups={groups} showMsg={showMsg} onSelectStudent={(s) => { setSelectedStudent(s); setTab("students"); }} />
+              TEACHER_DASH_V3
+                ? <TeacherTodayV3 students={students} groups={groups} showMsg={showMsg} onSelectStudent={(s) => { setSelectedStudent(s); setTab("students"); }} onGoTab={(t) => { setSelectedStudent(null); setTab(t); }} />
+                : <TeacherTodayTab students={students} groups={groups} showMsg={showMsg} onSelectStudent={(s) => { setSelectedStudent(s); setTab("students"); }} />
             )}
 
             {tab === "students" && !selectedStudent && (
@@ -8357,6 +8364,206 @@ function PronunciationTab({ showMsg }) {
 // Engagement pulse: at-a-glance view of student activity. A student is "active"
 // this week if they responded to a QoD OR practiced a phrase in the last 7 days.
 // ── Teacher Today Tab ─────────────────────────────────────────────────────────
+// ── TeacherTodayV3 — pulse-first Today (teacher dashboard redesign, step 3) ─────
+// Answers "how is everyone / who needs me" at a glance. Context card (post-session
+// 정리하기 ↔ next-session prep) · 내가 할 일 (actionable counts) · 이번 주 학생 현황
+// (per-student status from attendance + minutes, sorted attention-first). Behind
+// TEACHER_DASH_V3. See TEACHER_DASHBOARD_REDESIGN.md.
+const TDAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab }) {
+  const [data, setData] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [wrapTarget, setWrapTarget] = useState(null); // { group, date }
+
+  useEffect(() => {
+    let cancelled = false;
+    const pad = n => String(n).padStart(2, "0");
+    const dateStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    (async () => {
+      const now = new Date();
+      const daysFromMon = (now.getDay() + 6) % 7;
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysFromMon);
+      const monStr = dateStr(monday);
+      const cutoff14 = new Date(now.getTime() - 14 * 86400000);
+
+      const [sched, att, segs, reqs, msgs, qodResp] = await Promise.all([
+        db.get("group_schedule", "select=*").catch(() => []),
+        db.get("attendance", `session_date=gte.${dateStr(cutoff14)}&select=student_id,session_date,attended`).catch(() => []),
+        db.get("active_time_segments", `date=gte.${monStr}&select=student_id,seconds`).catch(() => []),
+        db.get("class_requests", "status=eq.new&select=id").catch(() => []),
+        db.get("student_messages", "replied=eq.false&select=id").catch(() => []),
+        db.get("qod_responses", `is_private=eq.false&created_at=gte.${monday.toISOString()}&select=id`).catch(() => []),
+      ]);
+
+      // Thursday answers awaiting a teacher comment (public, this week, no teacher_text comment)
+      let thursday = 0;
+      const respIds = (qodResp || []).map(r => r.id);
+      if (respIds.length) {
+        const comments = await db.get("qod_comments", `response_id=in.(${respIds.join(",")})&select=response_id,teacher_text`).catch(() => []);
+        const done = new Set((comments || []).filter(c => (c.teacher_text || "").trim()).map(c => c.response_id));
+        thursday = respIds.filter(id => !done.has(id)).length;
+      }
+
+      const minBy = {};
+      (segs || []).forEach(x => { minBy[x.student_id] = (minBy[x.student_id] || 0) + (x.seconds || 0); });
+      const slotsByGroup = {};
+      (sched || []).forEach(x => { (slotsByGroup[x.group_id] = slotsByGroup[x.group_id] || []).push(x); });
+      const attMap = {};
+      (att || []).forEach(a => { attMap[`${a.student_id}|${a.session_date}`] = !!a.attended; });
+
+      const lastSessionFor = (groupId) => {
+        let best = null;
+        (slotsByGroup[groupId] || []).forEach(slot => {
+          let diff = (now.getDay() - slot.day_of_week + 7) % 7;
+          if (diff === 0) {
+            const [h, m] = String(slot.start_time || "00:00").split(":").map(Number);
+            const st = new Date(now); st.setHours(h || 0, m || 0, 0, 0);
+            if (now < st) diff = 7;
+          }
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+          if (!best || d > best.date) best = { date: d, slot };
+        });
+        return best;
+      };
+      const nextSessionFor = (groupId) => {
+        let best = null;
+        (slotsByGroup[groupId] || []).forEach(slot => {
+          let diff = (slot.day_of_week - now.getDay() + 7) % 7;
+          const [h, m] = String(slot.start_time || "00:00").split(":").map(Number);
+          if (diff === 0) { const st = new Date(now); st.setHours(h || 0, m || 0, 0, 0); if (now >= st) diff = 7; }
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff); d.setHours(h || 0, m || 0, 0, 0);
+          if (!best || d < best.date) best = { date: d, slot };
+        });
+        return best;
+      };
+
+      const pulse = (students || []).map(s => {
+        const weekMin = Math.floor((minBy[s.id] || 0) / 60);
+        const practiced = weekMin > 0;
+        const last = lastSessionFor(s.group_id);
+        let attended = null, lastStr = null;
+        if (last) { lastStr = dateStr(last.date); const k = `${s.id}|${lastStr}`; attended = k in attMap ? attMap[k] : null; }
+        let daysQuiet = 999;
+        if (s.last_practice) { const lp = new Date(s.last_practice + "T00:00:00"); daysQuiet = Math.floor((now - lp) / 86400000); }
+        let level, note;
+        if (last && attended !== null) {
+          level = (attended && practiced) ? "green" : (!attended && !practiced) ? "red" : "yellow";
+          note = `지난 수업 ${attended ? "✓" : "✗"} · 이번 주 ${weekMin}분`;
+        } else if (last && attended === null) {
+          level = "gray"; note = `정리 전 · 이번 주 ${weekMin}분`;
+        } else {
+          level = practiced ? "green" : (daysQuiet > 4 ? "red" : "gray");
+          note = `이번 주 ${weekMin}분`;
+        }
+        const reachOut = level === "red" || (!practiced && daysQuiet > 4);
+        return { s, level, note, reachOut };
+      });
+      const order = { red: 0, yellow: 1, gray: 2, green: 3 };
+      pulse.sort((a, b) => order[a.level] - order[b.level] || a.s.name.localeCompare(b.s.name));
+
+      const todayStr = dateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+      let wrapCard = null, nextCard = null;
+      (groups || []).forEach(g => {
+        const last = lastSessionFor(g.id);
+        if (last && dateStr(last.date) === todayStr) {
+          const recorded = (att || []).some(a => a.session_date === todayStr && (students || []).some(s => s.id === a.student_id && s.group_id === g.id));
+          if (!recorded && !wrapCard) wrapCard = { group: g, date: todayStr };
+        }
+        const n = nextSessionFor(g.id);
+        if (n && (!nextCard || n.date < nextCard.date)) nextCard = { group: g, ...n };
+      });
+
+      if (!cancelled) setData({
+        pulse,
+        counts: { thursday, requests: (reqs || []).length, messages: (msgs || []).length, reachout: pulse.filter(p => p.reachOut).length },
+        wrapCard, nextCard,
+        hasSchedule: (sched || []).length > 0,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [students, groups, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const now = new Date();
+  const dateLabel = `${TDAY_NAMES[now.getDay()]}요일 · ${now.getMonth() + 1}월 ${now.getDate()}일`;
+  const DOT = { green: "🟢", yellow: "🟡", red: "🔴", gray: "⚪️" };
+  const card = { background: C.bgCard, borderRadius: 16, padding: "16px", boxShadow: "0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05)", marginBottom: 14, border: `1px solid ${C.border}` };
+
+  if (!data) return React.createElement("div", { style: { textAlign: "center", padding: "40px" } }, React.createElement(Spinner));
+  const { pulse, counts, wrapCard, nextCard, hasSchedule } = data;
+  const todo = [];
+  if (counts.thursday) todo.push({ icon: "🙏", label: `Thursday 답변 ${counts.thursday}개 — 댓글 대기`, go: "inbox" });
+  if (counts.requests) todo.push({ icon: "💬", label: `리퀘스트 ${counts.requests}개`, go: "inbox" });
+  if (counts.messages) todo.push({ icon: "📩", label: `메시지 ${counts.messages}개`, go: "inbox" });
+  if (counts.reachout) todo.push({ icon: "📞", label: `연락해볼 학생 ${counts.reachout}명`, go: null });
+
+  return (
+    <div>
+      <div style={{ fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: "-0.5px" }}>오늘</div>
+      <div style={{ fontSize: 13, color: C.textLight, marginBottom: 18 }}>{dateLabel}</div>
+
+      {/* Context card */}
+      {wrapCard ? (
+        <button onClick={() => setWrapTarget({ group: wrapCard.group, date: wrapCard.date })}
+          style={{ ...card, width: "100%", textAlign: "left", cursor: "pointer", display: "block" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.success, marginBottom: 4 }}>방금 수업</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{wrapCard.group.name} · 정리하기 →</div>
+          <div style={{ fontSize: 13, color: C.textMid, marginTop: 2 }}>출석 체크 + 오늘 배운 표현 추가</div>
+        </button>
+      ) : nextCard ? (
+        <div style={card}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, marginBottom: 4 }}>다음 수업</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{nextCard.group.name} · {TDAY_NAMES[nextCard.slot.day_of_week]}요일 {nextCard.slot.start_time}</div>
+          <div style={{ fontSize: 13, color: C.textMid, margin: "2px 0 12px" }}>{students.filter(s => s.group_id === nextCard.group.id).map(s => s.name).join(" · ") || "학생 없음"}</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => onGoTab && onGoTab("setup")} style={{ padding: "9px 16px", borderRadius: 100, border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>표현 추가</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ ...card, textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: C.textMid, marginBottom: 8 }}>{hasSchedule ? "예정된 수업이 없어요." : "수업 일정을 설정하면 여기에 표시돼요."}</div>
+          {!hasSchedule && <button onClick={() => onGoTab && onGoTab("setup")} style={{ padding: "9px 16px", borderRadius: 100, border: "none", background: C.text, color: C.bg, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>일정 설정 →</button>}
+        </div>
+      )}
+
+      {/* Needs you */}
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, textTransform: "uppercase", margin: "6px 2px 10px" }}>내가 할 일</div>
+      {todo.length === 0
+        ? <div style={{ ...card, textAlign: "center", color: C.textMid, fontSize: 14 }}>다 확인했어요 ✓</div>
+        : <div style={{ ...card, padding: "4px 16px" }}>
+            {todo.map((t, i) => (
+              <button key={i} onClick={() => t.go && onGoTab && onGoTab(t.go)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderBottom: i < todo.length - 1 ? `1px solid ${C.bgSoft}` : "none", background: "transparent", border: "none", cursor: t.go ? "pointer" : "default", fontFamily: FONT, textAlign: "left" }}>
+                <span style={{ fontSize: 16 }}>{t.icon}</span>
+                <span style={{ flex: 1, fontSize: 14, color: C.text, fontWeight: 600 }}>{t.label}</span>
+                {t.go && <span style={{ color: C.textLight }}>›</span>}
+              </button>
+            ))}
+          </div>}
+
+      {/* This week's pulse */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 2px 10px" }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, textTransform: "uppercase" }}>이번 주 학생 현황</div>
+        <button onClick={() => onGoTab && onGoTab("students")} style={{ background: "transparent", border: "none", color: C.textLight, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}>전체 ▸</button>
+      </div>
+      <div style={{ ...card, padding: "4px 16px" }}>
+        {pulse.length === 0
+          ? <div style={{ padding: "16px 0", textAlign: "center", color: C.textLight, fontSize: 13 }}>학생이 없어요.</div>
+          : pulse.map((p, i) => (
+              <button key={p.s.id} onClick={() => onSelectStudent && onSelectStudent(p.s)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "11px 0", borderBottom: i < pulse.length - 1 ? `1px solid ${C.bgSoft}` : "none", background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, textAlign: "left" }}>
+                <span style={{ fontSize: 13 }}>{DOT[p.level]}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.text, minWidth: 64 }}>{p.s.name}</span>
+                <span style={{ flex: 1, fontSize: 12, color: C.textMid }}>{p.note}</span>
+                {p.reachOut && <span style={{ fontSize: 11, fontWeight: 700, color: C.error, background: C.errorBg, borderRadius: 100, padding: "2px 8px" }}>연락?</span>}
+              </button>
+            ))}
+      </div>
+
+      {wrapTarget && React.createElement(SessionWrapUp, { group: wrapTarget.group, students, sessionDate: wrapTarget.date, onClose: () => { setWrapTarget(null); setRefreshKey(k => k + 1); }, onAddPhrases: () => onGoTab && onGoTab("setup"), showMsg })}
+    </div>
+  );
+}
+
 function TeacherTodayTab({ students, groups, showMsg, onSelectStudent }) {
   const [todayPrompt, setTodayPrompt] = useState(null);
   const [responses, setResponses] = useState([]);
