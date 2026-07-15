@@ -11504,8 +11504,14 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
     <div>
       {editingPhrase && React.createElement(EditPhraseModal, { phrase: editingPhrase, onSave: updated => { setGroupPhrases(prev => prev.map(sp => sp.phrase_bank?.id === updated.id ? { ...sp, phrase_bank: updated } : sp)); setPhraseBank(prev => prev.map(p => p.id === updated.id ? updated : p)); setEditingPhrase(null); showMsg("✓ Phrase updated across all groups"); }, onClose: () => setEditingPhrase(null) })}
 
+      {/* Header */}
+      <div style={{ marginBottom: "20px" }}>
+        <div style={{ fontSize: "26px", fontWeight: "900", color: C.text, letterSpacing: "-0.5px" }}>Phrases</div>
+        <div style={{ fontSize: "13px", color: C.textLight, marginTop: "3px" }}>Add this week's phrases, review nominations, and tidy up.</div>
+      </div>
+
       {/* ── Phrase Cleanup ── */}
-      <div style={{ background: C.bgSoft, borderRadius: "14px", border: `1px solid ${C.border}`, padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+      <div style={{ background: C.bgSoft, borderRadius: "16px", border: `1px solid ${C.border}`, padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
         <div>
           <div style={{ fontSize: "13px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>🧹 Phrase Cleanup</div>
           <div style={{ fontSize: "11px", color: C.textLight, lineHeight: 1.5 }}>
@@ -11520,7 +11526,7 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
 
       {/* ── Student Nominations ── */}
       {nominations.length > 0 && (
-        <div style={{ background: "#EEF2FF", borderRadius: "14px", border: `1px solid ${C.navy}22`, padding: "14px 16px", marginBottom: "16px" }}>
+        <div style={{ background: "#EEF2FF", borderRadius: "16px", border: `1px solid ${C.navy}22`, padding: "14px 16px", marginBottom: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div>
               <div style={{ fontSize: "13px", fontWeight: "700", color: C.navy }}>📌 Student Nominations · {selectedGroup?.name}</div>
