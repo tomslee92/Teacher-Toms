@@ -9,13 +9,14 @@ const SUPABASE_URL = "https://ulpnmewvejvpancvqnrp.supabase.co";
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || "sb_publishable_sDP-kuCv5E2LmpDMPp8Y4A_n1ryWhNO";
 const GROQ_KEY = process.env.REACT_APP_GROQ_KEY;
 const GEMINI_KEY = process.env.REACT_APP_GEMINI_KEY;
-// Groq model IDs — single source of truth (CLAUDE.md §2b.2). Migrated off the
-// llama-3.* models (decommissioned Aug 16 2026) to GPT-OSS. The "openai/" prefix is
-// part of the string. GPT-OSS are reasoning-style — structured-output parsing was
-// hardened first (see extractLLMJSON / stripReasoning). To revert: set PRIMARY back to
-// "llama-3.3-70b-versatile" and FALLBACK to "llama-3.1-8b-instant".
-const GROQ_MODEL_PRIMARY  = "openai/gpt-oss-120b";
-const GROQ_MODEL_FALLBACK = "openai/gpt-oss-20b";
+// Groq model IDs — single source of truth (CLAUDE.md §2b.2). Still on llama-3.*
+// (decommissioned Aug 16 2026). A trial swap to openai/gpt-oss-120b / gpt-oss-20b
+// returned empty structured output (reasoning tokens appear to consume the response
+// budget / land in a channel the parser doesn't see) — reverted pending a tuning pass
+// (reasoning_effort / reasoning_format / higher max_tokens). Parser hardening
+// (extractLLMJSON / stripReasoning) is kept and is model-agnostic.
+const GROQ_MODEL_PRIMARY  = "llama-3.3-70b-versatile";
+const GROQ_MODEL_FALLBACK = "llama-3.1-8b-instant";
 
 // ── Push Notifications — Firebase Cloud Messaging ─────────────────────────────
 // VAPID public key from Firebase Console → Project Settings → Cloud Messaging
