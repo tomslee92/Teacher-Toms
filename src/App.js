@@ -5913,8 +5913,9 @@ function UnifiedPhraseRow({ phrase, progress, sessionReset, user, isPreview, onU
             {isSaved ? T("saved", lang) : T("save_to_list", lang)}
           </button>
         )}
-        {/* 🎓 Move to library — personal phrases, once passed (student archives when ready) */}
-        {phrase.isPersonal && onGraduate && passed && !inLibrary && (
+        {/* 🎓 Move to library — personal phrases. Available any time (not just once passed) so
+            "move to my list" is an alternative to deleting a phrase off the weekly list. */}
+        {phrase.isPersonal && onGraduate && !inLibrary && (
           <button onClick={onGraduate} title="라이브러리로 이동"
             style={{ background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: "100px", padding: "5px 11px", fontSize: "11px", fontWeight: "600", color: C.textMid, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", flexShrink: 0 }}>
             🎓 라이브러리로
