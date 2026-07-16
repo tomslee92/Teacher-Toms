@@ -2396,6 +2396,17 @@ function TappableText({ text, style = {}, wordStyle = {}, highlightWord = null, 
   const activeWord = highlightWord || tappedWord;
   const { isActive } = useSpeakingState(activeWord);
 
+  // Fade the highlight out once the word's audio finishes (active → idle), so a tapped
+  // word highlights, plays, then clears — instead of staying lit until another tap.
+  const wasActiveRef = React.useRef(false);
+  React.useEffect(() => {
+    if (isActive) { wasActiveRef.current = true; return; }
+    if (!wasActiveRef.current) return;
+    wasActiveRef.current = false;
+    const t = setTimeout(() => { setTappedWord(null); if (onWordTap) onWordTap(null); }, 450);
+    return () => clearTimeout(t);
+  }, [isActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!text) return null;
   const tokens = text.trim().split(/(\s+)/);
   const cleanWord = w => w.replace(/^[^\w{}]+|[^\w{}]+$/g, "").toLowerCase();
