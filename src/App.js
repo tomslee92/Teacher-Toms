@@ -1646,11 +1646,12 @@ async function groqCall(prompt, lang = "ko") {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({ model: GROQ_MODEL_PRIMARY, max_tokens: 1200, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }] })
   });
-  if (res.status === 429 || res.status === 413) {
-    console.warn("Groq limit hit — using Gemini");
+  // Fall back to Gemini on ANY Groq failure (rate limit, outage, or a decommissioned
+  // model after Aug 16 2026) — not just 429/413 — so no feature hard-fails.
+  if (!res.ok) {
+    console.warn("Groq call failed (" + res.status + ") — falling back to Gemini");
     return geminiCall(prompt, SYSTEM);
   }
-  if (!res.ok) throw new Error("Groq API error: " + await res.text());
   const d = await res.json();
   // Strip any reasoning block at the source so every groqCall consumer (text + JSON) is clean.
   return cleanText(stripReasoning(d.choices[0].message.content), lang);
@@ -1739,11 +1740,10 @@ async function groqCallWavy(userMessage, systemPrompt) {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({ model: GROQ_MODEL_PRIMARY, max_tokens: 200, temperature: 0.8, messages })
   });
-  if (res.status === 429) {
-    // Fallback to Gemini with custom system prompt
+  if (!res.ok) {
+    // Any Groq failure (incl. a decommissioned model) → Gemini with the custom system prompt.
     return geminiCall(userMessage, systemPrompt);
   }
-  if (!res.ok) throw new Error("Groq API error: " + await res.text());
   const d = await res.json();
   return d.choices[0].message.content.trim();
 }
@@ -1792,7 +1792,7 @@ RULES:
       }, { role: "user", content: prompt }]
     })
   });
-  if (res.status === 429 || res.status === 413) {
+  if (!res.ok) {
     console.warn("Groq limit hit on scaffold — using Gemini");
     return geminiCall(prompt, `You are a Korean-to-English translation assistant. OUTPUT LANGUAGE: English only. Never output Korean.
 Translate the EXACT meaning into natural conversational English a real person would say.
@@ -1849,7 +1849,7 @@ Return ONLY the Korean translation, nothing else. No explanation, no alternative
       messages: [{ role: "system", content: SYSTEM + "\n\n" + TRANSLATION_SYSTEM }, { role: "user", content: prompt }]
     })
   });
-  if (res.status === 429 || res.status === 413) {
+  if (!res.ok) {
     console.warn("Groq limit hit on translate — using Gemini");
     return cleanText(await geminiCall(`Context: ${context}\n\nTranslate into natural Korean 해요체: "${text}"\n\nCRITICAL: Return ONLY the Korean translation in hangul (가-힣). No English words in the translation. No other languages. Keep any {{token}} placeholders like {{name}}, {{job}}, {{hobby}} exactly as-is.`, SYSTEM + "\n\n" + TRANSLATION_SYSTEM));
   }
@@ -1891,7 +1891,7 @@ Text to translate:
       messages: [{ role: "system", content: SYSTEM + "\n\n" + TRANSLATION_SYSTEM }, { role: "user", content: prompt }]
     })
   });
-  if (res.status === 429 || res.status === 413) {
+  if (!res.ok) {
     console.warn("Groq limit hit on 70b translate — using Gemini");
     return cleanText(await geminiCall(`Context: ${context}\n\nTranslate into warm, natural Korean 해요체 — sound like a fluent Korean speaker, not a dictionary: "${text}"\n\nCRITICAL: Return ONLY the Korean translation in hangul (가-힣). No English words in the translation. Preserve idioms naturally.`, SYSTEM + "\n\n" + TRANSLATION_SYSTEM));
   }
@@ -2118,7 +2118,7 @@ Return ONLY valid JSON array:
       ]
     })
   });
-  if (res.status === 429 || res.status === 413) {
+  if (!res.ok) {
     const fallbackSystem = lang === "zh"
       ? "你是一个JSON API。korean和context字段必须仅用简体中文（汉字）。只返回有效的JSON数组，不要markdown。"
       : "You are a JSON API for Wayve. korean and context fields MUST be in Korean hangul (가-힣) 해요체 only. Return ONLY valid JSON array.";
@@ -2167,7 +2167,7 @@ RULES:
         }]
       })
     });
-    if (res.status === 429 || res.status === 413) {
+    if (!res.ok) {
       try { const fb = await geminiCall(`English phrase: "${english}"\n\nWrite 1 Korean 해요체 sentence about when and with whom to use this phrase. Do NOT translate it — describe the situation only. No "이 문장은" opener. Return ONLY the Korean sentence.`, TRANSLATION_SYSTEM); const ctx2=cleanText(fb.trim()); return {ko:cleanText(ko),context:hasIllegalChars(ctx2)?"":ctx2}; } catch(_){return{ko:cleanText(ko),context:""};}
     }
     const d = await res.json();
@@ -6640,7 +6640,7 @@ Return ONLY this JSON array, no markdown:
           }]
         })
       });
-      if (res.status === 429 || res.status === 413) {
+      if (!res.ok) {
         const fallback = await geminiCall(`A ${lang === "zh" ? "Chinese" : "Korean"} adult learner wants to express this in English: "${koreanText}"
 
 Give exactly 3 English expressions varying by register:
@@ -12794,8 +12794,13 @@ function ChineseTranslator({ showMsg }) {
           ]
         })
       });
-      const chineseData = await chineseRes.json();
-      const chinese = cleanText(chineseData.choices?.[0]?.message?.content?.trim() || "", "zh");
+      const chineseData = chineseRes.ok ? await chineseRes.json() : null;
+      let chinese = cleanText(chineseData?.choices?.[0]?.message?.content?.trim() || "", "zh");
+      if (!chinese) {
+        // Groq failed (e.g. decommissioned model) → Gemini.
+        const g = await geminiCall(`Translate into natural Simplified Chinese (普通话): "${p.english}"\nReturn ONLY the Chinese translation (汉字).`, "You are a translator. Output only Simplified Chinese.").catch(() => "");
+        chinese = cleanText((g || "").trim(), "zh");
+      }
 
       // Generate context_zh — when/with whom to use it
       const contextRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
