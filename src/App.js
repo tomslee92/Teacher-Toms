@@ -7866,7 +7866,7 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
                     isTeacherMsg ? "👨🏫 Teacher Tom" : msg.sender, " · ",
                     new Date(msg.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
                   ),
-                  React.createElement("div", { style: { maxWidth: "80%", padding: "9px 13px", borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: isMe ? C.text : isTeacherMsg ? C.goldBg : C.bgSoft, color: isMe ? "#fff" : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacherMsg && !isMe ? `1px solid ${C.gold}` : "none", wordBreak: "break-word" } }, msg.content)
+                  React.createElement("div", { style: { maxWidth: "80%", padding: "9px 13px", borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: isMe ? C.text : isTeacherMsg ? C.goldBg : C.bgSoft, color: isMe ? C.bg : C.text, fontSize: "14px", lineHeight: 1.5, border: isTeacherMsg && !isMe ? `1px solid ${C.gold}` : "none", wordBreak: "break-word" } }, msg.content)
                 )
               );
             })}
@@ -7893,7 +7893,7 @@ function FloatingChat({ user, group, isPreview, isTeacher = false, groups = [], 
               rows={1}
               style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "22px", fontSize: "15px", fontFamily: FONT, outline: "none", resize: "none", maxHeight: "100px", overflowY: "auto", lineHeight: 1.4, background: C.bgSoft, WebkitAppearance: "none" }}
             />
-            <button onClick={send} disabled={sending || !input.trim()} style={{ width: "42px", height: "42px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: "#fff", cursor: input.trim() ? "pointer" : "default", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+            <button onClick={send} disabled={sending || !input.trim()} style={{ width: "42px", height: "42px", borderRadius: "50%", background: input.trim() ? C.text : C.bgMid, border: "none", color: input.trim() ? C.bg : C.textMid, cursor: input.trim() ? "pointer" : "default", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
               {sending ? "⋯" : "➤"}
             </button>
           </div>
@@ -8100,7 +8100,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
                   </div>
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", position: "relative" }}>
                     <button onClick={() => setMoreOpen(o => !o)} title="설정"
-                      style={{ position: "relative", background: moreOpen ? C.text : C.bgSoft, border: `1px solid ${moreOpen ? C.text : C.border}`, color: moreOpen ? "#fff" : C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>
+                      style={{ position: "relative", background: moreOpen ? C.text : C.bgSoft, border: `1px solid ${moreOpen ? C.text : C.border}`, color: moreOpen ? C.bg : C.textMid, width: "36px", height: "36px", borderRadius: "100px", fontSize: "15px", fontFamily: FONT, cursor: "pointer", lineHeight: 1 }}>
                       ⚙
                       {moreBadge > 0 && !moreOpen && <span style={{ position: "absolute", top: "-2px", right: "-2px", width: "10px", height: "10px", background: C.error, borderRadius: "100px", border: `2px solid ${C.bg}` }} />}
                     </button>
@@ -8825,7 +8825,7 @@ function TeacherTodayTab({ students, groups, showMsg, onSelectStudent }) {
               const label = isTodayDate ? "Today" : new Date(date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
               return (
                 <button key={date} onClick={() => setSelectedDate(date)}
-                  style={{ flexShrink: 0, padding: "6px 14px", borderRadius: "100px", border: `1.5px solid ${isSelected ? C.text : C.border}`, background: isSelected ? C.text : "transparent", color: isSelected ? "#fff" : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" }}>
+                  style={{ flexShrink: 0, padding: "6px 14px", borderRadius: "100px", border: `1.5px solid ${isSelected ? C.text : C.border}`, background: isSelected ? C.text : "transparent", color: isSelected ? C.bg : C.textMid, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" }}>
                   {label}
                 </button>
               );
@@ -8843,7 +8843,7 @@ function TeacherTodayTab({ students, groups, showMsg, onSelectStudent }) {
                 <div style={{ display: "flex", background: C.bgMid, borderRadius: "100px", padding: "2px" }}>
                   {[1, 1.5, 2].map(rate => (
                     <button key={rate} onClick={() => setPlaybackRate(rate)}
-                      style={{ padding: "3px 8px", borderRadius: "100px", border: "none", background: playbackRate === rate ? C.text : "transparent", color: playbackRate === rate ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" }}>
+                      style={{ padding: "3px 8px", borderRadius: "100px", border: "none", background: playbackRate === rate ? C.text : "transparent", color: playbackRate === rate ? C.bg : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" }}>
                       {rate === 1 ? "1x" : `${rate}x`}
                     </button>
                   ))}
@@ -9232,7 +9232,7 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
         <div style={{ display: "flex", background: C.bg, border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
           {SORT_OPTIONS.map(opt => (
             <button key={opt.id} onClick={() => setSortBy(opt.id)}
-              style={{ padding: "8px 12px", border: "none", borderRight: `1px solid ${C.border}`, background: sortBy === opt.id ? C.text : "transparent", color: sortBy === opt.id ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", transition: "all 0.15s" }}>
+              style={{ padding: "8px 12px", border: "none", borderRight: `1px solid ${C.border}`, background: sortBy === opt.id ? C.text : "transparent", color: sortBy === opt.id ? C.bg : C.textMid, fontSize: "11px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap", transition: "all 0.15s" }}>
               {opt.label}
             </button>
           ))}
@@ -10533,7 +10533,7 @@ function TranslationsAuditTab({ phraseBank, setPhraseBank, showMsg }) {
         <button
           onClick={runBatch}
           disabled={batchRunning || filteredPhrases.length === 0}
-          style={{ background: batchRunning ? C.bgSoft : C.text, color: batchRunning ? C.textMid : "#fff", border: `1px solid ${batchRunning ? C.border : C.text}`, padding: "8px 14px", borderRadius: "100px", fontSize: "12px", fontWeight: "600", fontFamily: FONT, cursor: batchRunning ? "default" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+          style={{ background: batchRunning ? C.bgSoft : C.text, color: batchRunning ? C.textMid : C.bg, border: `1px solid ${batchRunning ? C.border : C.text}`, padding: "8px 14px", borderRadius: "100px", fontSize: "12px", fontWeight: "600", fontFamily: FONT, cursor: batchRunning ? "default" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}
         >
           {batchRunning ? React.createElement("span", null, `Reviewing ${batchProgress.done}/${batchProgress.total}…`) : "🤖 Review all"}
         </button>
@@ -10545,7 +10545,7 @@ function TranslationsAuditTab({ phraseBank, setPhraseBank, showMsg }) {
           <button
             key={k}
             onClick={() => setFilterMode(k)}
-            style={{ background: filterMode === k ? C.text : "transparent", color: filterMode === k ? "#fff" : C.textMid, border: `1px solid ${filterMode === k ? C.text : C.border}`, padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: filterMode === k ? "600" : "500", cursor: "pointer" }}
+            style={{ background: filterMode === k ? C.text : "transparent", color: filterMode === k ? C.bg : C.textMid, border: `1px solid ${filterMode === k ? C.text : C.border}`, padding: "5px 12px", borderRadius: "100px", fontSize: "12px", fontFamily: FONT, fontWeight: filterMode === k ? "600" : "500", cursor: "pointer" }}
           >
             {label}
           </button>
@@ -11056,7 +11056,7 @@ function GroupsTab({ groups, setGroups, students, setStudents, onPreview, onAddP
       {/* View toggle */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
         {[["overview", "📊 Overview"], ["activity", "🟢 Activity"]].map(([v, label]) =>
-          React.createElement("button", { key: v, onClick: () => setActiveView(v), style: { padding: "7px 16px", borderRadius: "20px", border: `1px solid ${activeView === v ? C.text : C.border}`, background: activeView === v ? C.text : C.bg, color: activeView === v ? "#fff" : C.textMid, fontSize: "13px", fontWeight: activeView === v ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
+          React.createElement("button", { key: v, onClick: () => setActiveView(v), style: { padding: "7px 16px", borderRadius: "20px", border: `1px solid ${activeView === v ? C.text : C.border}`, background: activeView === v ? C.text : C.bg, color: activeView === v ? C.bg : C.textMid, fontSize: "13px", fontWeight: activeView === v ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, label)
         )}
       </div>
 
@@ -11704,7 +11704,7 @@ Return ONLY a comma-separated list of tag ids (e.g. "travel,business_travel"), n
 
       {/* Group selector */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }}>
-        {groups.map(g => React.createElement("button", { key: g.id, onClick: () => setSelectedGroup(g), style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? "#fff" : C.textMid, fontSize: "13px", fontWeight: selectedGroup?.id === g.id ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, g.name))}
+        {groups.map(g => React.createElement("button", { key: g.id, onClick: () => setSelectedGroup(g), style: { padding: "6px 14px", borderRadius: "20px", border: `1px solid ${selectedGroup?.id === g.id ? C.text : C.border}`, background: selectedGroup?.id === g.id ? C.text : C.bg, color: selectedGroup?.id === g.id ? C.bg : C.textMid, fontSize: "13px", fontWeight: selectedGroup?.id === g.id ? "600" : "400", cursor: "pointer", fontFamily: FONT } }, g.name))}
       </div>
 
       {/* Scope selector — whole group (default) vs specific students in the group.
@@ -13436,7 +13436,7 @@ function ManualQodForm({ onSave, showMsg, categories, difficulties }) {
         <div style={{ display: "flex", gap: "6px" }}>
           {difficulties.map(d => (
             <button key={d.id} onClick={() => setDifficulty(d.id)}
-              style={{ flex: 1, padding: "8px", borderRadius: "10px", border: `1.5px solid ${difficulty === d.id ? C.text : C.border}`, background: difficulty === d.id ? C.text : "transparent", color: difficulty === d.id ? "#fff" : C.textMid, fontSize: "12px", fontWeight: difficulty === d.id ? "700" : "400", cursor: "pointer", fontFamily: FONT, textAlign: "center" }}>
+              style={{ flex: 1, padding: "8px", borderRadius: "10px", border: `1.5px solid ${difficulty === d.id ? C.text : C.border}`, background: difficulty === d.id ? C.text : "transparent", color: difficulty === d.id ? C.bg : C.textMid, fontSize: "12px", fontWeight: difficulty === d.id ? "700" : "400", cursor: "pointer", fontFamily: FONT, textAlign: "center" }}>
               <div>{d.label}</div>
               <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "2px" }}>{d.desc}</div>
             </button>
@@ -13620,7 +13620,7 @@ SPARK_6: [one sentence]`);
         <div style={{ display: "flex", gap: "6px", marginTop: "16px", flexWrap: "wrap" }}>
           {[["generate", "✨ Generate"], ["manual", "✏️ Add Manually"], ["saved", `📚 Library (${savedPrompts.length})`], ["schedule", `📅 Upcoming (${upcoming.length})`]].map(([t, label]) =>
             React.createElement("button", { key: t, onClick: () => setActiveTab(t),
-              style: { padding: "7px 16px", borderRadius: "100px", border: `1px solid ${activeTab === t ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.2)"}`, background: activeTab === t ? "rgba(255,255,255,0.9)" : "transparent", color: activeTab === t ? C.text : "#fff", fontSize: "12px", fontWeight: activeTab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" } }, label)
+              style: { padding: "7px 16px", borderRadius: "100px", border: `1px solid ${activeTab === t ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.2)"}`, background: activeTab === t ? "rgba(255,255,255,0.9)" : "transparent", color: activeTab === t ? "#16181D" : "#fff", fontSize: "12px", fontWeight: activeTab === t ? "700" : "400", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" } }, label)
           )}
         </div>
       </div>
@@ -13649,7 +13649,7 @@ SPARK_6: [one sentence]`);
             <div style={{ display: "flex", gap: "6px" }}>
               {QOD_DIFFICULTY.map(d => (
                 <button key={d.id} onClick={() => setSelectedDifficulty(d.id)}
-                  style={{ flex: 1, padding: "8px 6px", borderRadius: "100px", border: `1.5px solid ${selectedDifficulty === d.id ? C.text : C.border}`, background: selectedDifficulty === d.id ? C.text : "transparent", color: selectedDifficulty === d.id ? "#fff" : C.textMid, fontSize: "12px", fontWeight: selectedDifficulty === d.id ? "700" : "400", cursor: "pointer", fontFamily: FONT, textAlign: "center", transition: "all 0.15s" }}>
+                  style={{ flex: 1, padding: "8px 6px", borderRadius: "100px", border: `1.5px solid ${selectedDifficulty === d.id ? C.text : C.border}`, background: selectedDifficulty === d.id ? C.text : "transparent", color: selectedDifficulty === d.id ? C.bg : C.textMid, fontSize: "12px", fontWeight: selectedDifficulty === d.id ? "700" : "400", cursor: "pointer", fontFamily: FONT, textAlign: "center", transition: "all 0.15s" }}>
                   {d.label}
                 </button>
               ))}
@@ -15780,7 +15780,7 @@ function QodResponsesTab({ students, showMsg }) {
                 <div style={{ display: "flex", background: C.bgMid, borderRadius: "100px", padding: "2px" }}>
                   {[1, 1.5, 2].map(rate => (
                     <button key={rate} onClick={() => setPlaybackRate(rate)}
-                      style={{ padding: "3px 8px", borderRadius: "100px", border: "none", background: playbackRate === rate ? C.text : "transparent", color: playbackRate === rate ? "#fff" : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" }}>
+                      style={{ padding: "3px 8px", borderRadius: "100px", border: "none", background: playbackRate === rate ? C.text : "transparent", color: playbackRate === rate ? C.bg : C.textMid, fontSize: "11px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, transition: "all 0.15s" }}>
                       {rate === 1 ? "1x" : `${rate}x`}
                     </button>
                   ))}
