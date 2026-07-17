@@ -7957,6 +7957,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     return () => { document.body.style.background = prevBg; document.body.style.color = prevCol; };
   }, [teacherDark]);
   const [tab, setTab] = useState("today");
+  const [setupSection, setSetupSection] = useState(null); // lets the Today wrap-up open Setup directly on a section (e.g. "add")
   const [moreOpen, setMoreOpen] = useState(false); // v3 ⚙ menu (secondary nav items)
   const [students, setStudents] = useState([]);
   const [phraseBank, setPhraseBank] = useState([]);
@@ -8220,7 +8221,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
 
             {tab === "today" && (
               TEACHER_DASH_V3
-                ? <TeacherTodayV3 students={students} groups={groups} showMsg={showMsg} onSelectStudent={(s) => { setSelectedStudent(s); setTab("students"); }} onGoTab={(t) => { setSelectedStudent(null); setTab(t); }} />
+                ? <TeacherTodayV3 students={students} groups={groups} showMsg={showMsg} onSelectStudent={(s) => { setSelectedStudent(s); setTab("students"); }} onGoTab={(t) => { setSelectedStudent(null); setTab(t); }} onGoAddPhrases={() => { setSelectedStudent(null); setSetupSection("add"); setTab("setup"); }} />
                 : <TeacherTodayTab students={students} groups={groups} showMsg={showMsg} onSelectStudent={(s) => { setSelectedStudent(s); setTab("students"); }} />
             )}
 
@@ -8273,7 +8274,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
             )}
 
             {tab === "setup" && (
-              <TeacherSetupTab groups={groups} setGroups={setGroups} students={students} setStudents={setStudents} phraseBank={phraseBank} setPhraseBank={setPhraseBank} onPreview={onPreview} showMsg={showMsg} />
+              <TeacherSetupTab groups={groups} setGroups={setGroups} students={students} setStudents={setStudents} phraseBank={phraseBank} setPhraseBank={setPhraseBank} onPreview={onPreview} showMsg={showMsg} initialSection={setupSection} onSectionConsumed={() => setSetupSection(null)} />
             )}
           </div>
         </div>
@@ -8498,7 +8499,7 @@ function PronunciationTab({ showMsg }) {
 // (per-student status from attendance + minutes, sorted attention-first). Behind
 // TEACHER_DASH_V3. See TEACHER_DASHBOARD_REDESIGN.md.
 const TDAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
-function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab }) {
+function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab, onGoAddPhrases }) {
   const [data, setData] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [wrapTarget, setWrapTarget] = useState(null); // { group, date }
@@ -8695,7 +8696,7 @@ function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab })
             ))}
       </div>
 
-      {wrapTarget && React.createElement(SessionWrapUp, { group: wrapTarget.group, students, sessionDate: wrapTarget.date, onClose: () => { setWrapTarget(null); setRefreshKey(k => k + 1); }, onAddPhrases: () => onGoTab && onGoTab("setup"), showMsg })}
+      {wrapTarget && React.createElement(SessionWrapUp, { group: wrapTarget.group, students, sessionDate: wrapTarget.date, onClose: () => { setWrapTarget(null); setRefreshKey(k => k + 1); }, onAddPhrases: () => onGoAddPhrases ? onGoAddPhrases() : (onGoTab && onGoTab("setup")), showMsg })}
     </div>
   );
 }
@@ -10180,8 +10181,12 @@ function DeleteStudentSection({ student, onDelete, onBack, showMsg }) {
 }
 
 // ── Teacher Setup Tab ─────────────────────────────────────────────────────────
-function TeacherSetupTab({ groups, setGroups, students, setStudents, phraseBank, setPhraseBank, onPreview, showMsg }) {
+function TeacherSetupTab({ groups, setGroups, students, setStudents, phraseBank, setPhraseBank, onPreview, showMsg, initialSection, onSectionConsumed }) {
   const [section, setSection] = useState(null); // null = menu, else component key
+  // Allow a caller (e.g. the Today wrap-up "add phrases") to open Setup directly on a section.
+  useEffect(() => {
+    if (initialSection) { setSection(initialSection); onSectionConsumed && onSectionConsumed(); }
+  }, [initialSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const SECTIONS = [
     {
