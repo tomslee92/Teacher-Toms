@@ -293,7 +293,11 @@ const getTeacherName = (group) => {
   if (group?.teacher_name?.trim()) return group.teacher_name.trim();
   return TEACHER_DISPLAY_NAME;
 };
-const ONBOARDING_VERSION = "v23"; // bump to re-show tour for all users after major updates
+// NOTE: vestigial. The `wayve_seen_intro_${ONBOARDING_VERSION}` localStorage key below is
+// WRITTEN but never READ — bumping this does NOT re-show the tour. The tour actually triggers
+// off `students.tutorial_seen === false` (see the tutorial-prompt effect ~L4529). To re-show the
+// v3 tour to a student at rollout, set tutorial_seen=false when you flip redesign_v3_enabled.
+const ONBOARDING_VERSION = "v23";
 
 // ── Situation Tags ────────────────────────────────────────────────────────────
 const DEFAULT_SITUATION_TAGS = [
@@ -5150,8 +5154,8 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
     db.get("student_phrases", `student_id=eq.${user.id}&select=phrase_id,english`)
       .then(rows => setSavedClassPhraseIds(new Set(rows.map(r => r.phrase_id || r.english).filter(Boolean))))
       .catch(() => {});
-    db.get("phrase_pins", `student_id=eq.${user.id}&select=english,phrase_id`)
-      .then(rows => setPinnedPhraseIds(new Set(rows.map(r => r.phrase_id || r.english).filter(Boolean))))
+    db.get("class_requests", `student_id=eq.${user.id}&kind=eq.phrase&select=content,phrase_id`)
+      .then(rows => setPinnedPhraseIds(new Set(rows.map(r => r.phrase_id || r.content).filter(Boolean))))
       .catch(() => {});
   }, [user?.id]);
 
@@ -5197,16 +5201,18 @@ function PracticeTab({ user, group, isPreview, onPracticed, onGoHome = () => {},
     });
     try {
       if (alreadyPinned) {
-        await db.delete("phrase_pins", `student_id=eq.${user.id}&english=eq.${encodeURIComponent(phrase.english)}`);
+        await db.delete("class_requests", `student_id=eq.${user.id}&kind=eq.phrase&content=eq.${encodeURIComponent(phrase.english)}`);
       } else {
-        await db.insert("phrase_pins", {
+        await db.insert("class_requests", {
           student_id: user.id,
           group_id: group?.id || null,
-          english: phrase.english,
+          kind: "phrase",
+          content: phrase.english,
           korean: phrase.korean || "",
           context: phrase.context || "",
           source: "class",
           phrase_id: phrase.id || null,
+          status: "new",
         });
       }
     } catch(e) { console.error("Pin error:", e); }
@@ -6338,8 +6344,8 @@ function FreeTalkTab({ user, group, isPreview, onPracticed, onPhraseSaved }) {
   // Load existing pins
   useEffect(() => {
     if (!user?.id || isPreview) return;
-    db.get("phrase_pins", `student_id=eq.${user.id}&select=english`).catch(() => [])
-      .then(rows => setPinnedExprIds(new Set(rows.map(r => r.english).filter(Boolean))));
+    db.get("class_requests", `student_id=eq.${user.id}&kind=eq.phrase&select=content`).catch(() => [])
+      .then(rows => setPinnedExprIds(new Set(rows.map(r => r.content).filter(Boolean))));
   }, [user?.id]);
 
   const handlePinExpr = async (expr) => {
@@ -6352,16 +6358,18 @@ function FreeTalkTab({ user, group, isPreview, onPracticed, onPhraseSaved }) {
     });
     try {
       if (alreadyPinned) {
-        await db.delete("phrase_pins", `student_id=eq.${user.id}&english=eq.${encodeURIComponent(english)}`);
+        await db.delete("class_requests", `student_id=eq.${user.id}&kind=eq.phrase&content=eq.${encodeURIComponent(english)}`);
       } else {
-        await db.insert("phrase_pins", {
+        await db.insert("class_requests", {
           student_id: user.id,
           group_id: group?.id || null,
-          english,
+          kind: "phrase",
+          content: english,
           korean: expr.korean || "",
           context: expr.explanation || expr.example || "",
           source: "solo",
           phrase_id: null,
+          status: "new",
         });
       }
     } catch(e) { console.error("Pin expr error:", e); }
@@ -7358,13 +7366,13 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
     Promise.all([
       db.get("student_phrases", `student_id=eq.${user.id}&order=created_at.desc`),
       db.get("student_progress", `student_id=eq.${user.id}`),
-      db.get("phrase_pins", `student_id=eq.${user.id}&select=english,phrase_id`).catch(() => []),
+      db.get("class_requests", `student_id=eq.${user.id}&kind=eq.phrase&select=content,phrase_id`).catch(() => []),
     ]).then(([data, prog, pins]) => {
       setPhrases(data || []);
       const map = {};
       prog.forEach(p => { map[p.phrase_id || p.english] = p; });
       setProgress(map);
-      setPinnedIds(new Set(pins.map(p => p.phrase_id || p.english).filter(Boolean)));
+      setPinnedIds(new Set(pins.map(p => p.phrase_id || p.content).filter(Boolean)));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user?.id, refreshKey]);
@@ -7380,16 +7388,18 @@ function MyPhrasesTab({ user, isPreview, refreshKey = 0 }) {
     });
     try {
       if (alreadyPinned) {
-        await db.delete("phrase_pins", `student_id=eq.${user.id}&english=eq.${encodeURIComponent(phrase.english)}`);
+        await db.delete("class_requests", `student_id=eq.${user.id}&kind=eq.phrase&content=eq.${encodeURIComponent(phrase.english)}`);
       } else {
-        await db.insert("phrase_pins", {
+        await db.insert("class_requests", {
           student_id: user.id,
           group_id: phrase.group_id || null,
-          english: phrase.english,
+          kind: "phrase",
+          content: phrase.english,
           korean: phrase.korean || "",
           context: phrase.context || "",
           source: phrase.source || "mine",
           phrase_id: phrase.phrase_id || phrase.id || null,
+          status: "new",
         });
       }
     } catch(e) { console.error("Pin error:", e); }
@@ -8004,7 +8014,7 @@ function TeacherScreen({ groups, setGroups, setScreen, user, onPreview }) {
     // Inbox badge = unresolved messages + new (not-yet-actioned) class requests.
     Promise.all([
       db.get("student_messages", "replied=eq.false&select=id").catch(() => []),
-      db.get("class_requests", "status=eq.new&select=id").catch(() => []),
+      db.get("class_requests", "status=eq.new&kind=neq.phrase&select=id").catch(() => []),
     ]).then(([msgs, reqs]) => setInboxUnread((msgs?.length || 0) + (reqs?.length || 0)));
     refreshNotesUnread();
   }, []);
@@ -8523,7 +8533,7 @@ function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab, o
         db.get("group_schedule", "select=*").catch(() => []),
         db.get("attendance", `session_date=gte.${dateStr(cutoff14)}&select=student_id,session_date,attended`).catch(() => []),
         db.get("active_time_segments", `date=gte.${monStr}&select=student_id,seconds`).catch(() => []),
-        db.get("class_requests", "status=eq.new&select=id").catch(() => []),
+        db.get("class_requests", "status=eq.new&kind=neq.phrase&select=id").catch(() => []),
         db.get("student_messages", "replied=eq.false&select=id").catch(() => []),
         db.get("qod_responses", `is_private=eq.false&created_at=gte.${monday.toISOString()}&select=id`).catch(() => []),
       ]);
@@ -9428,7 +9438,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
           // All sources (app + wavi) — confirms the time metric is whole-app, not Wavi-only
           db.get("active_time_segments", `student_id=eq.${student.id}&date=gte.${_monStr}&select=date,seconds`).catch(() => []),
           db.get("attendance", `student_id=eq.${student.id}&order=session_date.desc&limit=60&select=session_date,attended`).catch(() => []),
-          db.get("class_requests", `student_id=eq.${student.id}&order=created_at.desc&select=id,content,status,created_at`).catch(() => []),
+          db.get("class_requests", `student_id=eq.${student.id}&kind=neq.phrase&order=created_at.desc&select=id,content,status,created_at`).catch(() => []),
         ]);
         setQodHistory(qod);
         setPhraseProgress(prog);
@@ -11365,15 +11375,19 @@ function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showM
   useEffect(() => {
     if (!selectedGroup?.id) return;
     setLoadingNoms(true);
-    db.get("phrase_pins", `group_id=eq.${selectedGroup.id}&select=*,students(name)&order=created_at.desc`)
+    db.get("class_requests", `group_id=eq.${selectedGroup.id}&kind=eq.phrase&select=student_id,content,korean,context,source,phrase_id&order=created_at.desc`)
       .then(rows => {
-        // Group by english phrase, count unique students
+        // Group by phrase (content), count unique students. Names resolved from the
+        // students prop — class_requests has no FK to students for a PostgREST embed.
+        const nameById = {};
+        (students || []).forEach(s => { nameById[s.id] = s.name; });
         const map = {};
         rows.forEach(r => {
-          const key = r.english;
-          if (!map[key]) map[key] = { english: r.english, korean: r.korean, context: r.context, source: r.source, phrase_id: r.phrase_id, students: [], count: 0 };
+          const key = r.content;
+          if (!key) return;
+          if (!map[key]) map[key] = { english: r.content, korean: r.korean, context: r.context, source: r.source, phrase_id: r.phrase_id, students: [], count: 0 };
           map[key].count++;
-          const name = r.students?.name || "Student";
+          const name = nameById[r.student_id] || "Student";
           if (!map[key].students.includes(name)) map[key].students.push(name);
         });
         setNominations(Object.values(map).sort((a, b) => b.count - a.count));
@@ -11406,7 +11420,7 @@ function AddPhrasesTab({ groups, students = [], phraseBank, setPhraseBank, showM
     if (!selectedGroup?.id) return;
     setClearingNoms(true);
     try {
-      await db.delete("phrase_pins", `group_id=eq.${selectedGroup.id}`);
+      await db.delete("class_requests", `group_id=eq.${selectedGroup.id}&kind=eq.phrase`);
       setNominations([]);
       showMsg("✓ Nominations cleared for next session");
     } catch(e) { showMsg("Error clearing: " + e.message, "error"); }
@@ -20679,7 +20693,7 @@ function TeacherInboxTab({ students, showMsg, onReply }) {
       setLoading(false);
     })();
     (async () => {
-      const reqs = await db.get("class_requests", "order=created_at.desc&limit=100").catch(() => []);
+      const reqs = await db.get("class_requests", "kind=neq.phrase&order=created_at.desc&limit=100").catch(() => []);
       setRequests(Array.isArray(reqs) ? reqs : []);
       setReqLoading(false);
     })();
@@ -22859,7 +22873,7 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
     if (!user?.id) return;
     let cancelled = false;
     (async () => {
-      const rows = await db.get("class_requests", `student_id=eq.${user.id}&order=created_at.desc&limit=20&select=id,content,status,created_at`).catch(() => []);
+      const rows = await db.get("class_requests", `student_id=eq.${user.id}&kind=neq.phrase&order=created_at.desc&limit=20&select=id,content,status,created_at`).catch(() => []);
       if (!cancelled) setMyRequests(Array.isArray(rows) ? rows : []);
     })();
     return () => { cancelled = true; };
@@ -23083,7 +23097,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         const hasLast = !!(lastAttempt && lastAttempt[0]);
         if (!cancelled) setPlan({ waviTotal, waviRemaining, reviewCount: (resurfRows || []).length, listenDone, todayExpr, hasLast });
         // Open (not-yet-covered) class requests — for the 다음 수업 리퀘스트 card subtitle.
-        const reqRows = await db.get("class_requests", `student_id=eq.${user.id}&status=neq.covered&select=id`).catch(() => []);
+        const reqRows = await db.get("class_requests", `student_id=eq.${user.id}&status=neq.covered&kind=neq.phrase&select=id`).catch(() => []);
         if (!cancelled) setOpenRequests((reqRows || []).length);
 
         if (scenariosVisible) {

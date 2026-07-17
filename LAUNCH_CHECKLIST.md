@@ -81,9 +81,11 @@ UPDATE students SET redesign_v3_enabled = TRUE WHERE name = 'Toms Lee';
 Start with the "would Chris notice?" benchmark; watch each before the next.
 
 ```sql
-UPDATE students SET redesign_v3_enabled = TRUE WHERE name = '[student name]';
+-- Flip v3 AND reset tutorial_seen so they get the new v3 tour once.
+-- (ONBOARDING_VERSION is vestigial — tutorial_seen is the real tour trigger.)
+UPDATE students SET redesign_v3_enabled = TRUE, tutorial_seen = FALSE WHERE name = '[student name]';
 -- check state:
-SELECT name, redesign_v3_enabled, wavy_enabled, home_v2_enabled FROM students;
+SELECT name, redesign_v3_enabled, tutorial_seen, wavy_enabled, home_v2_enabled FROM students;
 ```
 
 - [ ] Student 1 (benchmark) — enabled, spot-checked
