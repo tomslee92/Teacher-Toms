@@ -18070,7 +18070,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [scenarioVideoUrl, setScenarioVideoUrl] = useState(null); // current line's pre-rendered clip (plays instead of avatar+TTS)
   const [scenarioIntroText, setScenarioIntroText] = useState(null); // scene-setter shown + read before the conversation
   const [paused, setPaused] = useState(false);          // scenario playback paused
-  const [playbackRate, setPlaybackRate] = useState(0.75); // overall scenario speed (research: ~0.75x best for beginners)
+  const [playbackRate, setPlaybackRate] = useState(1); // natural speed by default; 천천히 → 0.6
   const [showScenarioChar, setShowScenarioChar] = useState(true); // character on scenario screen (A/B toggle, Toms can flip)
   const scenarioEndRef = useRef(null); // auto-scroll the bubble transcript
 
@@ -18393,7 +18393,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const videoDoneRef = useRef(null); // resolver for the currently-playing line video
   // ── Controlled scenario player (pause / resume / replay / speed) ──
   const pausedRef = useRef(false);
-  const rateRef = useRef(0.75);
+  const rateRef = useRef(1);
   const intentResolveRef = useRef(null);  // resolves the advance-gate with "advance" | "replay"
   const resumeResolveRef = useRef(null);  // resolves waitWhilePaused on resume
   const autoTimerRef = useRef(null);      // auto-advance timer at the gate
