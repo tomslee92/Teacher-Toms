@@ -205,7 +205,7 @@ const SESSION_NOTES_ENABLED = true;
 const SCENARIOS_STUDENT_ENABLED = false;
 // Groups (by id) allowed to see curated scenarios while still gated from everyone else.
 // Add a group id here to roll out to that class without flipping the global switch.
-const SCENARIOS_ALLOW_GROUP_IDS = ["b629d52c-73cf-421d-a686-7c8d9cecbda3"]; // Group 4 (Judy)
+const SCENARIOS_ALLOW_GROUP_IDS = ["b629d52c-73cf-421d-a686-7c8d9cecbda3", "c56f444b-8dce-49af-b685-eb7e6945f6c1"]; // Group 4 (Judy) · 🧪 Test (Wave) test group. Add Group 1 (033a3fed…) here at Narim rollout.
 
 // Dark mode (v3, ⑮): ONE module flag flips the whole app's palette. It's set true only
 // while a v3 student is in a dark session (see StudentScreen); every C.* and WAYVE_TOKENS.*
@@ -4443,6 +4443,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
   const [practiceSegment, setPracticeSegment] = useState(rv3 && initialTab === "myphrases" ? "mylist" : "week"); // "week" | "mylist"
   const [showWavy, setShowWavy] = useState(false);
   const [scenarioToLaunch, setScenarioToLaunch] = useState(null); // curated scenario chosen from the home card
+  const [scenarioRefreshKey, setScenarioRefreshKey] = useState(0); // bump on Wavi close → re-read scenario completions in the picker
   const [showProfile, setShowProfile] = useState(false);
   const [profileUser, setProfileUser] = useState(user);
   const lang = profileUser?.language || "ko";
@@ -4860,6 +4861,7 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
                 onOpenProfile: () => setShowProfile(true),
                 onStartScenario: (sc) => { setScenarioToLaunch(sc); setShowWavy(true); },
                 onOpenDailyQuestion,
+                scenarioRefreshKey,
               })
             ) : (user.home_v2_enabled || TEACHER_NAMES.includes(user.name)) ? (
               React.createElement(HomeGridV2, {
@@ -4936,8 +4938,8 @@ function StudentScreen({ user, group, isPreview, onBack, onSwitchToTeacher, font
       group,
       lang,
       initialScenarioId: scenarioToLaunch?.id || null,
-      onClose: () => { setShowWavy(false); setScenarioToLaunch(null); },
-      onManualExit: () => { setShowWavy(false); setScenarioToLaunch(null); },
+      onClose: () => { setShowWavy(false); setScenarioToLaunch(null); setScenarioRefreshKey(k => k + 1); },
+      onManualExit: () => { setShowWavy(false); setScenarioToLaunch(null); setScenarioRefreshKey(k => k + 1); },
     })}
 
     {showProfile && (rv3
@@ -18059,6 +18061,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const [scenarioLines, setScenarioLines] = useState([]);  // [{ id, sequence_order, speaker, english_text, korean_text }]
   const [scenarioIdx, setScenarioIdx] = useState(0);       // current line index
   const [scenarioOffer, setScenarioOffer] = useState(null);// { lineId, kind } when an exposure/shadow offer is shown
+  const [listenComplete, setListenComplete] = useState(false); // ⑩B handoff screen (after one full listen)
+  const [shadowCompare, setShadowCompare] = useState(null); // ⑪A compare card: { text, url } after a recording
+  const [shadowSummary, setShadowSummary] = useState(null); // ⑪B summary: { minutes, phrases }
+  const shadowedPhrasesRef = useRef([]); // English phrases the student shadowed this session (for ⑪B)
   const [shadowMode, setShadowMode] = useState(false);     // true during the Shadowing second pass (mic on)
   const [scShadowPraise, setScShadowPraise] = useState(false); // brief "encouraging" flash after the student speaks
   const [scenarioVideoUrl, setScenarioVideoUrl] = useState(null); // current line's pre-rendered clip (plays instead of avatar+TTS)
@@ -18392,6 +18398,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   const resumeResolveRef = useRef(null);  // resolves waitWhilePaused on resume
   const autoTimerRef = useRef(null);      // auto-advance timer at the gate
   const replayPendingRef = useRef(false); // a replay was requested mid-playback
+  const skipPendingRef = useRef(false);   // a "next" was requested mid-playback → advance
 
   // Play a pre-rendered line clip (carries its own audio, so no TTS). Resolves when the
   // video ends, errors, or a 30s safety cap fires — so the loop can never hang on it.
@@ -18463,6 +18470,29 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     if (r) r(accepted);
   };
 
+  // ⑩B listen-complete handoff — full screen; resolves true (shadow) / false (stop).
+  const listenCompleteResolveRef = useRef(null);
+  const showListenComplete = () => new Promise((resolve) => { listenCompleteResolveRef.current = resolve; setListenComplete(true); });
+  const answerListenComplete = (go) => {
+    setListenComplete(false);
+    const r = listenCompleteResolveRef.current; listenCompleteResolveRef.current = null;
+    if (r) r(go);
+  };
+
+  // ⑪A compare card — after a shadow recording; resolves "redo" | "next".
+  const shadowCompareResolveRef = useRef(null);
+  const showShadowCompare = (text, url) => new Promise((resolve) => {
+    shadowCompareResolveRef.current = { resolve, url };
+    setShadowCompare({ text, url });
+  });
+  const answerShadowCompare = (choice) => {
+    const rc = shadowCompareResolveRef.current; shadowCompareResolveRef.current = null;
+    setShadowCompare(null);
+    if (rc) { try { URL.revokeObjectURL(rc.url); } catch(_) {} rc.resolve(choice); }
+  };
+  // Play the student's own recording (from a blob URL). Plain play-from-start, no seeking.
+  const playShadowBlob = (url) => { try { const a = new Audio(url); a.play().catch(() => {}); } catch(_) {} };
+
   // Block until resumed when paused.
   const waitWhilePaused = () => new Promise((resolve) => {
     if (!pausedRef.current) { resolve(); return; }
@@ -18484,7 +18514,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // Play one line at the current rate; loop on replay; honor pause. Returns when it's time
   // to advance. Single audio stream at a time — fixes the replay race.
   const presentLine = async (line) => {
-    const voiceId = line.speaker === "student" ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID;
+    const voiceId = line.speaker === "student" ? WAVY_VOICE_ID : (scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID);
     for (;;) {
       if (shouldBail()) return;
       await waitWhilePaused();
@@ -18498,6 +18528,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       } catch(e) { /* aborted (pause/replay) */ }
       setWavyState("idle");
       if (shouldBail()) return;
+      if (skipPendingRef.current) { skipPendingRef.current = false; return; }        // "next" mid-play → advance
       if (replayPendingRef.current) { replayPendingRef.current = false; continue; } // replay hit mid-play
       const intent = await waitIntent();
       if (shouldBail()) return;
@@ -18513,6 +18544,17 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       const r = intentResolveRef.current; intentResolveRef.current = null; r("replay");
     } else {
       replayPendingRef.current = true;
+      try { abortRef.current?.abort(); } catch(_) {}
+    }
+  };
+
+  // Advance to the next line now (skip the auto-advance beat, or cut the current playback).
+  const nextLine = () => {
+    if (intentResolveRef.current) {
+      clearTimeout(autoTimerRef.current);
+      const r = intentResolveRef.current; intentResolveRef.current = null; r("advance");
+    } else {
+      skipPendingRef.current = true;
       try { abortRef.current?.abort(); } catch(_) {}
     }
   };
@@ -18562,41 +18604,17 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       await presentLine(line); // controlled play: speed, pause/resume, replay, auto-advance
       if (shouldBail()) return;
       // Exposure-driven offers apply to student-role lines only.
-      if (isStudent && line.id) {
-        const { count, attempted } = await bumpExposure(user.id, line.id);
-        listenCounts.push(count);
-        // 1-2 pure listen · 3 warm offer · 4-5 gentle reminder ONLY if not yet attempted · 6+ stop
-        const offer = count === 3 || ((count === 4 || count === 5) && !attempted);
-        if (offer) {
-          await scenarioSay("한 번 말해볼까요?", WAVY_VOICE_ID);
-          if (shouldBail()) return;
-          const accepted = await showExposureOffer(line, count === 3 ? "warm" : "gentle");
-          if (shouldBail()) return;
-          if (accepted) {
-            markAttempted(user.id, line.id);
-            await scenarioSay("좋아요! 천천히 다시 들려드릴게요. 같이 말해보세요.", WAVY_VOICE_ID);
-            if (shouldBail()) return;
-            await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID, Math.min(rateRef.current, 0.7)); // slowed replay to shadow along
-          }
-        }
-      }
+      // Track exposure only; no mid-listen offers — the flow hands off to shadowing (⑩B) after one listen.
+      if (isStudent && line.id) bumpExposure(user.id, line.id);
     }
     if (shouldBail()) return;
-    // Offer Shadowing only after the student has heard the whole scenario 3+ times
-    // (full-listen count = the min exposure across the scenario's student-role lines).
-    const fullListens = listenCounts.length ? Math.min(...listenCounts) : 0;
-    if (fullListens >= 3) {
-      await scenarioSay("잘 들으셨어요! 이번에는 직접 말해볼까요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
-      if (shouldBail()) return;
-      const wantShadow = await showExposureOffer({ id: "shadow" }, "shadow");
-      if (shouldBail()) return;
-      if (wantShadow) { await runShadowing(lines); return; }
-      await scenarioSay("좋아요, 오늘은 여기까지예요. 수고하셨어요!", WAVY_VOICE_ID);
-      endScenario();
-    } else {
-      await scenarioSay("오늘도 잘 들으셨어요. 수고하셨어요!", WAVY_VOICE_ID);
-      endScenario();
-    }
+    // ⑩B — after ONE complete listen, hand off to shadowing (no 3-listen gate).
+    await scenarioSay("다 들으셨어요! 이번엔 직접 말해볼까요? 제가 상대방을 맡을게요.", WAVY_VOICE_ID);
+    if (shouldBail()) return;
+    const wantShadow = await showListenComplete();
+    if (shouldBail()) return;
+    if (wantShadow) { await runShadowing(lines); return; }
+    endScenario();
   };
 
   // ── Shadowing Mode (second pass) ────────────────────────────────────────────
@@ -18604,16 +18622,16 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // no judgment — like rehearsing a scene. 5s of silence and Wavi gently moves on.
   const captureShadowLine = () => new Promise((resolve) => {
     let settled = false;
-    const done = (spoke) => { if (settled) return; settled = true; setMicLevel(0); setWavyState("idle"); resolve(spoke); };
+    const done = (spoke, blob) => { if (settled) return; settled = true; setMicLevel(0); setWavyState("idle"); resolve({ spoke, blob: blob || null }); };
     let listener;
     try {
       listener = new WavyVoiceListener({ silenceDurationMs: 1200, speechMinDurationMs: 400, noSpeechTimeoutMs: 5000, maxRecordingMs: 12000 });
-    } catch(e) { return resolve(false); }
+    } catch(e) { return resolve({ spoke: false, blob: null }); }
     listenerRef.current = listener;
     setWavyState("listening");
     listener.start({
-      onResult: () => done(true),    // they spoke — blob intentionally discarded (no scoring)
-      onTimeout: () => done(false),  // 5s silence / no mic — move on
+      onResult: (blob) => done(true, blob),  // retained in memory for self-comparison (never uploaded/scored)
+      onTimeout: () => done(false, null),    // 5s silence / no mic — move on
       onAmplitude: (lvl) => setMicLevel(lvl),
     });
   });
@@ -18632,39 +18650,57 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     if (shouldBail()) return;
     setShadowMode(true);
     setScenarioIdx(0);
-    await scenarioSay("좋아요! 나의 차례가 오면 직접 말해보세요. 천천히 해도 괜찮아요.", WAVY_VOICE_ID);
+    shadowedPhrasesRef.current = [];
+    const isFramingLine = (l) => l.speaker === "student" && !/[a-zA-Z]/.test(l.english_text || "");
+    const otherVoice = scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
+    await scenarioSay("좋아요! 제가 먼저 문장을 들려드릴게요. 그다음 따라 말해보세요.", WAVY_VOICE_ID);
     for (let i = 0; i < lines.length; i++) {
       if (shouldBail()) return;
       setScenarioIdx(i);
       const line = lines[i];
-      const isStudent = line.speaker === "student";
-      await sleep(250);
+      await sleep(220);
       if (shouldBail()) return;
-      if (isStudent) {
-        await sleep(300); // brief pause — line stays on screen, then mic opens
+      if (isFramingLine(line)) {
+        // Wavi's Korean aside — play it, never ask to shadow it.
+        await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID);
+      } else if (line.speaker === "student") {
+        // Wavi models the line, then the student shadows → self-comparison (no scoring).
+        await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID);
         if (shouldBail()) return;
-        const spoke = await captureShadowLine();
-        if (shouldBail()) return;
-        if (spoke) {
-          if (line.id) markAttempted(user.id, line.id);
-          setScShadowPraise(true);
-          await sleep(900);
-          setScShadowPraise(false);
-        } else {
-          await scenarioSay("괜찮아요, 다음으로 가볼게요.", WAVY_VOICE_ID);
+        let redo = true;
+        while (redo) {
+          await sleep(250);
+          if (shouldBail()) return;
+          const { spoke, blob } = await captureShadowLine();
+          if (shouldBail()) return;
+          if (spoke && line.id) markAttempted(user.id, line.id);
+          if (spoke && blob) {
+            setScShadowPraise(true); await sleep(600); setScShadowPraise(false);
+            const url = URL.createObjectURL(blob);
+            const choice = await showShadowCompare(fillName(line.english_text), url);
+            if (shouldBail()) return;
+            redo = (choice === "redo");
+            if (!redo) shadowedPhrasesRef.current.push(fillName(line.english_text));
+          } else {
+            await scenarioSay("괜찮아요, 다음으로 가볼게요.", WAVY_VOICE_ID); // 5s silence / no mic
+            redo = false;
+          }
         }
       } else if (line.wavi_video_url) {
         await playLineVideo(line.wavi_video_url); setScenarioVideoUrl(null); setWavyState("idle");
       } else {
-        await scenarioSay(fillName(line.english_text), SCENARIO_OTHER_VOICE_ID);
+        await scenarioSay(fillName(line.english_text), otherVoice);
       }
       if (shouldBail()) return;
       await sleep(200);
     }
     if (shouldBail()) return;
     setShadowMode(false);
-    await scenarioSay("정말 잘하셨어요! 한 장면을 끝까지 해냈어요. 수고하셨어요!", WAVY_VOICE_ID);
-    endScenario();
+    // ⑪B — the ONLY persistence in this flow: mark this scenario complete (upsert; re-runnable, no counter).
+    if (scenario?.id) db.upsert("scenario_completions?on_conflict=student_id,scenario_id", { student_id: user.id, scenario_id: scenario.id }).catch(() => {});
+    const durSec = Math.round((Date.now() - (sessionStartTimeRef.current || Date.now())) / 1000);
+    if (durSec > 1) { try { reportWaviSessionTime(user.id, durSec); } catch(_) {} }
+    setShadowSummary({ minutes: Math.max(1, Math.round(durSec / 60)), phrases: shadowedPhrasesRef.current.slice() });
   };
 
   const endScenario = () => {
@@ -20247,41 +20283,92 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     );
   }
 
-  // ── Listen Mode (scenario) render — light, message-bubble layout (WAYVE_TOKENS) ──
+  // ── ⑪B Shadowing summary (shown over the scenario phase) ──
+  if (phase === "scenario" && shadowSummary) {
+    const restart = () => { setShadowSummary(null); setScenarioIdx(0); runScenario(scenarioLines, scenario); };
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 50%, #0B1F3A 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
+      React.createElement("style", null, "html, body { background: #0B1F3A !important; }"),
+      React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", gap: "14px" } },
+        React.createElement("div", { style: { width: "72px", height: "72px", borderRadius: "50%", background: "#22C55E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px", color: "#fff", fontWeight: "800", boxShadow: "0 10px 30px rgba(34,197,94,0.35)" } }, "✓"),
+        React.createElement("div", { style: { fontSize: "22px", fontWeight: "800", color: "#fff" } }, "수고하셨어요!"),
+        React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: "rgba(255,255,255,0.75)", textAlign: "center" } }, `${shadowSummary.minutes}분 · 표현 ${shadowSummary.phrases.length}개가 입에 붙었어요`),
+        shadowSummary.phrases.length > 0 && React.createElement("div", { style: { width: "100%", maxWidth: "360px", background: "#fff", borderRadius: "20px", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" } },
+          shadowSummary.phrases.map((p, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "flex-start", gap: "8px" } },
+            React.createElement("span", { style: { color: "#22C55E", fontWeight: "800", fontSize: "14px", flexShrink: 0, marginTop: "1px" } }, "✓"),
+            React.createElement("span", { style: { fontSize: "14px", fontWeight: "600", color: "#0B1F3A", lineHeight: 1.4, wordBreak: "keep-all" } }, `"${p}"`)
+          ))
+        ),
+        React.createElement("div", { style: { fontSize: "13px", color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 1.55, wordBreak: "keep-all", marginTop: "4px", maxWidth: "320px" } }, "내일 같은 시나리오를 한 번 더 들으면 완전히 내 것이 돼요.")
+      ),
+      React.createElement("div", { style: { flexShrink: 0, padding: "12px 20px calc(18px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: "10px" } },
+        React.createElement("button", { onClick: () => { setShadowSummary(null); exitWavi(); }, style: { width: "100%", padding: "16px", borderRadius: "100px", border: "none", background: "#3E7BFA", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT } }, "홈으로"),
+        React.createElement("button", { onClick: restart, style: { width: "100%", padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.8)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "한 번 더 듣기")
+      )
+    );
+  }
+
+  // ── ⑩B Listen-complete → shadow handoff (shown over the scenario phase) ──
+  if (phase === "scenario" && listenComplete) {
+    const dialogueCount = scenarioLines.filter(l => !(l.speaker === "student" && !/[a-zA-Z]/.test(l.english_text || ""))).length;
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 50%, #0B1F3A 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
+      React.createElement("style", null, "html, body { background: #0B1F3A !important; }"),
+      React.createElement("div", { style: { display: "flex", alignItems: "center", padding: "10px 16px", flexShrink: 0 } },
+        React.createElement("button", { onClick: exitWavi, style: { background: "transparent", border: "none", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, padding: "6px 4px" } }, "← 나가기")
+      ),
+      React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 30px", gap: "18px" } },
+        React.createElement("div", { style: { width: "72px", height: "72px", borderRadius: "50%", background: "#22C55E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px", color: "#fff", fontWeight: "800", boxShadow: "0 10px 30px rgba(34,197,94,0.35)" } }, "✓"),
+        React.createElement("div", { style: { fontSize: "22px", fontWeight: "800", color: "#fff" } }, "다 들었어요"),
+        React.createElement("div", { style: { display: "flex", gap: "3px", width: "100%", maxWidth: "300px" } }, Array.from({ length: Math.max(dialogueCount, 1) }).map((_, i) => React.createElement("div", { key: i, style: { flex: 1, height: "4px", borderRadius: "100px", background: "#22C55E" } }))),
+        React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.7)", textAlign: "center", lineHeight: 1.5, wordBreak: "keep-all" } }, "이번엔 직접 말해볼까요? 제가 상대방을 맡을게요.")
+      ),
+      React.createElement("div", { style: { flexShrink: 0, padding: "12px 20px calc(18px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: "10px" } },
+        React.createElement("button", { onClick: () => answerListenComplete(true), style: { width: "100%", padding: "16px", borderRadius: "100px", border: "none", background: "#3E7BFA", color: "#fff", fontSize: "16px", fontWeight: "800", cursor: "pointer", fontFamily: FONT } }, "이어서 따라 말하기 · 약 2분 →"),
+        React.createElement("button", { onClick: () => answerListenComplete(false), style: { width: "100%", padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.8)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "오늘은 여기까지")
+      )
+    );
+  }
+
+  // ── Listen Mode (scenario) render — full-screen navy player (⑩A) ──
   if (phase === "scenario") {
-    const T = WAYVE_TOKENS;
     const firstName = (user?.name || "").trim().split(/\s+/)[0] || "";
-    // Wavi only "speaks" the student-role lines (she coaches them); on an "other" line she listens.
+    // A "framing" line is Wavi's Korean scene-set/close (student-role, no English) — an aside,
+    // not a dialogue turn: rendered centered, and excluded from shadow targets + the 문장 count.
+    const isFraming = (l) => l && l.speaker === "student" && !/[a-zA-Z]/.test(l.english_text || "");
     const curSpeaker = (scenarioLines[scenarioIdx] || {}).speaker;
-    const waviSpeaking = wavyState === "speaking" && curSpeaker !== "other"; // her voice (vs the other person's)
+    const waviSpeaking = wavyState === "speaking" && curSpeaker !== "other";
     const charExpr = scShadowPraise ? "encouraging"
-      : wavyState === "listening" ? "listening"          // mic active (shadowing)
-      : (wavyState === "speaking" && curSpeaker === "other") ? "listening"  // other person talking → Wavi listens
-      : wavyState === "speaking" ? "speaking"            // Wavi coaching the student line
+      : wavyState === "listening" ? "listening"
+      : (wavyState === "speaking" && curSpeaker === "other") ? "listening"
+      : wavyState === "speaking" ? "speaking"
       : "neutral";
     const isTomsAcct = user?.name === "Toms Lee" || user?.name === "Toms";
-    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: T.bgGrouped, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
-      React.createElement("style", null, "html, body { background: #F2F3F7 !important; } @keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}} @keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes scPop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}"),
+    const slow = playbackRate <= 0.7;
+    const dialogueCount = scenarioLines.filter(l => !isFraming(l)).length;
+    const curDialogueNo = scenarioLines.slice(0, scenarioIdx + 1).filter(l => !isFraming(l)).length;
+    const otherVoice = scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
+    const cBtn = (label, onClick, primary) => React.createElement("button", { onClick, style: { background: primary ? "#3E7BFA" : "rgba(255,255,255,0.10)", border: primary ? "none" : "1px solid rgba(255,255,255,0.18)", color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "10px 15px", borderRadius: "100px" } }, label);
+    return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 50%, #0B1F3A 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
+      React.createElement("style", null, "html, body { background: #0B1F3A !important; } @keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}} @keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes scPop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}"),
       // Top bar
       React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", flexShrink: 0 } },
-        React.createElement("button", { onClick: exitWavi, style: { background: "transparent", border: "none", color: T.ink2, fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, padding: "6px 4px" } }, "← 나가기"),
-        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T.ink, display: "flex", alignItems: "center", gap: "5px", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, React.createElement("span", { style: { fontSize: "15px" } }, "🌊"), React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis" } }, scenario ? scenario.title : "Wavi")),
+        React.createElement("button", { onClick: exitWavi, style: { background: "transparent", border: "none", color: "rgba(255,255,255,0.7)", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: FONT, padding: "6px 4px" } }, "← 나가기"),
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: "#fff", display: "flex", alignItems: "center", gap: "5px", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, React.createElement("span", null, "🌊"), React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis" } }, scenario ? scenario.title : "Wavi")),
         isTomsAcct
-          ? React.createElement("button", { onClick: () => setShowScenarioChar(v => !v), title: "Toggle character (A/B)", style: { background: showScenarioChar ? T.waveSoft : "transparent", border: `1px solid ${T.hairline}`, color: showScenarioChar ? T.wave : T.ink3, fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "5px 9px", borderRadius: T.rPill } }, "👤")
+          ? React.createElement("button", { onClick: () => setShowScenarioChar(v => !v), title: "Toggle character (A/B)", style: { background: showScenarioChar ? "rgba(255,255,255,0.16)" : "transparent", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "5px 9px", borderRadius: "100px" } }, "👤")
           : React.createElement("div", { style: { width: "30px" } })
       ),
       // Scene-setter screen
       scenarioIntroText && React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 30px", gap: "20px", animation: "scFade 0.5s ease both" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: T.ink3 } }, "잠깐, 상상해 보세요"),
-        React.createElement("div", { style: { fontSize: "21px", fontWeight: "700", color: T.ink, lineHeight: 1.55, textAlign: "center", wordBreak: "keep-all" } }, scenarioIntroText),
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "2px", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" } }, "잠깐, 상상해 보세요"),
+        React.createElement("div", { style: { fontSize: "21px", fontWeight: "700", color: "#fff", lineHeight: 1.55, textAlign: "center", wordBreak: "keep-all" } }, scenarioIntroText),
         React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "5px", height: "26px" } },
-          [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "5px", height: "24px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none", opacity: wavyState === "speaking" ? 1 : 0.4 } }))
+          [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "5px", height: "24px", borderRadius: "100px", background: "#6FA0FF", transformOrigin: "bottom", transform: "scaleY(0.3)", animation: wavyState === "speaking" ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none", opacity: wavyState === "speaking" ? 1 : 0.4 } }))
         )
       ),
-      // Main: character (flagged) + progress dots + bubble transcript + controls
+      // Player
       !scenarioIntroText && React.createElement(React.Fragment, null,
-        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "14px 0 6px", flexShrink: 0 } },
-          React.createElement("div", { style: { position: "relative", width: "84px", height: "84px", borderRadius: "50%", overflow: "hidden", background: T.card, border: `2px solid ${T.card}`, boxShadow: `0 4px 14px rgba(16,24,40,.10)${waviSpeaking ? `, 0 0 0 3px ${T.waveSoft}` : ""}`, transition: "box-shadow 0.3s ease" } },
+        (showScenarioChar || scenarioVideoUrl) && React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "8px 0 2px", flexShrink: 0 } },
+          React.createElement("div", { style: { position: "relative", width: "76px", height: "76px", borderRadius: "50%", overflow: "hidden", background: "rgba(255,255,255,0.08)", boxShadow: waviSpeaking ? "0 0 0 3px rgba(62,123,250,0.4)" : "none", transition: "box-shadow 0.3s ease" } },
             scenarioVideoUrl
               ? React.createElement("video", { src: scenarioVideoUrl, autoPlay: true, playsInline: true,
                   onCanPlay: (e) => { try { e.target.play().catch(() => {}); } catch(_) {} },
@@ -20289,46 +20376,73 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
                   onError: () => { const r = videoDoneRef.current; videoDoneRef.current = null; if (r) r(); },
                   style: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 16%" } })
               : ["neutral", "speaking", "listening", "encouraging"].map(exp => React.createElement("img", { key: exp, src: `/wavi-${exp}.png`, alt: "", "aria-hidden": "true", onError: (e) => { e.target.style.visibility = "hidden"; }, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 16%", opacity: charExpr === exp ? 1 : 0, transition: "opacity 0.3s ease" } }))
-          ),
-          React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "3px", height: "12px", opacity: waviSpeaking ? 1 : 0, transition: "opacity 0.3s" } },
-            [0, 1, 2].map(i => React.createElement("div", { key: i, style: { width: "3px", height: "11px", borderRadius: "100px", background: T.wave, transformOrigin: "bottom", transform: "scaleY(0.3)", animation: waviSpeaking ? `scBar 0.8s ease-in-out ${i * 0.12}s infinite` : "none" } }))
           )
         ),
-        React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: "5px", padding: "10px 0 4px", flexShrink: 0 } },
-          scenarioLines.map((_, i) => React.createElement("div", { key: i, style: { width: i === scenarioIdx ? "18px" : "6px", height: "6px", borderRadius: "100px", background: i === scenarioIdx ? T.wave : (i < scenarioIdx ? "rgba(62,123,250,0.4)" : T.hairline), transition: "all 0.3s" } }))
+        // Segment bar + 문장 count (framing lines excluded from the count)
+        React.createElement("div", { style: { padding: "10px 20px 4px", flexShrink: 0 } },
+          React.createElement("div", { style: { display: "flex", gap: "3px", marginBottom: "6px" } },
+            scenarioLines.map((_, i) => React.createElement("div", { key: i, style: { flex: 1, height: "3px", borderRadius: "100px", background: i === scenarioIdx ? "#6FA0FF" : (i < scenarioIdx ? "rgba(111,160,255,0.45)" : "rgba(255,255,255,0.14)"), transition: "all 0.3s" } }))
+          ),
+          React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.5)", textAlign: "center" } }, `${Math.min(curDialogueNo, dialogueCount)} / ${dialogueCount} 문장`)
         ),
-        React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: "14px" } },
+        // Transcript
+        React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "8px 16px 16px", display: "flex", flexDirection: "column", gap: "12px" } },
           scenarioLines.slice(0, scenarioIdx + 1).map((l, i) => {
-            const stu = l.speaker === "student"; const cur = i === scenarioIdx;
-            return React.createElement("div", { key: l.id || i, style: { display: "flex", flexDirection: "column", alignItems: stu ? "flex-end" : "flex-start", animation: cur ? "scPop 0.35s ease both" : "none" } },
-              React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", color: stu ? T.wave : T.ink3, letterSpacing: "0.3px", marginBottom: "5px", padding: "0 8px" } }, stu ? `${firstName}의 역할` : "상대방 · Staff"),
-              React.createElement("div", { style: { maxWidth: "84%", background: stu ? T.waveSoft : T.card, border: stu ? "1px solid rgba(62,123,250,0.22)" : `1px solid ${T.hairline}`, borderRadius: stu ? "20px 7px 20px 20px" : "7px 20px 20px 20px", padding: "12px 14px", boxShadow: cur ? T.shadowCard : "none", opacity: cur ? 1 : 0.66, transition: "opacity 0.3s, box-shadow 0.3s" } },
-                React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: T.ink, lineHeight: 1.4, wordBreak: "keep-all" } }, `"${fillName(l.english_text)}"`),
-                l.korean_text && React.createElement("div", { style: { fontSize: "13px", color: T.ink2, lineHeight: 1.5, marginTop: "5px", wordBreak: "keep-all" } }, fillName(l.korean_text)),
-                React.createElement("button", { onClick: () => (cur ? replayLine() : scenarioSay(fillName(l.english_text), stu ? WAVY_VOICE_ID : SCENARIO_OTHER_VOICE_ID)), style: { marginTop: "8px", background: "transparent", border: "none", color: T.wave, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: 0 } }, "▶ 다시 듣기")
+            const cur = i === scenarioIdx;
+            if (isFraming(l)) {
+              return React.createElement("div", { key: l.id || i, style: { textAlign: "center", padding: "4px 16px", opacity: cur ? 1 : 0.4, animation: cur ? "scPop 0.35s ease both" : "none", transition: "opacity 0.3s" } },
+                React.createElement("div", { style: { fontSize: "14px", color: "rgba(255,255,255,0.85)", lineHeight: 1.55, wordBreak: "keep-all", fontStyle: "italic" } }, fillName(l.english_text))
+              );
+            }
+            const stu = l.speaker === "student";
+            return React.createElement("div", { key: l.id || i, style: { display: "flex", flexDirection: "column", alignItems: stu ? "flex-end" : "flex-start", opacity: cur ? 1 : 0.4, animation: cur ? "scPop 0.35s ease both" : "none", transition: "opacity 0.3s" } },
+              React.createElement("div", { style: { fontSize: "10px", fontWeight: "800", color: stu ? "#6FA0FF" : "rgba(255,255,255,0.5)", letterSpacing: "0.3px", marginBottom: "4px", padding: "0 8px" } }, stu ? `${firstName}의 역할` : "상대방"),
+              React.createElement("div", { style: { maxWidth: "84%", background: stu ? "rgba(62,123,250,0.22)" : "rgba(255,255,255,0.10)", border: stu ? "1px solid rgba(111,160,255,0.35)" : "1px solid rgba(255,255,255,0.14)", borderRadius: stu ? "20px 7px 20px 20px" : "7px 20px 20px 20px", padding: "12px 14px" } },
+                React.createElement("div", { style: { fontSize: "17px", fontWeight: "700", color: "#fff", lineHeight: 1.4, wordBreak: "keep-all" } }, `"${fillName(l.english_text)}"`),
+                l.korean_text && React.createElement("div", { style: { fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: 1.5, marginTop: "5px", wordBreak: "keep-all" } }, fillName(l.korean_text)),
+                React.createElement("button", { onClick: () => (cur ? replayLine() : scenarioSay(fillName(l.english_text), stu ? WAVY_VOICE_ID : otherVoice)), style: { marginTop: "8px", background: "transparent", border: "none", color: "#6FA0FF", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: 0 } }, "▶ 다시 듣기")
               )
             );
           }),
           React.createElement("div", { ref: scenarioEndRef })
         ),
-        React.createElement("div", { style: { flexShrink: 0, padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", borderTop: `1px solid ${T.hairline}`, background: T.card } },
+        // Bottom controls
+        React.createElement("div", { style: { flexShrink: 0, padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", borderTop: "1px solid rgba(255,255,255,0.10)" } },
           scenarioOffer
             ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-                React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: T.ink, textAlign: "center", wordBreak: "keep-all" } }, scenarioOffer.kind === "shadow" ? "이번에는 직접 말해볼까요?" : "한 번 말해볼까요?"),
+                React.createElement("div", { style: { fontSize: "15px", fontWeight: "700", color: "#fff", textAlign: "center", wordBreak: "keep-all" } }, scenarioOffer.kind === "shadow" ? "이번에는 직접 말해볼까요?" : "한 번 말해볼까요?"),
                 React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%", maxWidth: "360px" } },
-                  React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: T.rPill, border: `1px solid ${T.hairline}`, background: T.card, color: T.ink2, fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "다음에요"),
-                  React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: T.rPill, border: "none", background: T.wave, color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "네, 해볼게요")
+                  React.createElement("button", { onClick: () => answerOffer(false), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.10)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, scenarioOffer.kind === "shadow" ? "다음에 할게요" : "다음에요"),
+                  React.createElement("button", { onClick: () => answerOffer(true), style: { flex: 1, padding: "13px", borderRadius: "100px", border: "none", background: "#3E7BFA", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT } }, "네, 해볼게요")
                 )
               )
-            : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-                React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: shadowMode && wavyState === "listening" ? T.wave : scShadowPraise ? T.wave : T.ink3, minHeight: "16px" } }, shadowMode && wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "따라 들어보세요"),
-                !shadowMode && !scenarioVideoUrl && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "10px" } },
-                  React.createElement("button", { onClick: togglePause, style: { background: paused ? T.waveSoft : T.bgGrouped, border: `1px solid ${T.hairline}`, color: paused ? T.wave : T.ink, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "9px 16px", borderRadius: T.rPill } }, paused ? "▶ 계속하기" : "⏸ 잠깐 멈춤"),
-                  React.createElement("div", { style: { display: "flex", borderRadius: T.rPill, overflow: "hidden", border: `1px solid ${T.hairline}` } },
-                    [0.5, 0.75, 1].map(r => React.createElement("button", { key: r, onClick: () => setRate(r), style: { background: playbackRate === r ? T.wave : T.card, border: "none", color: playbackRate === r ? "#fff" : T.ink2, fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "8px 14px" } }, r === 1 ? "1x" : `${r}x`))
+            : shadowMode
+              ? (shadowCompare
+                  ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
+                      React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.55)" } }, "🎧 들어보고 비교해 보세요"),
+                      React.createElement("div", { style: { display: "flex", gap: "8px" } },
+                        cBtn("🌊 Wavi 발음", () => scenarioSay(shadowCompare.text, WAVY_VOICE_ID)),
+                        cBtn("🎤 내 목소리", () => playShadowBlob(shadowCompare.url))
+                      ),
+                      React.createElement("div", { style: { display: "flex", gap: "8px" } },
+                        cBtn("↺ 다시 녹음", () => answerShadowCompare("redo")),
+                        cBtn("다음 문장 →", () => answerShadowCompare("next"), true)
+                      ),
+                      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)" } }, "점수 없음 · 몇 번이든 괜찮아요")
+                    )
+                  : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" } },
+                      React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: wavyState === "listening" ? "#6FA0FF" : scShadowPraise ? "#4ADE80" : "rgba(255,255,255,0.6)", minHeight: "16px" } }, wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "잠깐만요…"),
+                      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)" } }, "점수 없음 · 몇 번이든 괜찮아요")
+                    ))
+              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
+                  React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.45)", minHeight: "14px" } }, wavyState === "speaking" ? "듣는 중…" : paused ? "멈춤" : "따라 들어보세요"),
+                  React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" } },
+                    cBtn("↺ 다시", replayLine),
+                    cBtn(paused ? "▶ 계속" : "⏸ 멈춤", togglePause),
+                    cBtn("다음 ⏭", nextLine),
+                    cBtn(slow ? "천천히 ✓" : "천천히", () => setRate(slow ? 1 : 0.6), slow)
                   )
                 )
-              )
         )
       )
     );
@@ -23048,7 +23162,7 @@ const COLLECTION_META = {
   },
 };
 
-function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile, onStartScenario, onOpenDailyQuestion }) {
+function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile, onStartScenario, onOpenDailyQuestion, scenarioRefreshKey }) {
   const T3 = useTokens();
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || "친구";
   const [plan, setPlan] = useState(null); // { waviTotal, waviRemaining, reviewCount, listenDone, todayExpr, hasLast }
@@ -23144,7 +23258,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       } catch(e) {}
     })();
     return () => { cancelled = true; };
-  }, [user?.id, isPreview, group?.id]);
+  }, [user?.id, isPreview, group?.id, scenarioRefreshKey]);
 
   const [listenOpen, setListenOpen] = useState(false);
   const openMode = () => { haptic.medium(); setModeSheet(true); };
