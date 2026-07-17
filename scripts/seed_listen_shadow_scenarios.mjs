@@ -40,6 +40,14 @@ const FRAME = {
 const STARTERS = ["cafe", "taxi", "small"];
 const AUS = ["aus1", "aus2", "aus3", "aus4", "aus5", "aus6", "aus7", "aus8"];
 
+// The aus other-person voice (DYkrAHD8iwork3YSUBbs) is male; rename the female character
+// "Emma" to a common Australian male name so voice and name match.
+for (const key of AUS) {
+  const sc = SCN[key];
+  if (sc.other === "Emma") sc.other = "Liam";
+  sc.lines.forEach((l) => { if (l.en) l.en = l.en.split("Emma").join("Liam"); });
+}
+
 const dialogueLines = (key) => SCN[key].lines.map((l) => ({
   speaker: l.who === "m" ? "student" : "other",
   english_text: l.en,
