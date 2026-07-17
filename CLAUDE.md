@@ -26,7 +26,7 @@ If any of these conflict with what you find on disk, **the disk wins — say so 
 | Live URL | wayvekr.vercel.app (business site: wayvekr.com) |
 | Stack | React (createElement pattern) · Supabase (backend + auth) · Groq (AI generation) · ElevenLabs (TTS) · Vercel (hosting) |
 | Deploy | `cd <project path> && vercel --prod` |
-| Wavi voice ID | `n2fbxG88jqAoaVPUy3IG` (`WAVY_VOICE_ID` constant, ~line 15226) |
+| Wavi voice ID | `XrExE9yKIg1WjnnlVkGX` — ElevenLabs Matilda (`WAVY_VOICE_ID` constant, ~line 17293). Corrected 2026-07-17: earlier docs said `n2fbxG88jqAoaVPUy3IG` — wrong; disk is authoritative. |
 | Second voice ID ("other person" in scenarios) | `UgBBYS2sOqTuMpoF3BR0` |
 | ElevenLabs settings | stability 0.7, similarity_boost 0.8, style 0.0; per-segment `language_code` forcing (pure EN → "en", pure KO → "ko", mixed → auto) |
 | Groq models — **DEPRECATION DEADLINE Aug 16, 2026** | Current: `llama-3.3-70b-versatile` (primary), `llama-3.1-8b-instant` (fallback) — both decommissioned Aug 16, 2026. Replacements: `openai/gpt-oss-120b` (primary), `openai/gpt-oss-20b` (fallback). The `openai/` prefix is **part of the string**. GPT-OSS models are reasoning-style — re-test all structured-output paths (Scenario Builder especially). |
@@ -186,7 +186,7 @@ If any of these conflict with what you find on disk, **the disk wins — say so 
 - Group 4: Judy — beginner, golf-travel English, 20-min solo sessions ×3/week
 
 **Technical landmarks in App.js** (line numbers drift — search by name, not number)
-- `WAVY_VOICE_ID` (~15226) · `HomeGridV2` (~18965) · variant pools at top of `WavyScreen` after `sleep` helper · `pickVariant` / `lastVariantRef` · `fetchHomeData` in `AppInner` · `useActivityTracker` · `celebrateAndAdvance` (writes `passed: true` to `student_progress` — the recently fixed bug; old Wavi masteries before the fix still read as unpassed) · `TEACHER_NAMES` · multi-tag system (`phrase_tags` junction, BulkAutoTagger with "↺ Re-tag all")
+- `WAVY_VOICE_ID` (~17293, value `XrExE9yKIg1WjnnlVkGX`) · `HomeGridV3` (~23029; `HomeGridV2` still ~23235) · variant pools at top of `WavyScreen` after `sleep` helper · `pickVariant` / `lastVariantRef` · `fetchHomeData` in `AppInner` · `useActivityTracker` · `celebrateAndAdvance` (writes `passed: true` to `student_progress` — the recently fixed bug; old Wavi masteries before the fix still read as unpassed) · `TEACHER_NAMES` · multi-tag system (`phrase_tags` junction, BulkAutoTagger with "↺ Re-tag all")
 
 **Active workstreams**
 1. **Groq migration (deadline Aug 16, 2026)** — DONE on `redesign-v3`, **pending live validation**. `GROQ_MODEL_PRIMARY` / `GROQ_MODEL_FALLBACK` (near `GROQ_KEY`, ~line 16) are now `openai/gpt-oss-120b` / `openai/gpt-oss-20b`. Structured-output parsing was hardened first (`extractLLMJSON` / `stripReasoning` — tolerate reasoning `<think>` preambles). Remaining: manually validate the Groq JSON paths on the preview (phrase gen, AI translation review, BulkAutoTagger, how-to-say, FreeTalk feedback, today's-expression). Note the **Scenario Builder generation is on Gemini**, not Groq. Revert = restore the llama IDs (2 lines).
@@ -197,7 +197,7 @@ If any of these conflict with what you find on disk, **the disk wins — say so 
 **Known bug watch**
 - Galaxy student: male voice before English statements — suspected TalkBack; awaiting student check.
 - iPhone Korean accent — believed fixed (language forcing + voice swap); awaiting more sessions.
-- Voice `n2fbxG88jqAoaVPUy3IG` still needs real-session validation.
+- Voice `XrExE9yKIg1WjnnlVkGX` (Matilda) still needs real-session validation.
 
 **Explicitly not building**
 - Wavi dual-mode (accuracy + flow blended) · Wavi background music · childish gamification · push-notification infrastructure at current scale.

@@ -64,4 +64,19 @@ Locked spec: `TEACHER_DASHBOARD_REDESIGN.md`. Built behind `TEACHER_DASH_V3`.
 - `SCENARIOS_STUDENT_ENABLED` — flip after real-session validation (unlocks ⑩ rollout + ⑪ player).
 - ③ in-session Wavi listening — pending your OK to restyle (drop message list → last line + persistent 다시 듣기/건너뛰기), with a manual session test.
 - 알림 server-honored OFF (a `students.push_enabled` column) — add, or leave enable-only?
-- Student rollout: flip `redesign_v3_enabled` per student + bump `ONBOARDING_VERSION` at go-live.
+- Student rollout: flip `redesign_v3_enabled` per student. To re-show the v3 tour, set
+  `tutorial_seen = FALSE` for that student (NOT bump `ONBOARDING_VERSION` — that key is vestigial;
+  the real tour trigger is `students.tutorial_seen`). See `LAUNCH_CHECKLIST.md` §6.
+
+## Resolved / added 2026-07-17 (launch-prep session)
+- **Class requests unified.** `phrase_pins` retired; phrase nominations now live in `class_requests`
+  (`kind='phrase'`) alongside topic requests (`kind='text'`). Nominations feature intact
+  (AddPhrasesTab); reads kind-filtered so the two don't cross-leak. Migration
+  `20260717_class_requests_unify_phrase_pins.sql` (adds korean/context/source + backfill).
+- **Attendance-driven pulse.** Teacher dashboard dots now anchor on the most recent *logged*
+  attendance (resilient to reschedules); wrap-up date is editable; schedule optional.
+- **Inline group move** on every student-list row.
+- **Today wrap-up "add phrases"** now opens the add-phrases screen, not the Setup menu.
+- **`sb()` apikey bug fixed** — an `opts` spread was clobbering headers, so every `db.upsert`
+  (attendance, dismissals, typing indicators) 401'd "No API key". All upserts now work.
+- **Wavi voice ID** corrected in CLAUDE.md to the actual `XrExE9yKIg1WjnnlVkGX` (Matilda).
