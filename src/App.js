@@ -23040,11 +23040,21 @@ function ListenPlayerV3({ phrase, onClose, onDone }) {
 // streak line → Wavi resume card → Thankful Thursday (Thu) → 추천 세션 (curated,
 // gated). Plan state is derived from the same student_progress / session_phrases data
 // the legacy home reads — no new tables. "시작" / the Wavi card open the mode sheet (②).
+// Display metadata for curated scenario collections (⑪C collection group).
+const COLLECTION_META = {
+  "narim-australia": {
+    title: "나림 · 호주 한 달 준비",
+    parts: [{ label: "PART 1 · 친구 사귀기", from: 1, to: 5 }, { label: "PART 2 · 카페에서 일하기", from: 6, to: 8 }],
+  },
+};
+
 function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile, onStartScenario, onOpenDailyQuestion }) {
   const T3 = useTokens();
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || "친구";
   const [plan, setPlan] = useState(null); // { waviTotal, waviRemaining, reviewCount, listenDone, todayExpr, hasLast }
   const [scenarios, setScenarios] = useState([]);
+  const [scenarioStarter, setScenarioStarter] = useState(false); // true = showing the is_starter set (no assignments yet)
+  const [completedScenarioIds, setCompletedScenarioIds] = useState(new Set()); // scenario_completions for this student
   const [todayQod, setTodayQod] = useState(null); // { prompt, answered } — Thankful Thursday
   const [modeSheet, setModeSheet] = useState(false);
   const [requestSheet, setRequestSheet] = useState(false);
@@ -23106,8 +23116,19 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           const assigns = await db.get("scenario_assignments", `or=(${aOrs.join(",")})&select=scenario_id`).catch(() => []);
           const ids = [...new Set((assigns || []).map(a => a.scenario_id))];
           let scenarioRows = [];
-          if (ids.length) scenarioRows = await db.get("scenarios", `id=in.(${ids.join(",")})&is_active=eq.true&order=created_at.desc`).catch(() => []);
-          if (!cancelled) setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
+          if (ids.length) {
+            // Assigned wins. Order by sort_order so collection arcs render in sequence.
+            scenarioRows = await db.get("scenarios", `id=in.(${ids.join(",")})&is_active=eq.true&order=sort_order.asc.nullslast,created_at.desc`).catch(() => []);
+          } else {
+            // No assignment → the starter set (⑪C first-scenario picker).
+            scenarioRows = await db.get("scenarios", `is_starter=eq.true&is_active=eq.true&order=created_at.asc`).catch(() => []);
+          }
+          const comps = await db.get("scenario_completions", `student_id=eq.${user.id}&select=scenario_id`).catch(() => []);
+          if (!cancelled) {
+            setScenarios(Array.isArray(scenarioRows) ? scenarioRows : []);
+            setScenarioStarter(ids.length === 0);
+            setCompletedScenarioIds(new Set((comps || []).map(c => c.scenario_id)));
+          }
         }
         // Thankful Thursday — open all week; card only rendered on Thursday
         const todayPrompt = await ensureThankfulThursdayPrompt().catch(() => null);
@@ -23225,16 +23246,57 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       chevron(T3.ink3)
     ),
     // 추천 세션 — curated Listen sessions (gated; only when assigned)
-    scenariosVisible && scenarios.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" } },
-      React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between" } },
-        React.createElement("div", { style: { fontSize: "15px", fontWeight: "800", color: T3.ink } }, "추천 세션"),
-        React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: T3.ink3 } }, `${scenarios.length}`)
-      ),
-      scenarios.slice(0, 3).map(sc => React.createElement("button", { key: sc.id, onClick: () => onStartScenario && onStartScenario(sc), style: { background: T3.card, borderRadius: "20px", padding: "16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
-        React.createElement("div", { style: { flex: 1, fontSize: "16px", fontWeight: "800", color: T3.ink } }, sc.title || sc.name || "세션"),
-        React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: T3.wave } }, "듣기 →")
-      ))
-    ),
+    scenariosVisible && scenarios.length > 0 && (() => {
+      const done = (sc) => completedScenarioIds.has(sc.id);
+      // A scenario card. `ordered` = the sequence it belongs to (drives 이어서 vs 시작).
+      const card = (sc, ordered, badge) => {
+        const isDone = done(sc);
+        const firstUn = ordered.find(x => !done(x));
+        const isNext = firstUn && firstUn.id === sc.id;
+        const cta = isDone ? "다시 →" : isNext ? "이어서 →" : (scenarioStarter ? "듣기 →" : "시작 →");
+        return React.createElement("button", { key: sc.id, onClick: () => onStartScenario && onStartScenario(sc),
+          style: { background: T3.card, borderRadius: "20px", padding: "16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: isNext ? `1.5px solid ${T3.wave}` : "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left", opacity: isDone ? 0.62 : 1 } },
+          badge != null && React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", flexShrink: 0, background: isDone ? T3.waveSoft : T3.bgGrouped, color: isDone ? T3.wave : T3.ink3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 } }, isDone ? "✓" : String(badge)),
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            sc.category && React.createElement("div", { style: { fontSize: 10, fontWeight: 800, letterSpacing: 1, color: T3.ink3, textTransform: "uppercase", marginBottom: 2 } }, sc.category),
+            React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: T3.ink } }, sc.title || sc.name || "세션")
+          ),
+          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: T3.wave, flexShrink: 0 } }, cta)
+        );
+      };
+      // Split assigned scenarios into collection arcs + flat singles.
+      const groups = {}; const flat = [];
+      scenarios.forEach(sc => { if (!scenarioStarter && sc.collection) (groups[sc.collection] = groups[sc.collection] || []).push(sc); else flat.push(sc); });
+      const children = [];
+      // Collection arcs (e.g. Narim Australia)
+      Object.keys(groups).forEach(col => {
+        const list = groups[col].slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        const meta = COLLECTION_META[col] || { title: col, parts: [] };
+        const doneCount = list.filter(done).length;
+        children.push(React.createElement("div", { key: "col-" + col, style: { display: "flex", flexDirection: "column", gap: 10, background: T3.bgGrouped, borderRadius: 24, padding: 16 } },
+          React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between" } },
+            React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: T3.ink } }, meta.title),
+            React.createElement("div", { style: { fontSize: 12, fontWeight: 800, color: T3.wave } }, `${doneCount}/${list.length} 완료`)
+          ),
+          // Thin sentence-segment bar (one segment per scenario) — NOT a progress bar.
+          React.createElement("div", { style: { display: "flex", gap: 3 } }, list.map(sc => React.createElement("div", { key: "seg-" + sc.id, style: { flex: 1, height: 4, borderRadius: 100, background: done(sc) ? "#22C55E" : T3.hairline } }))),
+          ...list.flatMap((sc, i) => {
+            const out = [];
+            const part = (meta.parts || []).find(p => sc.sort_order === p.from);
+            if (part) out.push(React.createElement("div", { key: "part-" + sc.id, style: { fontSize: 11, fontWeight: 800, letterSpacing: 1, color: T3.ink3, marginTop: i ? 4 : 0 } }, part.label));
+            out.push(card(sc, list, sc.sort_order || i + 1));
+            return out;
+          })
+        ));
+      });
+      // Flat singles (starters, or non-collection assigned)
+      if (flat.length) {
+        children.push(React.createElement("div", { key: "flat-hd", style: { fontSize: 15, fontWeight: 800, color: T3.ink } }, scenarioStarter ? "첫 시나리오를 골라봐요" : "추천 세션"));
+        flat.forEach(sc => children.push(card(sc, flat, null)));
+        if (scenarioStarter) children.push(React.createElement("div", { key: "starter-ft", style: { fontSize: 12, color: T3.ink3, lineHeight: 1.5, marginTop: 2 } }, "선생님이 배정한 시나리오가 생기면 여기에 먼저 보여요."));
+      }
+      return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 4 } }, children);
+    })(),
     // Mode sheet
     modeSheet && React.createElement(ModeSheetV3, { onClose: () => setModeSheet(false), onPick: pickMode }),
     // Class request sheet
