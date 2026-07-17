@@ -879,9 +879,13 @@ function aiUsageRemaining(bucket) {
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const sb = async (path, opts = {}) => {
+  // Pull headers/prefer out of opts BEFORE spreading `rest`, so a caller-supplied
+  // `headers` (e.g. db.upsert's Prefer) can't clobber the whole headers object and
+  // drop apikey/Authorization (that caused upserts to 401 "No API key found").
+  const { headers: extraHeaders, prefer, ...rest } = opts;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": opts.prefer || "return=representation", ...opts.headers },
-    ...opts
+    ...rest,
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": prefer || "return=representation", ...extraHeaders },
   });
   if (!res.ok) { const err = await res.text(); throw new Error(err); }
   const text = await res.text();
