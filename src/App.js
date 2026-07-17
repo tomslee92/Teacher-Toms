@@ -4316,8 +4316,8 @@ const TOUR_STEPS_V3 = [
   { location: "home", anchor: '[data-tour-v3="tab-freetalk"]', titleKo: "Solo", titleZh: "Solo",
     bodyKo: "하고 싶은 말을 말로도, 글로도 물어볼 수 있어요.", bodyZh: "想说的话可以用说的，也可以用写的来问。",
     ctaKo: "다음 →", ctaZh: "下一步 →" },
-  { location: "home", anchor: '[data-tour-v3="request"]', titleKo: "다음 수업 리퀘스트", titleZh: "下节课请求",
-    bodyKo: "배우고 싶은 걸 Toms에게 보내면 다음 수업에 반영돼요.", bodyZh: "把想学的发给 Toms，就会在下节课体现出来。",
+  { location: "home", anchor: '[data-tour-v3="request"]', titleKo: "다음 수업 주제 요청", titleZh: "下节课主题请求",
+    bodyKo: "배우고 싶은 걸 선생님께 보내면 다음 수업에 반영돼요.", bodyZh: "把想学的发给老师，就会在下节课体现出来。",
     ctaKo: "다음 →", ctaZh: "下一步 →" },
   { location: "home", anchor: '[data-tour-v3="tab-community"]', titleKo: "Community", titleZh: "Community",
     bodyKo: "매주 목요일, 감사한 일 한 가지를 반 친구들과 나눠요.", bodyZh: "每周四，和同学分享一件感恩的事。",
@@ -8620,7 +8620,7 @@ function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab })
   const { pulse, counts, wrapCard, nextCard, hasSchedule } = data;
   const todo = [];
   if (counts.thursday) todo.push({ icon: "🙏", label: `Thursday 답변 ${counts.thursday}개 — 댓글 대기`, go: "inbox" });
-  if (counts.requests) todo.push({ icon: "💬", label: `리퀘스트 ${counts.requests}개`, go: "inbox" });
+  if (counts.requests) todo.push({ icon: "💬", label: `요청 ${counts.requests}개`, go: "inbox" });
   if (counts.messages) todo.push({ icon: "📩", label: `메시지 ${counts.messages}개`, go: "inbox" });
   if (counts.reachout) todo.push({ icon: "📞", label: `연락해볼 학생 ${counts.reachout}명`, go: null });
 
@@ -9887,7 +9887,7 @@ function StudentDetailView({ student, students, groups, showMsg, teacher, onBack
               </div>}
           {studentRequests.length > 0 && (
             <>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, textTransform: "uppercase", marginBottom: 10 }}>다음 수업 리퀘스트</div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: C.textLight, textTransform: "uppercase", marginBottom: 10 }}>다음 수업 주제 요청</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {studentRequests.map(r => {
                   const label = { new: "접수됨", planned: "수업 반영", covered: "완료" }[r.status] || r.status;
@@ -22884,11 +22884,11 @@ function ClassRequestSheetV3({ user, group, presetText = "", onClose, onSent }) 
       React.createElement("div", { style: { width: "40px", height: "4px", borderRadius: "100px", background: T3.ink3, alignSelf: "center" } }),
       React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "3px", padding: "4px 4px 0" } },
         React.createElement("div", { style: { fontSize: "18px", fontWeight: "800", color: T3.ink } }, "다음 수업에서 배우고 싶은 게 있어요?"),
-        React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, countdown || "여러 개 보내도 좋아요 — Toms가 하나씩 확인해요.")
+        React.createElement("div", { style: { fontSize: "13px", color: T3.ink2 } }, countdown || "여러 개 보내도 좋아요 — 선생님이 하나씩 확인해요.")
       ),
       // Previous requests
       myRequests.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px" } },
-        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "0.5px", color: T3.ink3, padding: "4px 4px 0" } }, `보낸 리퀘스트 ${myRequests.length}개`),
+        React.createElement("div", { style: { fontSize: "11px", fontWeight: "800", letterSpacing: "0.5px", color: T3.ink3, padding: "4px 4px 0" } }, `보낸 요청 ${myRequests.length}개`),
         myRequests.map(r => {
           const st = STATUS[r.status] || STATUS.new;
           return React.createElement("div", { key: r.id, style: { background: T3.bgGrouped, borderRadius: "14px", padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: "10px" } },
@@ -23144,8 +23144,8 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
     React.createElement("button", { "data-tour-v3": "request", onClick: () => { haptic.medium(); setRequestSheet(true); }, style: { background: T3.card, borderRadius: "20px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", boxShadow: T3.shadowCard, border: "none", cursor: "pointer", fontFamily: FONT_V3, width: "100%", textAlign: "left" } },
       React.createElement("div", { style: { width: "40px", height: "40px", borderRadius: "12px", background: T3.waveSoft, display: "flex", alignItems: "center", justifyContent: "center", color: T3.wave, fontSize: "18px", flexShrink: 0 } }, "💬"),
       React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: "1px" } },
-        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T3.ink } }, "다음 수업 리퀘스트"),
-        React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, openRequests > 0 ? `보낸 리퀘스트 ${openRequests}개 · 새로 보내기` : "배우고 싶은 걸 Toms에게 보내요")
+        React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: T3.ink } }, "다음 수업 주제 요청"),
+        React.createElement("div", { style: { fontSize: "12px", color: T3.ink2 } }, openRequests > 0 ? `보낸 요청 ${openRequests}개 · 새로 보내기` : "배우고 싶은 걸 선생님께 보내요")
       ),
       chevron(T3.ink3)
     ),
@@ -23755,7 +23755,7 @@ function HomeGridV2({ user, group, isPreview, onNavigate, streak, onOpenProfile,
           latestNote.text_content || latestNote.structured?.wentWell || ""
         ),
         React.createElement("div", { style: { fontSize: "13px", fontWeight: "600", color: WAYVE_TOKENS.ink3, textAlign: "right", marginTop: "12px" } },
-          `— ${latestNote.teacher_name || "Toms"}`
+          `— ${latestNote.teacher_name || "선생님"}`
         )
       ),
 
