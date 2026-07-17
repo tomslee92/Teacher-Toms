@@ -8538,6 +8538,10 @@ function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab })
       (sched || []).forEach(x => { (slotsByGroup[x.group_id] = slotsByGroup[x.group_id] || []).push(x); });
       const attMap = {};
       (att || []).forEach(a => { attMap[`${a.student_id}|${a.session_date}`] = !!a.attended; });
+      // Most recent LOGGED attendance date per student — the real pulse anchor, so the
+      // dots stay correct even when a class is rescheduled off its weekly slot.
+      const lastAttBy = {};
+      (att || []).forEach(a => { if (!lastAttBy[a.student_id] || a.session_date > lastAttBy[a.student_id]) lastAttBy[a.student_id] = a.session_date; });
 
       const lastSessionFor = (groupId) => {
         let best = null;
@@ -8568,16 +8572,20 @@ function TeacherTodayV3({ students, groups, showMsg, onSelectStudent, onGoTab })
       const pulse = (students || []).map(s => {
         const weekMin = Math.floor((minBy[s.id] || 0) / 60);
         const practiced = weekMin > 0;
-        const last = lastSessionFor(s.group_id);
-        let attended = null, lastStr = null;
-        if (last) { lastStr = dateStr(last.date); const k = `${s.id}|${lastStr}`; attended = k in attMap ? attMap[k] : null; }
+        // Anchor on the student's most recent LOGGED attendance; fall back to the
+        // schedule-derived date only when nothing has been logged yet.
+        const schedLast = lastSessionFor(s.group_id);
+        const lastStr = lastAttBy[s.id] || (schedLast ? dateStr(schedLast.date) : null);
+        const hasSession = !!lastStr;
+        let attended = null;
+        if (lastStr) { const k = `${s.id}|${lastStr}`; attended = k in attMap ? attMap[k] : null; }
         let daysQuiet = 999;
         if (s.last_practice) { const lp = new Date(s.last_practice + "T00:00:00"); daysQuiet = Math.floor((now - lp) / 86400000); }
         let level, note;
-        if (last && attended !== null) {
+        if (hasSession && attended !== null) {
           level = (attended && practiced) ? "green" : (!attended && !practiced) ? "red" : "yellow";
           note = `지난 수업 ${attended ? "✓" : "✗"} · 이번 주 ${weekMin}분`;
-        } else if (last && attended === null) {
+        } else if (hasSession && attended === null) {
           level = "gray"; note = `정리 전 · 이번 주 ${weekMin}분`;
         } else {
           level = practiced ? "green" : (daysQuiet > 4 ? "red" : "gray");
@@ -9079,6 +9087,10 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
       (sched || []).forEach(x => { (slotsByGroup[x.group_id] = slotsByGroup[x.group_id] || []).push(x); });
       const attMap = {};
       (att || []).forEach(a => { attMap[`${a.student_id}|${a.session_date}`] = !!a.attended; });
+      // Most recent LOGGED attendance per student — anchor the dot on real sessions,
+      // not the recurring schedule, so reschedules don't break it (mirrors TeacherTodayV3).
+      const lastAttBy = {};
+      (att || []).forEach(a => { if (!lastAttBy[a.student_id] || a.session_date > lastAttBy[a.student_id]) lastAttBy[a.student_id] = a.session_date; });
       const lastSessionDate = (groupId) => {
         let best = null;
         (slotsByGroup[groupId] || []).forEach(slot => {
@@ -9097,14 +9109,16 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
       (students || []).forEach(s => {
         const weekMin = Math.floor((minBy[s.id] || 0) / 60);
         const practiced = weekMin > 0;
-        const last = lastSessionDate(s.group_id);
+        const schedLast = lastSessionDate(s.group_id);
+        const lastStr = lastAttBy[s.id] || (schedLast ? dateStr(schedLast) : null);
+        const hasSession = !!lastStr;
         let attended = null;
-        if (last) { const k = `${s.id}|${dateStr(last)}`; attended = k in attMap ? attMap[k] : null; }
+        if (lastStr) { const k = `${s.id}|${lastStr}`; attended = k in attMap ? attMap[k] : null; }
         let daysQuiet = 999;
         if (s.last_practice) { const lp = new Date(s.last_practice + "T00:00:00"); daysQuiet = Math.floor((now - lp) / 86400000); }
         let level;
-        if (last && attended !== null) level = (attended && practiced) ? "green" : (!attended && !practiced) ? "red" : "yellow";
-        else if (last && attended === null) level = "gray";
+        if (hasSession && attended !== null) level = (attended && practiced) ? "green" : (!attended && !practiced) ? "red" : "yellow";
+        else if (hasSession && attended === null) level = "gray";
         else level = practiced ? "green" : (daysQuiet > 4 ? "red" : "gray");
         map[s.id] = { level, weekMin };
       });
@@ -9167,6 +9181,19 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
     { id: "activity", label: "Streak" },
   ];
 
+  // Inline group reassignment from the list row (mirrors the admin StudentsTab
+  // updateGroup: DB write + phrase migration + local state). Lets the teacher move
+  // a student between groups from the list without opening the detail view.
+  const updateGroup = async (id, groupId) => {
+    const oldGroupId = students.find(s => s.id === id)?.group_id;
+    try {
+      await db.update("students", `id=eq.${id}`, { group_id: groupId });
+      await migrateStudentPhrasesOnGroupChange(id, oldGroupId, groupId);
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, group_id: groupId } : s));
+      showMsg("✓ 그룹 변경됨 — 표현이 함께 이동해요");
+    } catch(e) { showMsg("Error", "error"); }
+  };
+
   const renderStudentRow = (s, i, total) => {
     const genderLabel = s.gender === "male" ? "M" : s.gender === "female" ? "F" : null;
     const genderColor = s.gender === "male" ? "#3B82F6" : s.gender === "female" ? "#EC4899" : C.textLight;
@@ -9205,6 +9232,15 @@ function TeacherStudentsTab({ students, setStudents, groups, showMsg, onSelectSt
             {s.hometown && ` · ${s.hometown}`}
           </div>
         </div>
+        <select
+          value={s.group_id || ""}
+          onClick={e => e.stopPropagation()}
+          onChange={e => { e.stopPropagation(); updateGroup(s.id, e.target.value || null); }}
+          title="그룹 이동"
+          style={{ flexShrink: 0, maxWidth: "116px", padding: "5px 8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, color: C.textMid, fontSize: "11px", fontWeight: "600", fontFamily: FONT, cursor: "pointer" }}>
+          <option value="">No group</option>
+          {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
         <div style={{ fontSize: "16px", color: C.textLight }}>›</div>
       </div>
     );
@@ -10964,7 +11000,14 @@ function SessionWrapUp({ group, students, sessionDate, onClose, onAddPhrases, sh
       <div onClick={e => e.stopPropagation()} style={{ background: C.bgCard, width: "100%", maxWidth: "480px", borderRadius: "24px 24px 0 0", padding: "10px 20px calc(20px + env(safe-area-inset-bottom))", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)", fontFamily: FONT, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ width: 40, height: 4, borderRadius: 100, background: C.border, margin: "4px auto 14px" }} />
         <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{group.name} 수업 정리</div>
-        <div style={{ fontSize: 12, color: C.textLight, marginBottom: 16 }}>{resolvedDate || "…"}</div>
+        {/* Editable session date — schedule supplies the default, but the teacher can
+            log attendance for the day the class actually happened (resilient to reschedules). */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 12, color: C.textLight }}>수업 날짜</span>
+          <input type="date" value={resolvedDate || ""} max={localToday()}
+            onChange={e => setResolvedDate(e.target.value || null)}
+            style={{ fontSize: 12, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 8px", fontFamily: FONT, cursor: "pointer" }} />
+        </div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>출석 · {attendedCount}/{gs.length}</div>
         {attended === null
