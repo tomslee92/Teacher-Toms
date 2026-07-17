@@ -1468,7 +1468,7 @@ async function speak(text, speed = null) {
   } catch(e) {
     console.warn("ElevenLabs TTS failed, falling back to Groq:", e.message);
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/audio/speech", {
+      const res = await fetch("/api/groq-speech", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({ model: "playai-tts", input: text, voice: "Calum-PlayAI", response_format: "mp3" })
@@ -1641,7 +1641,7 @@ function extractLLMJSON(raw) {
 async function groqCall(prompt, lang = "ko") {
   if (!GROQ_KEY) throw new Error("GROQ_KEY not configured in Vercel environment variables");
   aiUsageTick("groq70b");
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({ model: GROQ_MODEL_PRIMARY, max_tokens: 1200, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt }] })
@@ -1692,7 +1692,7 @@ Current Korean: "${currentKorean || '(none)'}"
 Evaluate the current Korean translation. Suggest a fix if it's inaccurate, awkward, or could be more natural.`;
 
   aiUsageTick("groq70b");
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
@@ -1735,7 +1735,7 @@ async function groqCallWavy(userMessage, systemPrompt) {
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage }
   ];
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({ model: GROQ_MODEL_PRIMARY, max_tokens: 200, temperature: 0.8, messages })
@@ -1753,7 +1753,7 @@ async function groqCallWavy(userMessage, systemPrompt) {
 // Uses 70b for quality and a system prompt that expects English output
 async function groqScaffold(prompt) {
   if (!GROQ_KEY) throw new Error("GROQ_KEY not configured");
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
@@ -1839,7 +1839,7 @@ Text to translate:
 
 Return ONLY the Korean translation, nothing else. No explanation, no alternatives.`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
@@ -1881,7 +1881,7 @@ RULES:
 Text to translate:
 "${text}"`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
@@ -1937,7 +1937,7 @@ async function transcribe(blob) {
   fd.append("file", blob, `rec.${ext}`);
   fd.append("model", "whisper-large-v3");
   fd.append("response_format", "text");
-  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", { method: "POST", headers: { "Authorization": `Bearer ${GROQ_KEY}` }, body: fd });
+  const res = await fetch("/api/groq-transcribe", { method: "POST", headers: { "Authorization": `Bearer ${GROQ_KEY}` }, body: fd });
   if (!res.ok) {
     const errText = await res.text();
     console.error("[TRANSCRIBE] Groq error:", res.status, errText);
@@ -2106,7 +2106,7 @@ Choose phrases that feel genuinely useful and slightly surprising — the kind n
 Return ONLY valid JSON array:
 [{"english":"natural English phrase","korean":"자연스러운 한국어 번역","context":"이 표현을 언제 누구와 사용하는지 설명"}]`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await fetch("/api/groq", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
@@ -2146,7 +2146,7 @@ Return ONLY valid JSON array:
 async function autoFillKorean(english) {
   try {
     const ko = await groqTranslate(english, "This is an English phrase that Korean adult learners will practice. Translate it into natural Korean 해요체.");
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch("/api/groq", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
@@ -6626,7 +6626,7 @@ CRITICAL: korean and explanation MUST be in ${lang === "zh" ? "Simplified Chines
     if (!koreanText.trim()) return;
     setLoadingHowTo(true); setHowToSay(null); setHowToError("");
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch("/api/groq", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
@@ -12795,7 +12795,7 @@ function ChineseTranslator({ showMsg }) {
   const translateOne = async (p) => {
     try {
       // Translate korean → chinese
-      const chineseRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const chineseRes = await fetch("/api/groq", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
@@ -12815,7 +12815,7 @@ function ChineseTranslator({ showMsg }) {
       }
 
       // Generate context_zh — when/with whom to use it
-      const contextRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const contextRes = await fetch("/api/groq", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
@@ -13887,7 +13887,7 @@ async function translateQodToKorean(prompt, lang = "ko") {
   if (lang === "zh") {
     // Use direct Groq call — groqTranslate forces Korean output via TRANSLATION_SYSTEM
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch("/api/groq", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
@@ -17472,7 +17472,7 @@ async function wavyTranscribe(audioBlob) {
   form.append("file", audioBlob, "audio.webm");
   form.append("model", "whisper-large-v3");
   form.append("response_format", "json");
-  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+  const res = await fetch("/api/groq-transcribe", {
     method: "POST",
     headers: { "Authorization": `Bearer ${GROQ_KEY}` },
     body: form,
@@ -17499,7 +17499,7 @@ Scoring:
 - partial: gist there but missing words or structural issues
 - none: completely different or unintelligible`;
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch("/api/groq", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
