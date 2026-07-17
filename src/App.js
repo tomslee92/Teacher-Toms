@@ -20346,7 +20346,12 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     const dialogueCount = scenarioLines.filter(l => !isFraming(l)).length;
     const curDialogueNo = scenarioLines.slice(0, scenarioIdx + 1).filter(l => !isFraming(l)).length;
     const otherVoice = scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
-    const cBtn = (label, onClick, primary) => React.createElement("button", { onClick, style: { background: primary ? "#3E7BFA" : "rgba(255,255,255,0.09)", border: primary ? "none" : "1px solid rgba(255,255,255,0.16)", color: primary ? "#fff" : "rgba(255,255,255,0.92)", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "11px 18px", borderRadius: "100px", boxShadow: primary ? "0 6px 18px rgba(62,123,250,0.42)" : "none", WebkitTapHighlightColor: "transparent" } }, label);
+    const cBtn = (label, onClick, primary) => React.createElement("button", { onClick, style: { flex: 1, background: primary ? "#3E7BFA" : "rgba(255,255,255,0.09)", border: primary ? "none" : "1px solid rgba(255,255,255,0.16)", color: primary ? "#fff" : "rgba(255,255,255,0.92)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "13px 16px", borderRadius: "100px", boxShadow: primary ? "0 6px 18px rgba(62,123,250,0.42)" : "none", WebkitTapHighlightColor: "transparent" } }, label);
+    // v3 player controls: SVG-icon buttons + a circular primary (matches ListenPlayerV3), not emoji pills.
+    const svgIcon = (d, sz = 22) => React.createElement("svg", { width: sz, height: sz, viewBox: "0 0 24 24", fill: "currentColor" }, Array.isArray(d) ? d.map((x, i) => React.createElement("path", { key: i, d: x })) : React.createElement("path", { d }));
+    const pauseIcon = React.createElement("svg", { width: 24, height: 24, viewBox: "0 0 24 24", fill: "#fff" }, React.createElement("rect", { x: 7, y: 5, width: 3.6, height: 14, rx: 1.2 }), React.createElement("rect", { x: 13.4, y: 5, width: 3.6, height: 14, rx: 1.2 }));
+    const roundBtn = (child, onClick, size, primary) => React.createElement("button", { onClick, "aria-label": "control", style: { width: size, height: size, borderRadius: "50%", background: primary ? "#3E7BFA" : "rgba(255,255,255,0.08)", border: primary ? "none" : "1px solid rgba(255,255,255,0.16)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: primary ? "0 8px 22px rgba(62,123,250,0.45)" : "none", WebkitTapHighlightColor: "transparent", padding: 0, flexShrink: 0 } }, child);
+    const listenPill = (label, onClick) => React.createElement("button", { onClick, style: { display: "flex", alignItems: "center", gap: "7px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", borderRadius: "100px", padding: "10px 16px", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, WebkitTapHighlightColor: "transparent" } }, React.createElement("span", { style: { color: "#6FA0FF", display: "flex" } }, svgIcon("M8 5v14l11-7z", 13)), label);
     return React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg, #0B1F3A 0%, #16345C 50%, #0B1F3A 100%)", display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: "env(safe-area-inset-top)", fontFamily: FONT } },
       React.createElement("style", null, "html, body { background: #0B1F3A !important; } @keyframes scBar{0%,100%{transform:scaleY(0.3)}50%{transform:scaleY(1)}} @keyframes scFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}} @keyframes scPop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}"),
       // Top bar
@@ -20418,14 +20423,14 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
               )
             : shadowMode
               ? (shadowCompare
-                  ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
-                      React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.55)" } }, "🎧 들어보고 비교해 보세요"),
-                      React.createElement("div", { style: { display: "flex", gap: "8px" } },
-                        cBtn("🌊 Wavi 발음", () => scenarioSay(shadowCompare.text, WAVY_VOICE_ID)),
-                        cBtn("🎤 내 목소리", () => playShadowBlob(shadowCompare.url))
+                  ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", alignItems: "center", width: "100%", maxWidth: "360px", margin: "0 auto" } },
+                      React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.55)" } }, "들어보고 비교해 보세요"),
+                      React.createElement("div", { style: { display: "flex", gap: "10px", justifyContent: "center" } },
+                        listenPill("Wavi 발음", () => scenarioSay(shadowCompare.text, WAVY_VOICE_ID)),
+                        listenPill("내 목소리", () => playShadowBlob(shadowCompare.url))
                       ),
-                      React.createElement("div", { style: { display: "flex", gap: "8px" } },
-                        cBtn("↺ 다시 녹음", () => answerShadowCompare("redo")),
+                      React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%" } },
+                        cBtn("다시 녹음", () => answerShadowCompare("redo")),
                         cBtn("다음 문장 →", () => answerShadowCompare("next"), true)
                       ),
                       React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)" } }, "점수 없음 · 몇 번이든 괜찮아요")
@@ -20434,14 +20439,14 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
                       React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: wavyState === "listening" ? "#6FA0FF" : scShadowPraise ? "#4ADE80" : "rgba(255,255,255,0.6)", minHeight: "16px" } }, wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "잠깐만요…"),
                       React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)" } }, "점수 없음 · 몇 번이든 괜찮아요")
                     ))
-              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" } },
+              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" } },
                   React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.45)", minHeight: "14px" } }, wavyState === "speaking" ? "듣는 중…" : paused ? "멈춤" : "따라 들어보세요"),
-                  React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" } },
-                    cBtn("↺ 다시", replayLine),
-                    cBtn(paused ? "▶ 계속" : "⏸ 멈춤", togglePause),
-                    cBtn("다음 ⏭", nextLine),
-                    cBtn(slow ? "천천히 ✓" : "천천히", () => setRate(slow ? 1 : 0.6), slow)
-                  )
+                  React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "22px" } },
+                    roundBtn(svgIcon("M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z", 20), replayLine, 48, false),
+                    roundBtn(paused ? svgIcon("M8 5v14l11-7z", 26) : pauseIcon, togglePause, 64, true),
+                    roundBtn(svgIcon(["M6 6l8.5 6L6 18z", "M15.4 6h2.3v12h-2.3z"], 22), nextLine, 48, false)
+                  ),
+                  React.createElement("button", { onClick: () => setRate(slow ? 1 : 0.6), style: { background: slow ? "rgba(62,123,250,0.25)" : "rgba(255,255,255,0.07)", border: `1px solid ${slow ? "rgba(111,160,255,0.5)" : "rgba(255,255,255,0.14)"}`, color: slow ? "#9DBEFF" : "rgba(255,255,255,0.72)", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "7px 16px", borderRadius: "100px", WebkitTapHighlightColor: "transparent" } }, slow ? "천천히 ✓" : "천천히")
                 )
         )
       )
