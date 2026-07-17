@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+    body { margin:0; background:#E7E8EC; font-family:"Pretendard Variable", Pretendard, -apple-system, "SF Pro", system-ui, sans-serif; color:#16181D; word-break:keep-all; -webkit-font-smoothing:antialiased; }
+    a { color:#3E7BFA; text-decoration:none; }
+    a:hover { color:#16345C; }
+    @keyframes wavePulse { 0%,100% { box-shadow:0 0 0 10px rgba(62,123,250,0.10); } 50% { box-shadow:0 0 0 18px rgba(62,123,250,0.22); } }
+    @keyframes recPulse { 0%,100% { box-shadow:0 0 0 10px rgba(255,93,78,0.15); } 50% { box-shadow:0 0 0 20px rgba(255,93,78,0.3); } }
+    @keyframes barBounce { 0%,100% { transform:scaleY(0.5); } 50% { transform:scaleY(1); } }
+  </style>
+</helmet>
+<section style="min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:16px; padding:48px 24px 72px;">
+  <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+    <div style="font-size:12px; font-weight:800; letter-spacing:3px; color:#9DA0A8;">WAYVE · 인터랙티브 프로토타입</div>
+    <div style="font-size:20px; font-weight:800; letter-spacing:-0.3px;">듣기 → 따라 말하기 — 한 흐름</div>
+    <div style="font-size:13px; color:#6E7178;">시나리오를 골라서 끝까지 진행해보세요.</div>
+  </div>
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+    <div style="height:100%; display:flex; flex-direction:column; background:{{ screenBg }};">
+
+      <sc-if value="{{ isPicker }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1; overflow-y:auto; padding:70px 20px 40px; display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; flex-direction:column; gap:4px; padding:0 4px;">
+            <div style="font-size:22px; font-weight:800; color:#16181D; letter-spacing:-0.3px;">첫 시나리오를 골라봐요</div>
+            <div style="font-size:14px; color:#6E7178; line-height:1.5;">선생님이 시나리오를 배정하기 전에도<br>바로 시작할 수 있어요.</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; padding:0 4px;">
+              <div style="font-size:13px; font-weight:800; color:#16181D;">나림 · 호주 한 달 준비 ✈</div>
+              <div style="font-size:11px; font-weight:700; color:#3E7BFA;">{{ narimProgressLabel }}</div>
+            </div>
+            <div style="display:flex; gap:4px; padding:0 4px 2px;">
+              <sc-for list="{{ narimProgressSegs }}" as="seg" hint-placeholder-count="6">
+                <div style="{{ seg.style }}"></div>
+              </sc-for>
+            </div>
+            <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:#9DA0A8; padding:2px 4px 0;">PART 1 · 친구 사귀기</div>
+            <sc-for list="{{ narimSocialCards }}" as="c" hint-placeholder-count="5">
+              <div onClick="{{ c.pick }}" style="{{ c.cardStyle }}" style-active="transform:scale(0.98)">
+                <div style="{{ c.badgeStyle }}">{{ c.badge }}</div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+                  <div style="{{ c.titleStyle }}">{{ c.title }}</div>
+                  <div style="font-size:11px; color:#9DA0A8;">{{ c.sub }}</div>
+                </div>
+                <div style="{{ c.ctaStyle }}">{{ c.cta }}</div>
+              </div>
+            </sc-for>
+            <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:#9DA0A8; padding:8px 4px 0;">PART 2 · 카페에서 일하기</div>
+            <sc-for list="{{ narimJobCards }}" as="c" hint-placeholder-count="3">
+              <div onClick="{{ c.pick }}" style="{{ c.cardStyle }}" style-active="transform:scale(0.98)">
+                <div style="{{ c.badgeStyle }}">{{ c.badge }}</div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+                  <div style="{{ c.titleStyle }}">{{ c.title }}</div>
+                  <div style="font-size:11px; color:#9DA0A8;">{{ c.sub }}</div>
+                </div>
+                <div style="{{ c.ctaStyle }}">{{ c.cta }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:13px; font-weight:800; color:#16181D; padding:8px 4px 0;">기본 시나리오</div>
+          <div onClick="{{ pickCafe }}" style="cursor:pointer; background:#FFFFFF; border-radius:20px; padding:16px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05); border:1.5px solid #3E7BFA;" style-active="transform:scale(0.98)">
+            <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:#9DA0A8;">CAFÉ · 추천</div>
+              <div style="font-size:16px; font-weight:800; color:#16181D;">Ordering Coffee</div>
+              <div style="font-size:12px; color:#9DA0A8;">약 5분 · 문장 6개</div>
+            </div>
+            <div style="font-size:13px; font-weight:700; color:#3E7BFA;">시작 →</div>
+          </div>
+          <div onClick="{{ pickTaxi }}" style="cursor:pointer; background:#FFFFFF; border-radius:20px; padding:16px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05);" style-active="transform:scale(0.98)">
+            <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:#9DA0A8;">TAXI</div>
+              <div style="font-size:16px; font-weight:800; color:#16181D;">Getting to the Hotel</div>
+              <div style="font-size:12px; color:#9DA0A8;">약 5분 · 문장 6개</div>
+            </div>
+            <div style="font-size:13px; font-weight:700; color:#3E7BFA;">시작 →</div>
+          </div>
+          <div onClick="{{ pickSmall }}" style="cursor:pointer; background:#FFFFFF; border-radius:20px; padding:16px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05);" style-active="transform:scale(0.98)">
+            <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:#9DA0A8;">SMALL TALK</div>
+              <div style="font-size:16px; font-weight:800; color:#16181D;">Meeting a New Coworker</div>
+              <div style="font-size:12px; color:#9DA0A8;">약 6분 · 문장 6개</div>
+            </div>
+            <div style="font-size:13px; font-weight:700; color:#3E7BFA;">시작 →</div>
+          </div>
+          <div style="font-size:12px; color:#9DA0A8; padding:0 4px; line-height:1.5;">선생님이 배정한 시나리오가 생기면 여기에 먼저 보여요.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isListen }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; overflow:hidden; padding:66px 24px 0; display:flex; flex-direction:column; gap:14px;">
+          <div style="width:100%; display:flex; align-items:center; justify-content:space-between;">
+            <div onClick="{{ goHome }}" style="cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.75); font-size:13px; font-weight:700; padding:8px 14px; border-radius:100px;">← 나가기</div>
+            <div style="font-size:11px; font-weight:800; letter-spacing:2px; color:rgba(255,255,255,0.45);">듣기 모드</div>
+            <div onClick="{{ toggleSlow }}" style="{{ slowStyle }}">천천히</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; text-align:center; margin-top:4px;">
+            <div style="font-size:10px; font-weight:800; letter-spacing:3px; color:rgba(255,255,255,0.4);">{{ scnCat }}</div>
+            <div style="font-size:21px; font-weight:800; color:#fff; letter-spacing:-0.3px;">{{ scnTitle }}</div>
+            <div style="display:flex; gap:5px; justify-content:center; align-items:center; margin-top:2px;">
+              <sc-for list="{{ segs }}" as="seg" hint-placeholder-count="6">
+                <div style="{{ seg.style }}"></div>
+              </sc-for>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:rgba(255,255,255,0.4);">{{ progressLabel }}</div>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:10px;">
+            <sc-for list="{{ lineViews }}" as="ln" hint-placeholder-count="3">
+              <div style="{{ ln.wrapStyle }}">
+                <div style="{{ ln.labelStyle }}">{{ ln.label }}</div>
+                <div style="{{ ln.bubbleStyle }}">
+                  <div style="{{ ln.enStyle }}">{{ ln.en }}</div>
+                  <div style="{{ ln.koStyle }}">{{ ln.ko }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="padding:0 24px 44px; display:flex; flex-direction:column; align-items:center; gap:14px;">
+          <div style="display:flex; align-items:center; gap:22px;">
+            <div onClick="{{ replay }}" style="cursor:pointer; width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.7); font-size:17px; font-weight:700;" style-active="transform:scale(0.94)">↺</div>
+            <div onClick="{{ togglePlay }}" style="cursor:pointer; width:68px; height:68px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(255,255,255,0.15);" style-active="transform:scale(0.96)">
+              <sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; gap:5px;">
+                  <div style="width:5px; height:20px; border-radius:2px; background:#0B1F3A;"></div>
+                  <div style="width:5px; height:20px; border-radius:2px; background:#0B1F3A;"></div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}">
+                <svg width="20" height="22" viewBox="0 0 16 18" style="margin-left:3px;"><path d="M1 1.5v15l14-7.5z" fill="#0B1F3A"></path></svg>
+              </sc-if>
+            </div>
+            <div onClick="{{ nextLine }}" style="cursor:pointer; width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center;" style-active="transform:scale(0.94)">
+              <svg width="10" height="14" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="rgba(255,255,255,0.7)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </div>
+          </div>
+          <div style="font-size:12px; color:rgba(255,255,255,0.4);">마이크를 쓰지 않아요 — 편하게 들어요</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isListenDone }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; overflow:hidden; padding:66px 24px 0; display:flex; flex-direction:column; gap:16px;">
+          <div style="width:100%; display:flex; align-items:center; justify-content:space-between;">
+            <div onClick="{{ goHome }}" style="cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.75); font-size:13px; font-weight:700; padding:8px 14px; border-radius:100px;">← 나가기</div>
+            <div style="font-size:11px; font-weight:800; letter-spacing:2px; color:rgba(255,255,255,0.45);">듣기 모드</div>
+            <div style="width:70px;"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; text-align:center; margin-top:6px;">
+            <div style="font-size:10px; font-weight:800; letter-spacing:3px; color:rgba(255,255,255,0.4);">{{ scnCat }}</div>
+            <div style="font-size:21px; font-weight:800; color:#fff; letter-spacing:-0.3px;">{{ scnTitle }}</div>
+            <div style="display:flex; gap:5px; justify-content:center; align-items:center; margin-top:2px;">
+              <sc-for list="{{ doneSegs }}" as="seg" hint-placeholder-count="6">
+                <div style="{{ seg.style }}"></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:18px; padding-bottom:40px;">
+            <div style="width:56px; height:56px; border-radius:50%; background:#2FB344; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 12px rgba(47,179,68,0.12);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;">
+              <div style="font-size:22px; font-weight:800; color:#fff; letter-spacing:-0.3px;">다 들었어요</div>
+              <div style="font-size:14px; color:rgba(255,255,255,0.6); line-height:1.6; max-width:280px;">귀에 익었죠? 이제 입으로 꺼낼 차례예요.<br>같은 문장을 따라 말해봐요.</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 24px 44px; display:flex; flex-direction:column; align-items:center; gap:12px;">
+          <div onClick="{{ startShadow }}" style="cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; background:#fff; color:#0B1F3A; font-size:15px; font-weight:800; padding:16px 0; border-radius:100px; box-shadow:0 8px 24px rgba(255,255,255,0.12);" style-active="transform:scale(0.98)">이어서 따라 말하기 · 약 2분 →</div>
+          <div onClick="{{ goHome }}" style="cursor:pointer; font-size:13px; font-weight:700; color:rgba(255,255,255,0.45); padding:6px 16px;">오늘은 여기까지</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isShadow }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; overflow:hidden; padding:66px 24px 0; display:flex; flex-direction:column; align-items:center; gap:16px;">
+          <div style="width:100%; display:flex; align-items:center; justify-content:space-between;">
+            <div onClick="{{ goHome }}" style="cursor:pointer; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.75); font-size:13px; font-weight:700; padding:8px 14px; border-radius:100px;">← 나가기</div>
+            <div style="font-size:11px; font-weight:800; letter-spacing:2px; color:rgba(255,255,255,0.45);">따라 말하기 · {{ shadowLabel }}</div>
+            <div style="width:70px;"></div>
+          </div>
+          <div style="{{ waviRingStyle }}">
+            <img src="assets/wavi-speaking.png" alt="Wavi" style="width:100%; height:100%; object-fit:cover; object-position:50% 18%;">
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center;">
+            <div style="font-size:22px; font-weight:800; color:#fff; letter-spacing:-0.3px; line-height:1.4; max-width:330px;">"{{ shadowEn }}"</div>
+            <div style="{{ shadowKoStyle }}">{{ shadowKo }}</div>
+          </div>
+          <sc-if value="{{ isPhaseWavi }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:9px; background:rgba(62,123,250,0.16); border:1px solid rgba(62,123,250,0.28); padding:9px 18px; border-radius:100px; margin-top:6px;">
+              <div style="display:flex; align-items:flex-end; gap:2px; height:14px;">
+                <div style="width:3px; height:14px; border-radius:2px; background:#8FB5FF; animation:barBounce 0.7s ease-in-out infinite;"></div>
+                <div style="width:3px; height:14px; border-radius:2px; background:#8FB5FF; animation:barBounce 0.7s ease-in-out 0.15s infinite;"></div>
+                <div style="width:3px; height:14px; border-radius:2px; background:#8FB5FF; animation:barBounce 0.7s ease-in-out 0.3s infinite;"></div>
+              </div>
+              <div style="font-size:13px; font-weight:700; color:#fff;">Wavi가 말하는 중…</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isPhaseReady }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:14px; margin-top:8px;">
+              <div onClick="{{ record }}" style="cursor:pointer; width:76px; height:76px; border-radius:50%; background:#3E7BFA; display:flex; align-items:center; justify-content:center; color:#fff; animation:wavePulse 2s ease-in-out infinite;" style-active="transform:scale(0.95)">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="9.2" y="3.5" width="5.6" height="10.5" rx="2.8" stroke="currentColor" stroke-width="2"></rect><path d="M6.2 11.5a5.8 5.8 0 0 0 11.6 0M12 17.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+              </div>
+              <div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.6);">탭하고 따라 말해보세요</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isPhaseRecording }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:14px; margin-top:8px;">
+              <div style="width:76px; height:76px; border-radius:50%; background:#FF5D4E; display:flex; align-items:center; justify-content:center; animation:recPulse 1.1s ease-in-out infinite;">
+                <div style="width:22px; height:22px; border-radius:6px; background:#fff;"></div>
+              </div>
+              <div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.6);">듣고 있어요…</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isPhaseCompare }}" hint-placeholder-val="{{ false }}">
+            <div style="width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:16px; display:flex; flex-direction:column; gap:12px; margin-top:4px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:rgba(255,255,255,0.4);">들어보고 비교해요</div>
+              <div style="display:flex; gap:10px;">
+                <div onClick="{{ playWavi }}" style="{{ waviPillStyle }}" style-active="transform:scale(0.97)">
+                  <svg width="10" height="12" viewBox="0 0 10 12"><path d="M1 1.5v9l8-4.5z" fill="#8FB5FF"></path></svg>
+                  Wavi 발음
+                </div>
+                <div onClick="{{ playMine }}" style="{{ minePillStyle }}" style-active="transform:scale(0.97)">
+                  <svg width="10" height="12" viewBox="0 0 10 12"><path d="M1 1.5v9l8-4.5z" fill="rgba(255,255,255,0.8)"></path></svg>
+                  내 목소리
+                </div>
+              </div>
+              <div style="display:flex; align-items:flex-end; gap:3px; height:26px; justify-content:center;">
+                <sc-for list="{{ waveBars }}" as="bar" hint-placeholder-count="8">
+                  <div style="{{ bar.style }}"></div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.07); padding:8px 16px; border-radius:100px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#7ED892;"></div>
+            <div style="font-size:12px; font-weight:700; color:rgba(255,255,255,0.6);">점수 없음 · 몇 번이든 괜찮아요</div>
+          </div>
+        </div>
+        <div style="padding:0 24px 44px; display:flex; flex-direction:column; align-items:center; gap:14px;">
+          <sc-if value="{{ isPhaseCompare }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; gap:10px; width:100%;">
+              <div onClick="{{ record }}" style="cursor:pointer; flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.16); color:#fff; font-size:14px; font-weight:800; padding:15px 0; border-radius:100px;" style-active="transform:scale(0.98)">다시 녹음</div>
+              <div onClick="{{ nextShadow }}" style="cursor:pointer; flex:1; display:flex; align-items:center; justify-content:center; background:#fff; color:#0B1F3A; font-size:14px; font-weight:800; padding:15px 0; border-radius:100px;" style-active="transform:scale(0.98)">다음 문장 →</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isSummary }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; overflow:hidden; padding:80px 28px 0; display:flex; flex-direction:column; align-items:center; gap:18px;">
+          <div style="width:72px; height:72px; border-radius:50%; background:#2FB344; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 14px rgba(47,179,68,0.12);">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;">
+            <div style="font-size:24px; font-weight:800; color:#fff; letter-spacing:-0.4px;">수고하셨어요!</div>
+            <div style="font-size:14px; color:rgba(255,255,255,0.6);">{{ summaryLine }}</div>
+          </div>
+          <div style="width:100%; background:rgba(255,255,255,0.97); border-radius:20px; padding:18px; display:flex; flex-direction:column; gap:12px; box-shadow:0 12px 40px rgba(0,0,0,0.3); margin-top:6px;">
+            <div style="font-size:11px; font-weight:800; letter-spacing:1px; color:#9DA0A8;">오늘 따라 말한 표현</div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ shadowedPhrases }}" as="ph" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#2FB344" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <div style="font-size:14px; font-weight:700; color:#16181D;">{{ ph.en }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:13px 16px;">
+            <div style="font-size:13px; color:rgba(255,255,255,0.65); line-height:1.5;">내일 같은 시나리오를 한 번 더 들으면 완전히 내 것이 돼요.</div>
+          </div>
+        </div>
+        <div style="padding:0 24px 44px; display:flex; flex-direction:column; align-items:center; gap:12px;">
+          <div onClick="{{ goHome }}" style="cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; background:#fff; color:#0B1F3A; font-size:15px; font-weight:800; padding:16px 0; border-radius:100px;" style-active="transform:scale(0.98)">홈으로</div>
+          <div onClick="{{ listenAgain }}" style="cursor:pointer; font-size:13px; font-weight:700; color:rgba(255,255,255,0.45); padding:6px 16px;">한 번 더 듣기</div>
+        </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+  <div style="font-size:12px; color:#9DA0A8; max-width:402px; text-align:center; line-height:1.6;">오디오는 시뮬레이션이에요 — 실제 앱에서는 두 목소리 TTS와 로컬 녹음이 재생돼요.</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:480,&quot;height&quot;:1020},&quot;paceMs&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2400,&quot;min&quot;:1400,&quot;max&quot;:4200,&quot;step&quot;:200,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;재생&quot;},&quot;showKorean&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;학습 난이도&quot;}}">
+class Component extends DCLogic {
+  state = { screen:'picker', scn:'cafe', lineIdx:0, playing:false, slow:false, shadowIdx:0, phase:'wavi', playback:null, startTs:null };
+  SCN = {
+    cafe: { cat:'CAFÉ', title:'Ordering Coffee', lines:[
+      {who:'o', en:'Hi there! What can I get for you?'},
+      {who:'m', en:'Could I get an iced americano, please?', ko:'아이스 아메리카노 한 잔 주시겠어요?'},
+      {who:'o', en:'Sure. What size would you like?'},
+      {who:'m', en:'A large one, please. Not too much ice.', ko:'큰 걸로 주세요. 얼음은 너무 많지 않게요.'},
+      {who:'o', en:'Got it. Anything else for you today?'},
+      {who:'m', en:"No, that's all. Thank you so much.", ko:'아니요, 그게 다예요. 정말 감사해요.'} ], other:'직원' },
+    taxi: { cat:'TAXI', title:'Getting to the Hotel', lines:[
+      {who:'o', en:'Good evening! Where are you headed?'},
+      {who:'m', en:'Could you take us to the Grand Hotel?', ko:'그랜드 호텔로 가주시겠어요?'},
+      {who:'o', en:"Of course. It'll take about twenty minutes."},
+      {who:'m', en:'How much will it cost, roughly?', ko:'대략 얼마나 나올까요?'},
+      {who:'o', en:'Around fifteen dollars, depending on traffic.'},
+      {who:'m', en:'Sounds good. Thank you!', ko:'좋아요. 감사합니다!'} ], other:'기사님' },
+    small: { cat:'SMALL TALK', title:'Meeting a New Coworker', lines:[
+      {who:'o', en:"Hi, I don't think we've met. I'm Sarah."},
+      {who:'m', en:'Nice to meet you! I just joined this week.', ko:'만나서 반가워요! 이번 주에 입사했어요.'},
+      {who:'o', en:'Welcome! Which team are you on?'},
+      {who:'m', en:"I'm on the marketing team, third floor.", ko:'3층 마케팅 팀이에요.'},
+      {who:'o', en:'Oh nice, we work together a lot.'},
+      {who:'m', en:'Great — looking forward to working with you.', ko:'좋네요 — 같이 일하게 되어 기대돼요.'} ], other:'Sarah' },
+    aus1: { cat:'MAKING FRIENDS · 1/5', title:'Making a First Friend', lines:[
+      {who:'m', en:'Hi, mind if I join you?', ko:'저 여기 앉아도 될까요?'},
+      {who:'o', en:"Not at all, have a seat. I'm Emma."},
+      {who:'m', en:"Nice to meet you, Emma. I'm Narim.", ko:'만나서 반가워요, 엠마. 저는 나림이에요.'},
+      {who:'o', en:'Nice to meet you too. Where are you from?'},
+      {who:'m', en:"I'm from Korea. I just got here yesterday.", ko:'한국에서 왔어요. 어제 막 도착했어요.'},
+      {who:'o', en:'Oh nice! How long are you staying?'},
+      {who:'m', en:'About a month. How long have you been here?', ko:'한 달 정도요. 여기 온 지 얼마나 됐어요?'},
+      {who:'o', en:"Two weeks now. Sydney's amazing, you'll love it."},
+      {who:'m', en:'I hope so. Any places I should check out?', ko:'그러길 바라요. 가볼 만한 곳 있어요?'},
+      {who:'o', en:'Definitely the coastal walk from Bondi. A few of us are going tomorrow.'},
+      {who:'m', en:'That sounds fun. Mind if I join you?', ko:'재밌겠네요. 저도 껴도 될까요?'},
+      {who:'o', en:"Of course! We're meeting in the lobby at ten."},
+      {who:'m', en:'Perfect. See you at ten then.', ko:'좋아요. 그럼 10시에 봐요.'} ], other:'Emma' },
+    aus2: { cat:'MAKING FRIENDS · 2/5', title:'Joining a Group Activity', lines:[
+      {who:'o', en:"Hey, you're from the hostel too, right? I'm Jack."},
+      {who:'m', en:"Yes! I'm Narim. Is this your first time on this walk?", ko:'네! 저는 나림이에요. 이 산책은 처음이에요?'},
+      {who:'o', en:'First time, yeah. The view is unreal.'},
+      {who:'m', en:"Same here. I can't stop taking photos.", ko:'저도요. 사진을 멈출 수가 없어요.'},
+      {who:'o', en:'Ha, same here. Are you traveling alone?'},
+      {who:'m', en:"I am. It's a little scary, but exciting.", ko:'네. 조금 무섭지만 설레요.'},
+      {who:'o', en:'I get that. Solo travel is the best way to meet people though.'},
+      {who:'m', en:"That's what I'm hoping for.", ko:'저도 그러길 바라고 있어요.'},
+      {who:'o', en:"A bunch of us are grabbing fish and chips after. You in?"},
+      {who:'m', en:'Count me in!', ko:'저도 갈래요!'},
+      {who:'o', en:"Nice. And Sunday we're doing a surfing lesson, if you want."},
+      {who:'m', en:'A surfing lesson? Count me in for that too.', ko:'서핑 수업이요? 그것도 갈래요.'} ], other:'Jack' },
+    aus3: { cat:'MAKING FRIENDS · 3/5', title:'Getting to Know Someone', lines:[
+      {who:'o', en:'So Narim, what do you do back home?'},
+      {who:'m', en:'I work at a design company in Seoul. What about you?', ko:'서울에서 디자인 회사에 다녀요. 당신은요?'},
+      {who:'o', en:"I'm a nurse. I'm taking a break before a new job."},
+      {who:'m', en:"That's brave. I've always wanted to take a long break like this.", ko:'용감하네요. 저도 늘 이런 긴 휴식을 원했어요.'},
+      {who:'o', en:"Well, you're doing it right now!"},
+      {who:'m', en:"True! I've always wanted to see Australia, and here I am.", ko:'맞아요! 늘 호주에 와보고 싶었는데, 드디어 왔네요.'},
+      {who:'o', en:'What made you choose Australia?'},
+      {who:'m', en:'The nature, mostly. And I wanted to practice my English.', ko:'자연 때문이 커요. 영어 연습도 하고 싶었고요.'},
+      {who:'o', en:'Your English is great, honestly.'},
+      {who:'m', en:'Thank you, that means a lot. What about you, where to next?', ko:'고마워요, 큰 힘이 돼요. 당신은 다음에 어디로 가요?'},
+      {who:'o', en:"New Zealand, maybe. We'll see."} ], other:'Emma' },
+    aus4: { cat:'MAKING FRIENDS · 4/5', title:"When You Don't Understand", lines:[
+      {who:'o', en:"We're heading to Manly this arvo. Wanna come?"},
+      {who:'m', en:'Sorry, could you say that again?', ko:'죄송한데 다시 한 번 말해줄래요?'},
+      {who:'o', en:"We're going to Manly beach this arvo."},
+      {who:'m', en:'What does "arvo" mean?', ko:'"arvo"가 무슨 뜻이에요?'},
+      {who:'o', en:"Oh, it's Aussie slang for afternoon."},
+      {who:'m', en:"Got it! Then yes, I'd love to come.", ko:'알겠어요! 그럼 저도 갈래요.'},
+      {who:'o', en:"Sweet. It's heaps nice there this time of year."},
+      {who:'m', en:'"Heaps"? What does that mean?', ko:'"heaps"는 무슨 뜻이에요?'},
+      {who:'o', en:'Ha, it means "very" or "a lot". You\'ll hear it heaps.'},
+      {who:'m', en:'Got it. Australians have their own English!', ko:'알겠어요. 호주만의 영어가 있네요!'},
+      {who:'o', en:'We do speak fast sometimes. Just ask anytime.'},
+      {who:'m', en:'Thanks. Sorry, could you say the meeting time again?', ko:'고마워요. 죄송한데 모이는 시간 다시 말해줄래요?'},
+      {who:'o', en:"Two o'clock, at the wharf."} ], other:'Jack' },
+    aus5: { cat:'MAKING FRIENDS · 5/5', title:'Making Plans to Meet Again', lines:[
+      {who:'o', en:'Today was so fun. We should hang out again before you leave.'},
+      {who:'m', en:'Definitely, we should! Are you free on Saturday?', ko:'꼭 그래요! 토요일에 시간 있어요?'},
+      {who:'o', en:"Saturday works. There's a night market in Chinatown."},
+      {who:'m', en:'Perfect, I love night markets. Add me on Instagram?', ko:'좋아요, 야시장 완전 좋아해요. 인스타 맞팔할래요?'},
+      {who:'o', en:"Sure, what's your handle?"},
+      {who:'m', en:"It's narim underscore travels. I'll follow you back.", ko:'narim_travels예요. 맞팔할게요.'},
+      {who:'o', en:"Done! I'll message you about Saturday."},
+      {who:'m', en:'Sounds good. And are you free on Sunday for the surfing lesson?', ko:'좋아요. 일요일 서핑 수업도 시간 돼요?'},
+      {who:'o', en:"Ha, you're really going for it. Yes, I'm in."},
+      {who:'m', en:'Great. We should hang out as much as we can!', ko:'좋아요. 있는 동안 최대한 자주 놀아요!'} ], other:'Emma' },
+    aus6: { cat:'CAFÉ JOB · 1/3', title:'Getting the Job', lines:[
+      {who:'m', en:'Hi, excuse me. I saw your sign outside. Are you hiring?', ko:'실례합니다. 밖에 공고를 봤는데, 직원 구하세요?'},
+      {who:'o', en:"We are! Summer's busy, so we're always hiring around now."},
+      {who:'m', en:"Great. I'd love to apply. I have café experience in Korea.", ko:'잘됐네요. 지원하고 싶어요. 한국에서 카페 경험이 있어요.'},
+      {who:'o', en:'Nice. Can you leave your resume with me?'},
+      {who:'m', en:"Sure, here it is. I'm on a working holiday visa.", ko:'네, 여기요. 워킹홀리데이 비자로 왔어요.'},
+      {who:'o', en:'Perfect. When are you available to start?'},
+      {who:'m', en:"I'm available right away, any day of the week.", ko:'바로 시작할 수 있어요. 요일 상관없어요.'},
+      {who:'o', en:'Good to know. Have you used an espresso machine before?'},
+      {who:'m', en:"Yes, and I'd love to learn your menu too.", ko:'네, 여기 메뉴도 배우고 싶어요.'},
+      {who:'o', en:'Lovely. The manager will call you this week.'},
+      {who:'m', en:'Thank you so much. I look forward to it.', ko:'정말 감사해요. 기다리고 있을게요.'} ], other:'직원' },
+    aus7: { cat:'CAFÉ JOB · 2/3', title:'Your First Shift', lines:[
+      {who:'m', en:'Hi, what can I get for you?', ko:'안녕하세요, 뭐 드릴까요?'},
+      {who:'o', en:'Can I get a large flat white, please?'},
+      {who:'m', en:'Sure. For here or takeaway?', ko:'네. 드시고 가세요, 가져가세요?'},
+      {who:'o', en:'Takeaway, thanks.'},
+      {who:'m', en:'Anything else for you?', ko:'더 필요한 건 없으세요?'},
+      {who:'o', en:'Hmm, is the banana bread good?'},
+      {who:'m', en:"It's really popular. We toast it with butter.", ko:'정말 인기 많아요. 버터에 구워드려요.'},
+      {who:'o', en:'Go on then, one of those too.'},
+      {who:'m', en:"Great. That's twelve dollars altogether.", ko:'좋아요. 전부 12달러예요.'},
+      {who:'o', en:'Here you go. Oh — actually, can you make it two flat whites?'},
+      {who:'m', en:'No worries. Anything else with that?', ko:'괜찮아요. 더 필요한 건요?'},
+      {who:'o', en:"No, that's everything."},
+      {who:'m', en:"Both takeaway as well? They're coming right up.", ko:'둘 다 테이크아웃이죠? 바로 준비해드릴게요.'},
+      {who:'o', en:'Yes please. Thanks so much.'},
+      {who:'m', en:'Two flat whites, coming right up!', ko:'플랫화이트 두 잔, 바로 나갑니다!'} ], other:'손님' },
+    aus8: { cat:'CAFÉ JOB · 3/3', title:'Making Friends at Work', lines:[
+      {who:'m', en:'Hey Mia, do you want a hand with the dishes?', ko:'미아, 설거지 도와줄까요?'},
+      {who:'o', en:"That'd be great, thanks. How's your first week going?"},
+      {who:'m', en:"It's going well. I'm getting faster with the coffee machine.", ko:'잘 지내고 있어요. 커피 머신도 점점 빨라지고요.'},
+      {who:'o', en:"You're doing great. The regulars like you already."},
+      {who:'m', en:'Really? That makes me so happy.', ko:'정말요? 너무 기뻐요.'},
+      {who:'o', en:"How's it going with the till? It confused me at first."},
+      {who:'m', en:"Honestly, still a little confusing. Can I ask you when I'm stuck?", ko:'솔직히 아직 좀 헷갈려요. 막히면 물어봐도 돼요?'},
+      {who:'o', en:'Of course, anytime. Do you want a hand closing up?'},
+      {who:'m', en:'Sure! Then we can leave together.', ko:'좋아요! 그럼 같이 퇴근해요.'},
+      {who:'o', en:'Deal. Some of us get dumplings after Friday shifts. Come along!'},
+      {who:'m', en:"I'd love that. See you tomorrow, Mia.", ko:'좋아요. 내일 봐요, 미아.'},
+      {who:'o', en:'See you tomorrow. Great work today.'} ], other:'Mia' } };
+  NARIM = [
+    { key:'aus1', grp:'social', title:'Making a First Friend', sub:'호스텔에서 처음 말 걸기 · "Mind if I join you?"' },
+    { key:'aus2', grp:'social', title:'Joining a Group Activity', sub:'같이 하고 싶을 때 · "Count me in"' },
+    { key:'aus3', grp:'social', title:'Getting to Know Someone', sub:'내 이야기 나누기 · "What about you?"' },
+    { key:'aus4', grp:'social', title:"When You Don't Understand", sub:'자연스럽게 되묻기 · "Could you say that again?"' },
+    { key:'aus5', grp:'social', title:'Making Plans to Meet Again', sub:'다음 약속 잡기 · "We should hang out"' },
+    { key:'aus6', grp:'job', title:'Getting the Job', sub:'일자리 묻고 지원하기 · "Are you hiring?"' },
+    { key:'aus7', grp:'job', title:'Your First Shift', sub:'주문 받기 · "For here or takeaway?"' },
+    { key:'aus8', grp:'job', title:'Making Friends at Work', sub:'동료와 친해지기 · "Do you want a hand?"' } ];
+  componentWillUnmount() { clearTimeout(this.t); }
+  arcDone() { try { return JSON.parse(localStorage.getItem('wayve_narim_arc_done') || '[]'); } catch(e) { return []; } }
+  markArcDone(key) {
+    if (!key.startsWith('aus')) return;
+    const done = this.arcDone();
+    if (!done.includes(key)) { done.push(key); localStorage.setItem('wayve_narim_arc_done', JSON.stringify(done)); }
+  }
+  pace() { return (this.props.paceMs ?? 2400) * (this.state.slow ? 1.6 : 1); }
+  after(ms, fn) { clearTimeout(this.t); this.t = setTimeout(fn, ms); }
+  scn() { return this.SCN[this.state.scn]; }
+  meLines() { return this.scn().lines.filter(l => l.who === 'm'); }
+  pick(key) {
+    this.setState({ scn:key, screen:'listen', lineIdx:0, playing:true, startTs:Date.now() });
+    this.after(this.pace(), () => this.advance());
+  }
+  advance() {
+    const len = this.scn().lines.length;
+    if (this.state.lineIdx + 1 >= len) { this.setState({ screen:'listenDone', playing:false }); }
+    else { this.setState({ lineIdx:this.state.lineIdx + 1 }); this.after(this.pace(), () => this.advance()); }
+  }
+  startShadowPhase() {
+    this.setState({ phase:'wavi' });
+    this.after(1900, () => this.setState({ phase:'ready' }));
+  }
+  renderVals() {
+    const s = this.state, scn = this.scn(), lines = scn.lines, showKo = this.props.showKorean ?? true;
+    const me = this.meLines();
+    const seg = (on, green) => ({ width:'20px', height:'3px', borderRadius:'2px', background: green ? '#7ED892' : (on ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.18)') });
+    const lo = Math.max(0, Math.min(s.lineIdx - 1, lines.length - 3));
+    const lineViews = lines.slice(lo, lo + 3).map((l, i) => {
+      const idx = lo + i, cur = idx === s.lineIdx, isMe = l.who === 'm';
+      return {
+        en: l.en, ko: (isMe && showKo && cur) ? l.ko : '', label: isMe ? '나' : scn.other,
+        wrapStyle: { alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth:'88%', display:'flex', flexDirection:'column', gap:'4px', opacity: cur ? 1 : 0.4, transition:'opacity 0.4s' },
+        labelStyle: { fontSize:'11px', fontWeight:800, color: isMe ? '#8FB5FF' : 'rgba(255,255,255,0.4)', textAlign: isMe ? 'right' : 'left', padding:'0 4px' },
+        bubbleStyle: isMe
+          ? { background:'rgba(62,123,250,0.22)', border: cur ? '1.5px solid rgba(62,123,250,0.5)' : '1px solid rgba(62,123,250,0.25)', borderRadius:'18px 6px 18px 18px', padding:'12px 15px', display:'flex', flexDirection:'column', gap:'4px' }
+          : { background:'rgba(255,255,255,0.09)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'6px 18px 18px 18px', padding:'11px 15px' },
+        enStyle: { fontSize: cur && isMe ? '15px' : '14px', fontWeight: isMe ? 800 : 400, color: isMe ? '#fff' : 'rgba(255,255,255,0.7)', lineHeight:1.5 },
+        koStyle: { fontSize:'12px', color:'rgba(255,255,255,0.55)' } };
+    });
+    const cur = me[Math.min(s.shadowIdx, me.length - 1)] || { en:'', ko:'' };
+    const pill = (active, blue) => ({ cursor:'pointer', flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:'7px',
+      background: active ? 'rgba(126,216,146,0.25)' : (blue ? 'rgba(62,123,250,0.22)' : 'rgba(255,255,255,0.1)'),
+      border: active ? '1px solid rgba(126,216,146,0.55)' : (blue ? '1px solid rgba(62,123,250,0.4)' : '1px solid rgba(255,255,255,0.18)'),
+      borderRadius:'100px', padding:'11px 0', fontSize:'13px', fontWeight:800, color:'#fff', transition:'all 0.2s' });
+    const barH = [8,16,24,12,20,10,18,7];
+    return {
+      screenBg: s.screen === 'picker' ? '#F2F3F7' : 'linear-gradient(180deg, #0B1F3A 0%, #16345C 55%, #0B1F3A 100%)',
+      isPicker: s.screen === 'picker', isListen: s.screen === 'listen', isListenDone: s.screen === 'listenDone',
+      isShadow: s.screen === 'shadow', isSummary: s.screen === 'summary',
+      pickCafe: () => this.pick('cafe'), pickTaxi: () => this.pick('taxi'), pickSmall: () => this.pick('small'),
+      narimProgressLabel: (() => { const n = this.NARIM.filter(c => this.arcDone().includes(c.key)).length; return n >= this.NARIM.length ? '아크 완료! 🎉' : n + '/' + this.NARIM.length + ' 완료'; })(),
+      narimProgressSegs: this.NARIM.map(c => ({ style: { flex:1, height:'4px', borderRadius:'2px', background: this.arcDone().includes(c.key) ? '#2FB344' : 'rgba(22,24,29,0.1)', transition:'background 0.3s' } })),
+      ...(() => {
+        const done = this.arcDone();
+        const nextKey = (this.NARIM.find(c => !done.includes(c.key)) || {}).key;
+        const mk = (c, i) => {
+          const isDone = done.includes(c.key), isNext = c.key === nextKey;
+          return {
+            title: c.title, sub: c.sub, pick: () => this.pick(c.key),
+            badge: isDone ? '✓' : String(i + 1),
+            badgeStyle: { width:'30px', height:'30px', borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', fontWeight:800,
+              background: isDone ? '#2FB344' : 'rgba(62,123,250,0.1)', color: isDone ? '#fff' : '#3E7BFA' },
+            cardStyle: { cursor:'pointer', background:'#FFFFFF', borderRadius:'16px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'12px',
+              boxShadow:'0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.05)',
+              border: isNext ? '1.5px solid #3E7BFA' : '1.5px solid transparent', opacity: isDone ? 0.65 : 1 },
+            titleStyle: { fontSize:'14px', fontWeight:800, color:'#16181D' },
+            cta: isDone ? '다시 →' : (isNext ? '이어서 →' : '시작 →'),
+            ctaStyle: { fontSize:'12px', fontWeight:700, color: isDone ? '#9DA0A8' : '#3E7BFA', flexShrink:0 } };
+        };
+        return { narimSocialCards: this.NARIM.filter(c => c.grp === 'social').map(mk), narimJobCards: this.NARIM.filter(c => c.grp === 'job').map(mk) };
+      })(),
+      scnCat: scn.cat, scnTitle: scn.title,
+      segs: lines.map((_, i) => ({ style: seg(i <= s.lineIdx, false) })),
+      doneSegs: lines.map(() => ({ style: seg(true, true) })),
+      progressLabel: (s.lineIdx + 1) + ' / ' + lines.length + ' 문장',
+      lineViews,
+      playing: s.playing, paused: !s.playing,
+      togglePlay: () => {
+        if (s.playing) { clearTimeout(this.t); this.setState({ playing:false }); }
+        else { this.setState({ playing:true }); this.after(this.pace(), () => this.advance()); }
+      },
+      replay: () => { this.setState({ lineIdx: Math.max(0, s.lineIdx - 1), playing:true }); this.after(this.pace(), () => this.advance()); },
+      nextLine: () => this.advance(),
+      toggleSlow: () => this.setState({ slow: !s.slow }),
+      slowStyle: { cursor:'pointer', background: s.slow ? '#fff' : 'rgba(255,255,255,0.07)', color: s.slow ? '#0B1F3A' : 'rgba(255,255,255,0.6)', fontSize:'12px', fontWeight:700, padding:'8px 12px', borderRadius:'100px', transition:'all 0.2s' },
+      startShadow: () => { this.setState({ screen:'shadow', shadowIdx:0 }); this.startShadowPhase(); },
+      shadowLabel: (Math.min(s.shadowIdx + 1, me.length)) + '/' + me.length,
+      shadowEn: cur.en, shadowKo: showKo ? cur.ko : '',
+      shadowKoStyle: { fontSize:'14px', color:'rgba(255,255,255,0.55)' },
+      waviRingStyle: { width:'96px', height:'96px', borderRadius:'50%', overflow:'hidden', border:'3px solid rgba(255,255,255,0.2)', marginTop:'4px',
+        boxShadow: s.phase === 'wavi' ? '0 0 0 10px rgba(62,123,250,0.25)' : '0 0 0 10px rgba(62,123,250,0.1)', transition:'box-shadow 0.4s' },
+      isPhaseWavi: s.phase === 'wavi', isPhaseReady: s.phase === 'ready', isPhaseRecording: s.phase === 'recording', isPhaseCompare: s.phase === 'compare',
+      record: () => { this.setState({ phase:'recording', playback:null }); this.after(2600, () => this.setState({ phase:'compare' })); },
+      playWavi: () => { this.setState({ playback:'wavi' }); this.after(1500, () => this.setState({ playback:null })); },
+      playMine: () => { this.setState({ playback:'mine' }); this.after(1500, () => this.setState({ playback:null })); },
+      waviPillStyle: pill(s.playback === 'wavi', true), minePillStyle: pill(s.playback === 'mine', false),
+      waveBars: barH.map((h, i) => ({ style: { width:'4px', height:h + 'px', borderRadius:'2px', background: s.playback === 'mine' ? '#7ED892' : 'rgba(255,255,255,0.4)', transition:'background 0.3s', animation: s.playback ? ('barBounce 0.6s ease-in-out ' + (i * 0.08) + 's infinite') : 'none' } })),
+      nextShadow: () => {
+        if (s.shadowIdx + 1 >= me.length) { this.markArcDone(s.scn); this.setState({ screen:'summary' }); }
+        else { this.setState({ shadowIdx: s.shadowIdx + 1 }); this.startShadowPhase(); }
+      },
+      summaryLine: Math.max(1, Math.round((Date.now() - (s.startTs || Date.now())) / 60000)) + '분 · 표현 ' + me.length + '개가 입에 붙었어요',
+      shadowedPhrases: me.map(l => ({ en: l.en })),
+      goHome: () => { clearTimeout(this.t); this.setState({ screen:'picker', lineIdx:0, playing:false, shadowIdx:0, phase:'wavi', playback:null }); },
+      listenAgain: () => { this.setState({ screen:'listen', lineIdx:0, playing:true }); this.after(this.pace(), () => this.advance()); }
+    };
+  }
+}
+</script>
+</body>
+</html>
