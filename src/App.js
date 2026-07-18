@@ -17309,7 +17309,7 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
 
 const WAVY_VOICE_ID = "XrExE9yKIg1WjnnlVkGX"; // ElevenLabs Matilda — friendly, professional, multilingual
 const SCENARIO_OTHER_VOICE_ID = "UgBBYS2sOqTuMpoF3BR0"; // Second voice — the "other person" in Listen Mode scenarios
-const WAVY_BUILD = "0718-a"; // visible build tag in the scenario player top bar — bump to confirm a fresh load
+const WAVY_BUILD = "0718-b"; // visible build tag in the scenario player top bar — bump to confirm a fresh load
 
 // ── Audio cache ───────────────────────────────────────────────────────────────
 const wavyAudioCache = new Map();
@@ -18210,6 +18210,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       if (initialScenarioId) {
         const sc = await loadScenarioById(initialScenarioId);
         if (sc && sc.lines.length) {
+          scenarioRef.current = sc.scenario; // set synchronously so playback reads the real other_voice_id
           setScenario(sc.scenario);
           setScenarioLines(sc.lines);
           setScenarioIdx(0);
@@ -18396,6 +18397,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // ── Controlled scenario player (pause / resume / replay / speed) ──
   const pausedRef = useRef(false);
   const rateRef = useRef(1);
+  const scenarioRef = useRef(null); // the loaded scenario — read by playback closures (the `scenario` STATE closure is stale when runScenario fires via setTimeout)
   const intentResolveRef = useRef(null);  // resolves the advance-gate with "advance" | "replay"
   const resumeResolveRef = useRef(null);  // resolves waitWhilePaused on resume
   const autoTimerRef = useRef(null);      // auto-advance timer at the gate
@@ -18516,7 +18518,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
   // Play one line at the current rate; loop on replay; honor pause. Returns when it's time
   // to advance. Single audio stream at a time — fixes the replay race.
   const presentLine = async (line) => {
-    const voiceId = line.speaker === "student" ? WAVY_VOICE_ID : (scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID);
+    const voiceId = line.speaker === "student" ? WAVY_VOICE_ID : (scenarioRef.current?.other_voice_id || SCENARIO_OTHER_VOICE_ID);
     for (;;) {
       if (shouldBail()) return;
       await waitWhilePaused();
@@ -18654,7 +18656,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     setScenarioIdx(0);
     shadowedPhrasesRef.current = [];
     const isFramingLine = (l) => l.speaker === "student" && !/[a-zA-Z]/.test(l.english_text || "");
-    const otherVoice = scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
+    const otherVoice = scenarioRef.current?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
     await scenarioSay("좋아요! 제가 먼저 문장을 들려드릴게요. 그다음 따라 말해보세요.", WAVY_VOICE_ID);
     for (let i = 0; i < lines.length; i++) {
       if (shouldBail()) return;
@@ -20347,7 +20349,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     const slow = playbackRate <= 0.7;
     const dialogueCount = scenarioLines.filter(l => !isFraming(l)).length;
     const curDialogueNo = scenarioLines.slice(0, scenarioIdx + 1).filter(l => !isFraming(l)).length;
-    const otherVoice = scenario?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
+    const otherVoice = scenarioRef.current?.other_voice_id || SCENARIO_OTHER_VOICE_ID;
     const cBtn = (label, onClick, primary) => React.createElement("button", { onClick, style: { flex: 1, background: primary ? "#3E7BFA" : "rgba(255,255,255,0.09)", border: primary ? "none" : "1px solid rgba(255,255,255,0.16)", color: primary ? "#fff" : "rgba(255,255,255,0.92)", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: FONT, padding: "13px 16px", borderRadius: "100px", boxShadow: primary ? "0 6px 18px rgba(62,123,250,0.42)" : "none", WebkitTapHighlightColor: "transparent" } }, label);
     // v3 player controls: SVG-icon buttons + a circular primary (matches ListenPlayerV3), not emoji pills.
     const svgIcon = (d, sz = 22) => React.createElement("svg", { width: sz, height: sz, viewBox: "0 0 24 24", fill: "currentColor" }, Array.isArray(d) ? d.map((x, i) => React.createElement("path", { key: i, d: x })) : React.createElement("path", { d }));
