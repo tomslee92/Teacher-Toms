@@ -17309,7 +17309,6 @@ function WaviHomeScreen({ user, group, lang, onGoToApp, onQodSubmitted }) {
 
 const WAVY_VOICE_ID = "XrExE9yKIg1WjnnlVkGX"; // ElevenLabs Matilda — friendly, professional, multilingual
 const SCENARIO_OTHER_VOICE_ID = "UgBBYS2sOqTuMpoF3BR0"; // Second voice — the "other person" in Listen Mode scenarios
-const WAVY_BUILD = "0718-b"; // visible build tag in the scenario player top bar — bump to confirm a fresh load
 
 // ── Audio cache ───────────────────────────────────────────────────────────────
 const wavyAudioCache = new Map();
@@ -20364,7 +20363,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
         React.createElement("div", { style: { fontSize: "14px", fontWeight: "800", color: "#fff", display: "flex", alignItems: "center", gap: "5px", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, React.createElement("span", null, "🌊"), React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis" } }, scenario ? scenario.title : "Wavi")),
         isTomsAcct
           ? React.createElement("button", { onClick: () => setShowScenarioChar(v => !v), title: "Toggle character (A/B)", style: { background: showScenarioChar ? "rgba(255,255,255,0.16)" : "transparent", border: "1px solid rgba(255,255,255,0.18)", color: "#fff", fontSize: "13px", cursor: "pointer", fontFamily: FONT, padding: "5px 9px", borderRadius: "100px" } }, "👤")
-          : React.createElement("div", { style: { fontSize: "9px", color: "rgba(255,255,255,0.4)", fontWeight: "700", letterSpacing: "0.5px" } }, WAVY_BUILD)
+          : React.createElement("div", { style: { width: "30px" } })
       ),
       // Scene-setter screen
       scenarioIntroText && React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 30px", gap: "20px", animation: "scFade 0.5s ease both" } },
