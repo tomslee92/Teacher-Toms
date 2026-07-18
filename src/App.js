@@ -23230,17 +23230,18 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
         const reqRows = await db.get("class_requests", `student_id=eq.${user.id}&status=neq.covered&kind=neq.phrase&select=id`).catch(() => []);
         if (!cancelled) setOpenRequests((reqRows || []).length);
 
-        if (scenariosVisible) {
+        {
+          // Assigned scenarios ALWAYS show — assign in the Builder → the student sees it, no
+          // allowlist/flag/deploy needed. The starter set shows only for allowlisted / flag /
+          // teacher accounts (scenariosVisible).
           const aOrs = ["and(student_id.is.null,group_id.is.null)", `student_id.eq.${user.id}`];
           if (group?.id) aOrs.push(`group_id.eq.${group.id}`);
           const assigns = await db.get("scenario_assignments", `or=(${aOrs.join(",")})&select=scenario_id`).catch(() => []);
           const ids = [...new Set((assigns || []).map(a => a.scenario_id))];
           let scenarioRows = [];
           if (ids.length) {
-            // Assigned wins. Order by sort_order so collection arcs render in sequence.
             scenarioRows = await db.get("scenarios", `id=in.(${ids.join(",")})&is_active=eq.true&order=sort_order.asc.nullslast,created_at.desc`).catch(() => []);
-          } else {
-            // No assignment → the starter set (⑪C first-scenario picker).
+          } else if (scenariosVisible) {
             scenarioRows = await db.get("scenarios", `is_starter=eq.true&is_active=eq.true&order=created_at.asc`).catch(() => []);
           }
           const comps = await db.get("scenario_completions", `student_id=eq.${user.id}&select=scenario_id`).catch(() => []);
@@ -23366,7 +23367,7 @@ function HomeGridV3({ user, group, isPreview, onNavigate, streak, onOpenProfile,
       chevron(T3.ink3)
     ),
     // 추천 세션 — curated Listen sessions (gated; only when assigned)
-    scenariosVisible && scenarios.length > 0 && (() => {
+    scenarios.length > 0 && (() => {
       const done = (sc) => completedScenarioIds.has(sc.id);
       // A scenario card. `ordered` = the sequence it belongs to (drives 이어서 vs 시작).
       const card = (sc, ordered, badge) => {
