@@ -18664,8 +18664,8 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       await sleep(220);
       if (shouldBail()) return;
       if (isFramingLine(line)) {
-        // Wavi's Korean aside — play it, never ask to shadow it.
-        await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID);
+        // Skip the Korean scene-setter during shadowing — it's spoken only on the first listen pass.
+        continue;
       } else if (line.speaker === "student") {
         // Wavi models the line, then the student shadows → self-comparison (no scoring).
         await scenarioSay(fillName(line.english_text), WAVY_VOICE_ID);
@@ -18700,7 +18700,7 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
     if (shouldBail()) return;
     setShadowMode(false);
     // ⑪B — the ONLY persistence in this flow: mark this scenario complete (upsert; re-runnable, no counter).
-    if (scenario?.id) db.upsert("scenario_completions?on_conflict=student_id,scenario_id", { student_id: user.id, scenario_id: scenario.id }).catch(() => {});
+    if (scenarioRef.current?.id) db.upsert("scenario_completions?on_conflict=student_id,scenario_id", { student_id: user.id, scenario_id: scenarioRef.current.id }).catch(() => {});
     const durSec = Math.round((Date.now() - (sessionStartTimeRef.current || Date.now())) / 1000);
     if (durSec > 1) { try { reportWaviSessionTime(user.id, durSec); } catch(_) {} }
     setShadowSummary({ minutes: Math.max(1, Math.round(durSec / 60)), phrases: shadowedPhrasesRef.current.slice() });
@@ -20435,12 +20435,10 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
                       React.createElement("div", { style: { display: "flex", gap: "10px", width: "100%" } },
                         cBtn("다시 녹음", () => answerShadowCompare("redo")),
                         cBtn("다음 문장 →", () => answerShadowCompare("next"), true)
-                      ),
-                      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)" } }, "점수 없음 · 몇 번이든 괜찮아요")
+                      )
                     )
                   : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" } },
-                      React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: wavyState === "listening" ? "#6FA0FF" : scShadowPraise ? "#4ADE80" : "rgba(255,255,255,0.6)", minHeight: "16px" } }, wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "잠깐만요…"),
-                      React.createElement("div", { style: { fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.4)" } }, "점수 없음 · 몇 번이든 괜찮아요")
+                      React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: wavyState === "listening" ? "#6FA0FF" : scShadowPraise ? "#4ADE80" : "rgba(255,255,255,0.6)", minHeight: "16px" } }, wavyState === "listening" ? "🎤 말해보세요…" : scShadowPraise ? "✓ 좋아요!" : wavyState === "speaking" ? "듣는 중…" : "잠깐만요…")
                     ))
               : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" } },
                   React.createElement("div", { style: { fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.45)", minHeight: "14px" } }, wavyState === "speaking" ? "듣는 중…" : paused ? "멈춤" : "따라 들어보세요"),
@@ -23165,7 +23163,7 @@ function ListenPlayerV3({ phrase, onClose, onDone }) {
 // Display metadata for curated scenario collections (⑪C collection group).
 const COLLECTION_META = {
   "narim-australia": {
-    title: "나림 · 호주 한 달 준비",
+    title: "호주 여행 준비",
     parts: [{ label: "PART 1 · 친구 사귀기", from: 1, to: 5 }, { label: "PART 2 · 카페에서 일하기", from: 6, to: 8 }],
   },
 };
