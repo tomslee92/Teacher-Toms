@@ -888,6 +888,7 @@ const sb = async (path, opts = {}) => {
   // drop apikey/Authorization (that caused upserts to 401 "No API key found").
   const { headers: extraHeaders, prefer, ...rest } = opts;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    cache: "no-store", // always read fresh — never serve stale rows (e.g. an updated scenario voice) from the browser HTTP cache
     ...rest,
     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": prefer || "return=representation", ...extraHeaders },
   });
@@ -18590,9 +18591,9 @@ function WavyScreen({ user, group, lang, onClose, sessionMode = "normal", onSess
       if (shouldBail()) return;
       await sleep(700);
       setScenarioIntroText(null);
-    } else {
-      await scenarioSay(`${firstName ? firstName + ", " : ""}오늘은 같이 상황을 연습해볼게요. 편하게 듣고 따라오시면 돼요.`, WAVY_VOICE_ID);
     }
+    // No generic spoken intro: the first scenario_line (the Korean scene-setter) is both
+    // spoken AND shown, so the audio matches the subtitle from the very first line.
     const listenCounts = []; // exposure count per student line this pass → min = total full listens
     for (let i = 0; i < lines.length; i++) {
       if (shouldBail()) return;
